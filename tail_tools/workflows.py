@@ -4,7 +4,7 @@ import os, math, glob
 import nesoni
 from nesoni import config, working_directory, io, reporting
 
-from tail_tools import clip_runs, extend_sam, ratios
+from tail_tools import clip_runs, extend_sam, proportions
 
 
 class Tail_only(config.Action_filter):
@@ -92,6 +92,7 @@ class Analyse_polya(config.Action_with_output_dir):
 
 @config.String_flag('title', 'Analysis report title')
 @config.String_flag('file_prefix', 'Prefix for report files')
+@config.String_flag('blurb', 'Introductory HTML text for report')
 @config.String_flag('genome', 'IGV .genome file, to produce IGV plots')
 @config.String_flag('genome_dir', 'IGV directory of reference sequences to go with .genome file')
 @config.Bool_flag('include_genome', 'Include genome in IGV plots zip file?')
@@ -101,6 +102,8 @@ class Analyse_polya(config.Action_with_output_dir):
 class Analyse_polya_batch(config.Action_with_output_dir):
     file_prefix = ''
     title = '3\'seq analysis'
+    blurb = ''
+    
     genome = None
     genome_dir = None
     include_genome = True
@@ -192,7 +195,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             ) )
 
 
-        ratio_heatmaps = [ ]
+        proportion_heatmaps = [ ]
         for min_min, min_max in [
             (10, 50),
             (50, 50),
@@ -200,8 +203,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             (250, 250),
         ]:
             for fold in [ 1.5, 2.0, 4.0 ]:
-                ratio_heatmaps.append( ratios.Ratios(
-                    workspace/('ratio-heatmap-%.1ffold-%dminmin-%dminmax' % (fold, min_min, min_max)),
+                proportion_heatmaps.append( proportions.Proportions_heatmap(
+                    workspace/('proportions-heatmap-%.1ffold-%dminmin-%dminmax' % (fold, min_min, min_max)),
                     workspace/'counts.txt',
                     workspace/'counts-polyA.txt',
                     min_fold=fold,
@@ -209,9 +212,17 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                     min_max=min_max,
                 ))
 
-        stats = nesoni.Stats(*self.reads, output=workspace/'stats.txt')
+        extra = [ 
+            nesoni.Stats(*self.reads, output=workspace/'stats.txt'),
+            
+            proportions.Proportions(workspace/'proportions',
+                    workspace/'counts.txt',
+                    workspace/'counts-polyA.txt',
+                    norm_file=workspace/'counts-norm.txt'
+            )
+        ]
 
-        nesoni.parallel_map(nesoni.make, heatmaps + ratio_heatmaps + [stats])
+        nesoni.parallel_map(nesoni.make, heatmaps + proportion_heatmaps + extra)
         
         # Make a normalization file for all
         f_in = workspace.open('counts-norm.txt', 'rb')
@@ -230,6 +241,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         #===============================================
 
         r = reporting.Reporter(os.path.join(self.output_dir, 'report'), self.title, self.file_prefix)
+        
+        r.write(self.blurb)
         
         r.heading('Alignment to reference')
         
@@ -279,7 +292,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         for heatmap in heatmaps:
             r.report_heatmap(heatmap)
 
-        r.heading('Heatmaps of the proportion of poly-A reads')
+        r.heading('Proportion of poly-A reads')
+        
+        r.p( r.get(workspace/'proportions.csv') )
         
         r.p(
            'Genes were selected based on there being at least some number of reads '
@@ -289,8 +304,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
            'of two samples of at least some amount (fold).'
         )
                         
-        for ratio in ratio_heatmaps:
-            r.report_heatmap(ratio)
+        for prop in proportion_heatmaps:
+            r.report_heatmap(prop)
 
         r.close()
 

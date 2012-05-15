@@ -3,7 +3,52 @@ import nesoni
 from nesoni import config, runr
 
 @config.help(
-'Examine ratios.',
+'Create a file of proportions of poly-A reads.'
+)
+@config.String_flag('norm_file', 'Normalization file.')
+@config.Positional('all', 'Output from "nesoni count:" using all reads.')
+@config.Positional('polya', 'Output from "nesoni count:" using only poly-A reads.')
+class Proportions(runr.R_action, config.Action_with_prefix):
+    norm_file = None
+    all = None
+    polya = None
+
+    script = """
+        library(nesoni)
+        
+        all.dgelist <- read.counts(all, norm.file=norm_file)
+        polya.dgelist <- read.counts(polya)
+        
+        all <- all.dgelist$counts
+        polya <- polya.dgelist$counts
+        proportions <- polya / all
+        colnames(proportions) <- colnames(all)
+        
+        result <- data.frame(
+            Feature = rownames(all.dgelist$genes),
+            all.dgelist$genes,
+            check.names = FALSE
+        )
+        
+        for(name in colnames(proportions))
+            result[,paste(name,'prop')] <- proportions[,name]
+
+        for(name in colnames(all))
+            result[,paste(name,'norm')] <- all[,name] * all.dgelist$samples[name,'normalizing.multiplier']
+        
+        sink(sprintf("%s.csv", prefix))
+        
+        cat('# prop columns give the proportion of reads with poly-A tails\n')
+        cat('# norm columns give the normalized number of reads\n') 
+        cat('#\n')        
+        write.csv(result, row.names=FALSE)
+        
+        sink()        
+    """
+ 
+
+@config.help(
+'Plot heatmap of proportions of reads with poly-A tails.',
 )
 @config.Int_flag('min_min', 'For a gene to be included, all samples must have this many reads aligning.')
 @config.Int_flag('min_max', 'For a gene to be included, at least one sample must have this many reads aligning.')
@@ -12,7 +57,7 @@ from nesoni import config, runr
     'must be this many times larger than the ratio in some other sample.')
 @config.Positional('all', 'Output from "nesoni count:" using all reads.')
 @config.Positional('polya', 'Output from "nesoni count:" using only poly-A reads.')
-class Ratios(runr.R_action, config.Action_with_prefix):
+class Proportions_heatmap(runr.R_action, config.Action_with_prefix):
     all = None
     polya = None
     min_min = 10
