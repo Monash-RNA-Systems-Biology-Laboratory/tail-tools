@@ -1,0 +1,30 @@
+
+
+This is a Python 2 based suite of tools for analysing SOLiD sequencing
+reads with poly-A tails.
+
+Use of PyPy is recommened for speed.
+
+This package depends on "nesoni", available from 
+
+   http://vicbioinformatics.com/nesoni.shtml
+
+You don't need to install all of nesoni's dependencies, just Python 2.7 
+or later or PyPy.
+
+
+This package contains three utilities:
+    
+  python tail_tools/fasta_qual_merge.py
+    - Merge FASTA and qual files into a single FASTQ file.
+    
+  python tail_tools/clip_runs.py
+    - Clip poly-A tails and low quality sequence from the ends of SOLiD 
+      reads before alignment.
+    
+  python tail_tools/extend_sam.py
+    - If the reference truly did contain As, re-extend SAM alignments.
+    - Mark SAM records of reads with with poly-A tails as such.
+    
+
+These tools may also be used as part of a nesoni-style workflow python script.
