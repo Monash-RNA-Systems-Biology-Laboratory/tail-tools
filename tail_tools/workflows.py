@@ -21,6 +21,14 @@ class Tail_only(config.Action_filter):
         self.end_output(fout)
 
 
+@config.help(
+'Create nesoni working directories for a single sample.',
+"""\
+Reads are clipped using "clip-runs:", aligned using SHRiMP, extended using "extend-sam:" and \
+imported into a nesoni working directory.
+
+Directories are created both using all reads and for reads with a poly-A tail.
+""")
 @config.Bool_flag('consensus', 'Look for SNPs and indels.')
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
 @config.Positional('reads', 'Fastq file containing SOLiD reads.')
@@ -97,6 +105,11 @@ class Analyse_polya(config.Action_with_output_dir):
 
 
 
+@config.help(
+'Analyse a set of samples and produce an HTML report, including depth of coverage plots, heatmaps, etc.',
+"""\
+
+""")
 @config.String_flag('title', 'Analysis report title')
 @config.String_flag('file_prefix', 'Prefix for report files')
 @config.String_flag('blurb', 'Introductory HTML text for report')
