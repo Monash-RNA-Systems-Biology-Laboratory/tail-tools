@@ -21,11 +21,14 @@ class Tail_only(config.Action_filter):
         self.end_output(fout)
 
 
+@config.Bool_flag('consensus', 'Look for SNPs and indels.')
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
 @config.Positional('reads', 'Fastq file containing SOLiD reads.')
 class Analyse_polya(config.Action_with_output_dir):
     reference = None
     reads = None
+    
+    consensus = True
     
     def run(self):
         polya_dir = os.path.normpath(self.output_dir) + '-polyA'
@@ -43,50 +46,54 @@ class Analyse_polya(config.Action_with_output_dir):
         extended_filename = working.object_filename('alignments_extended.sam.gz')
         polya_filename = working.object_filename('alignments_extended_polyA.sam.gz')
         
-        nesoni.make(clip_runs.Clip_runs(
+        clip_runs.Clip_runs(
             self.reads,
             output=clipped_filename,
-        ))
+        ).make()
         
         cores = nesoni.coordinator().get_cores()
         
-        nesoni.make(nesoni.Execute(
+        nesoni.Execute(
             command = reference.shrimp_command(cs=True) + 
                       [ clipped_filename, '-N', str(cores) ],
             output=raw_filename,
             cores=cores,
-        ))
+        ).make()
                 
-        nesoni.make(extend_sam.Extend_sam(
+        extend_sam.Extend_sam(
             input=raw_filename,
             output=extended_filename,
             reads_filename=self.reads,
             reference_filenames=[ reference.reference_fasta_filename() ],
-        ))
+        ).make()
         
-        nesoni.make(Tail_only(
+        Tail_only(
             input=extended_filename,
             output=polya_filename,
-        ))
+        ).make()
         
         @nesoni.parallel_for([
             (extended_filename, self.output_dir),
             (polya_filename, polya_dir),
         ])
         def _((sam_filename, directory)):
-            nesoni.make(nesoni.Import(
+            nesoni.Import(
                 input=sam_filename,
                 output_dir=directory,
                 reference=[ self.reference ],
-            ))
+            ).make()
             
-            nesoni.make(nesoni.Consensus(
+            if self.consensus:
+                tool = nesoni.Consensus
+            else:
+                tool = nesoni.Filter 
+            tool(
                 working_dir=directory,
                 monogamous=False,
                 random=True,
                 infidelity=0,
                 userplots=False,
-            ))
+            ).make()
 
 
 
@@ -96,13 +103,18 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.String_flag('genome', 'IGV .genome file, to produce IGV plots')
 @config.String_flag('genome_dir', 'IGV directory of reference sequences to go with .genome file')
 @config.Bool_flag('include_genome', 'Include genome in IGV plots zip file?')
+@config.Int_flag('nmf', 'Perform non-negative matrix factorization up to this rank. '
+                        'Defaults to the number of samples.')
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
 @config.Main_section('reads', 'Fastq files containing SOLiD reads.')
+@config.Configurable_section('analyse', 'Parameters for each "analyse-polya:"')
 @config.Configurable_section('count', 'Parameters for "nesoni count:"')
+@config.Section('extra_files', 'Extra files to include in report')
 class Analyse_polya_batch(config.Action_with_output_dir):
     file_prefix = ''
     title = '3\'seq analysis'
     blurb = ''
+    extra_files = [ ]
     
     genome = None
     genome_dir = None
@@ -110,9 +122,13 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     reference = None
     reads = [ ]
     
+    nmf = None
+    
     count = nesoni.Count(
         filter='existing'
     )
+    
+    analyse = Analyse_polya()
 
     def run(self):
         names = [
@@ -133,7 +149,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
 
         @nesoni.parallel_for(zip(self.reads, dirs))
         def loop((reads_filename, directory)):
-            Analyse_polya(
+            self.analyse(
                 output_dir=directory,
                 reference=self.reference,
                 reads=reads_filename,
@@ -172,6 +188,17 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                         delete_igv = False,
                     ))
 
+        # Make a normalization file for all
+        f_in = workspace.open('counts-norm.txt', 'rb')
+        f_out = workspace.open('counts-norm-all.txt', 'wb')
+        f_out.write(f_in.readline())
+        for line in f_in:
+            parts = line.rstrip('\n').split('\t')
+            print >> f_out, '\t'.join(parts)
+            parts[0] += '-polyA'
+            print >> f_out, '\t'.join(parts)            
+        f_in.close()
+        f_out.close()
 
         heatmaps = [ ]
         for fold, min_count in [
@@ -194,6 +221,25 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 min_span = math.log(fold)/math.log(2.0),                        
             ) )
 
+
+        both_heatmaps = [ ]
+        for deviations, min_count in [
+            (1.0, 10),
+            (1.0, 50),
+            (1.0, 250),
+            
+            (2.0, 10),
+            (2.0, 50),
+            (2.0, 250),
+        ]:
+            both_heatmaps.append( nesoni.Heatmap(
+                workspace/('both-heatmap-%.1fsvd-%dminmax'% (deviations,min_count)),
+                workspace/'counts-both.txt',
+                norm_file = workspace/'counts-both-norm.txt',
+                min_total = 0,
+                min_max = min_count,
+                min_svd = deviations,                        
+            ) )
 
         proportion_heatmaps = [ ]
         for min_min, min_max in [
@@ -222,20 +268,29 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             )
         ]
 
-        nesoni.parallel_map(nesoni.make, heatmaps + proportion_heatmaps + extra)
+        nesoni.parallel_map(nesoni.make, heatmaps + both_heatmaps + proportion_heatmaps + extra)
         
-        # Make a normalization file for all
-        f_in = workspace.open('counts-norm.txt', 'rb')
-        f_out = workspace.open('counts-norm-all.txt', 'wb')
-        f_out.write(f_in.readline())
-        for line in f_in:
-            parts = line.rstrip('\n').split('\t')
-            print >> f_out, '\t'.join(parts)
-            parts[0] += '-polyA'
-            print >> f_out, '\t'.join(parts)            
-        f_in.close()
-        f_out.close()
-
+        
+        nmfs = self.nmf
+        if nmfs is None:
+            nmfs = len(self.reads)
+        
+        nmfspace = io.Workspace(workspace/'nmf', must_exist=False)
+        
+        order_hint = None
+        nmf_actions = [ ]
+        for i in xrange(2,nmfs+1):
+            act = nesoni.NMF(
+                nmfspace/('nmf-%d'%i),
+                workspace/'counts-both.txt',
+                norm_file=workspace/'counts-norm-all.txt',
+                rank=i,
+                order_hint = order_hint
+            )
+            nmf_actions.append(act)
+            nesoni.make(act)
+            order_hint = act.prefix + '.rds'        
+        
         #===============================================
         #                   Report        
         #===============================================
@@ -243,6 +298,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r = reporting.Reporter(os.path.join(self.output_dir, 'report'), self.title, self.file_prefix)
         
         r.write(self.blurb)
+        
+        for filename in self.extra_files:
+            r.p( r.get(filename) )
         
         r.heading('Alignment to reference')
         
@@ -291,7 +349,31 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         for heatmap in heatmaps:
             r.report_heatmap(heatmap)
+        
+        r.heading('Heatmaps including poly-A columns')
+        
+        r.p(
+           'Below is an attempt to include the number of poly-A reads in the heatmap.'
+           'There are columns for both total number of reads and for number of poly-A reads.'
+        )
+        r.p('Gene selection, short version: An attempt was made to select genes that '
+            'represent every different pattern of expression in the data.'
+        )
+        r.p(
+           'Gene selection, long version: Consider each gene as a point in a high-dimensional space, '
+           'with coordinates being the normalized log2 number of reads from each sample, '
+           'with and without poly-A tails '
+           '(2n dimensions from n samples). '
+           'The distribution of points is assumed to be a multivariate normal distribution, '
+           'which can be pictured as a fuzzy high-dimensional ovoid shape. '
+           'Singular Value Decomposition was used to linearly transform this fuzzy ovoid '
+           'into a fuzzy sphere. '
+           'Points furthest from the center of the sphere were chosen.'
+        )
 
+        for heatmap in both_heatmaps:
+            r.report_heatmap(heatmap)
+            
         r.heading('Proportion of poly-A reads')
         
         r.p( r.get(workspace/'proportions.csv') )
@@ -306,6 +388,23 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                         
         for prop in proportion_heatmaps:
             r.report_heatmap(prop)
+
+        if nmf_actions:
+            r.heading('Non-negative matrix factorization')
+            
+            r.p(
+                'This is an experimental method of clustering genes and samples.'
+            )
+            
+            r.p(
+                'The best number of clusters to divide the genes and samples into is '
+                'a matter of judgement. Choose the clustering you think is best.'
+            )
+            
+            for act in nmf_actions:
+                for filename in glob.glob(act.prefix + '*'):
+                    g = r.get(filename, prefix='')
+                r.p( r.get(act.prefix+'.html', title='%d clusters' % act.rank) )
 
         r.close()
 

@@ -26,9 +26,12 @@ class Proportions(runr.R_action, config.Action_with_prefix):
         
         result <- data.frame(
             Feature = rownames(all.dgelist$genes),
-            all.dgelist$genes,
             check.names = FALSE
         )
+        
+        for(name in colnames(all.dgelist$genes))
+            if (!all(is.na(all.dgelist$genes[,name])))
+                result[,name] <- all.dgelist$genes[,name]
         
         for(name in colnames(proportions))
             result[,paste(name,'prop')] <- proportions[,name]
