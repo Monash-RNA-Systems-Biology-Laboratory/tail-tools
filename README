@@ -16,7 +16,11 @@ or later or PyPy.
 This package contains a number of tools, which can be listed by typing:
 
 
-  python -m tail_tools
+  ./tail-tools
     
 
 These tools may also be used as part of a nesoni-style workflow python script.
+
+
+
+Tail-tools is free software, released under the GPL (version 2).

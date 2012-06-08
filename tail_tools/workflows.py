@@ -156,7 +156,7 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.String_flag('genome_dir', 'IGV directory of reference sequences to go with .genome file')
 @config.Bool_flag('include_genome', 'Include genome in IGV plots tarball?')
 @config.Int_flag('nmf', 'Perform non-negative matrix factorization up to this rank. '
-                        'Defaults to the number of samples.')
+                        'Defaults to the number of twice the samples minus one.')
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
 @config.Main_section('reads', 'Fastq files containing SOLiD reads.')
 @config.Configurable_section('analyse', 'Parameters for each "analyse-polya:"')
@@ -192,6 +192,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         workspace = io.Workspace(self.output_dir, must_exist=False)
         plotspace = io.Workspace(workspace/'plots', must_exist=False)
+        heatspace = io.Workspace(workspace/'heatmaps', must_exist=False)
 
         dirs = [
             workspace/item
@@ -201,105 +202,84 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         interleaved = [ item2 for item in zip(dirs,polya_dirs) for item2 in item ]
 
-        @nesoni.parallel_for(zip(self.reads, dirs))
-        def loop((reads_filename, directory)):
-            self.analyse(
-                output_dir=directory,
-                reference=self.reference,
-                reads=reads_filename,
-            ).run()
+        for reads_filename, directory in zip(self.reads, dirs):
+            @nesoni.process
+            def _():
+                self.analyse(
+                    output_dir=directory,
+                    reference=self.reference,
+                    reads=reads_filename,
+                ).run()
 
-        @nesoni.parallel_for([
-            ('counts', 'all', dirs),
-            ('counts-polyA', 'polyA', polya_dirs),
-            ('counts-both', None, dirs + polya_dirs),
-        ])
-        def loop((prefix, plot_name, directories)):
-            prefix = workspace/prefix
-            
-            self.count(
-                prefix = prefix,
-                filenames = self.count.filenames + directories,
-            ).make()
-            
-            nesoni.Norm_from_counts(
-                prefix,
-                
-                tmm=False,
-                # See email from Traude to Paul,
-                # subject "Larger Heatmap"
-                # instructions for figure 4
-            ).make()  
+        nesoni.barrier()
+        #========================================================================
 
-            if plot_name is not None:
-                nesoni.IGV_plots(
-                    plotspace/plot_name,
-                    working_dirs = directories,
-                    raw = False,
-                    norm = True,
-                    genome = self.genome,
-                    norm_file = prefix + '-norm.txt',
-                    #delete_igv = False,
+        for prefix, directories in [
+            ('counts', dirs),
+            ('counts-polyA', polya_dirs),
+            ('counts-both', dirs + polya_dirs),
+        ]:
+            @nesoni.process
+            def _():
+                self.count(
+                    prefix = workspace/prefix,
+                    filenames = self.count.filenames + directories,
                 ).make()
+                
+                nesoni.Norm_from_counts(
+                    workspace/prefix,            
+                    tmm=False,
+                ).make()  
 
-        # Make a normalization file for all
-        f_in = workspace.open('counts-norm.txt', 'rb')
-        f_out = workspace.open('counts-norm-all.txt', 'wb')
-        f_out.write(f_in.readline())
-        for line in f_in:
-            parts = line.rstrip('\n').split('\t')
-            print >> f_out, '\t'.join(parts)
-            parts[0] += '-polyA'
-            print >> f_out, '\t'.join(parts)            
-        f_in.close()
-        f_out.close()
+        nesoni.barrier()
+        #========================================================================
+
+        self.make_norms(workspace)
+
+
+        for plot_name, norm_filename, directories in [
+            ('all',   'counts-norm.txt', dirs),
+            ('polyA', 'counts-norm-polyA.txt', polya_dirs),
+        ]:
+            nesoni.IGV_plots(
+                plotspace/plot_name,
+                working_dirs = directories,
+                raw = False,
+                norm = True,
+                genome = self.genome,
+                norm_file = workspace/norm_filename,
+                #delete_igv = False,
+            ).process_make()
+
 
         heatmaps = [ ]
-        for fold, min_count in [
-            (1.5, 10),
-            (2, 10),
-            (4, 10),
-            (6, 10),
-            (8, 10),
-            
-            (1.5, 50),
-            (2, 50),
-            (4, 50),
-            (6, 50),
-            (8, 50),
-        ]:
-            act = nesoni.Heatmap(
-                workspace/('heatmap-%.1ffold-%dminmax'% (fold,min_count)),
-                workspace/'counts.txt',
-                norm_file = workspace/'counts-norm.txt',
-                min_total = 0,
-                min_max = min_count,
-                min_span = math.log(fold)/math.log(2.0),                        
-            )
-            heatmaps.append(act)
-            act.process_make()
+        for fold in [ 1.5, 2.0, 4.0, 6.0, 8.0 ]:
+            for min_count in [ 10, 50, 250 ]:
+                act = nesoni.Heatmap(
+                    heatspace/('heatmap-%.1ffold-%dminmax'% (fold,min_count)),
+                    workspace/'counts.txt',
+                    norm_file = workspace/'counts-norm.txt',
+                    min_total = 0,
+                    min_max = min_count,
+                    min_span = math.log(fold)/math.log(2.0),                        
+                )
+                heatmaps.append(act)
+                act.process_make()
 
 
         both_heatmaps = [ ]
-        for deviations, min_count in [
-            (1.0, 10),
-            (1.0, 50),
-            (1.0, 250),
-            
-            (2.0, 10),
-            (2.0, 50),
-            (2.0, 250),
-        ]:
-            act = nesoni.Heatmap(
-                workspace/('both-heatmap-%.1fsvd-%dminmax'% (deviations,min_count)),
-                workspace/'counts-both.txt',
-                norm_file = workspace/'counts-both-norm.txt',
-                min_total = 0,
-                min_max = min_count,
-                min_svd = deviations,                        
-            )
-            both_heatmaps.append(act)
-            act.process_make()
+        for deviations in [ 2.0,2.5,3.0 ]:
+            for min_count in [ 10, 50, 250 ]:
+                act = nesoni.Heatmap(
+                    heatspace/('both-heatmap-%.1fsvd-%dminmax'% (deviations,min_count)),
+                    workspace/'counts-both.txt',
+                    norm_file = workspace/'counts-both-norm.txt',
+                    min_total = 0,
+                    min_max = min_count,
+                    min_svd = deviations,                        
+                )
+                both_heatmaps.append(act)
+                act.process_make()
 
         proportion_heatmaps = [ ]
         for min_diff in [ 0.1, 0.25, 0.5 ]:
@@ -311,7 +291,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 (250, 250),
             ]:
                 act = proportions.Proportions_heatmap(
-                    workspace/('proportions-heatmap-%.2fmindiff-%dminmin-%dminmax' % (min_diff, min_min, min_max)),
+                    heatspace/('proportions-heatmap-%.2fmindiff-%dminmin-%dminmax' % (min_diff, min_min, min_max)),
                     workspace/'counts.txt',
                     workspace/'counts-polyA.txt',
                     min_diff=min_diff,
@@ -335,7 +315,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         nmfs = self.nmf
         if nmfs is None:
-            nmfs = len(self.reads)
+            nmfs = len(self.reads)*2-1
         
         nmfspace = io.Workspace(workspace/'nmf', must_exist=False)
         
@@ -393,38 +373,38 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.p( r.get(workspace/'counts-libsize.png', title='Normalized box and whisker plots') )
         r.p( r.get(workspace/'counts-norm.txt', title='Normalization spreadsheet') )
         
-        #r.heading('IGV plots')
-        #
-        #r.p('These files show the depth of coverage. They can be viewed with the IGV genome browser.')
-        #
-        #genome_files = [ ]
-        #if self.include_genome:
-        #    assert self.genome, '.genome file not specified.'
-        #    genome_files.append(self.genome)
-        #    if self.genome_dir:
-        #        base = os.path.split(self.genome_dir)[1]
-        #        for filename in os.listdir(self.genome_dir):
-        #            genome_files.append((
-        #                os.path.join(self.genome_dir, filename),
-        #                os.path.join(base, filename)
-        #            ))
-        #
-        #r.p(r.tar('igv-plots.tar.gz',
-        #   genome_files +
-        #   glob.glob(plotspace/'*.tdf')
-        #))
-        #
-        #r.heading('BAM files')
-        #
-        #r.p('These BAM files contain the alignments of reads to the reference sequences.')
-        #
-        #r.p('Reads with a poly-A tail have an \'AA\' attribute.')
-        #
-        #bam_files = [ ]
-        #for name in names:
-        #    bam_files.append( (workspace/(name,'alignments_filtered_sorted.bam'),name+'.bam') )
-        #    bam_files.append( (workspace/(name,'alignments_filtered_sorted.bam.bai'),name+'.bam.bai') )
-        #r.p(r.tar('bam-files.tar.gz', bam_files))
+        r.heading('IGV plots')
+        
+        r.p('These files show the depth of coverage. They can be viewed with the IGV genome browser.')
+        
+        genome_files = [ ]
+        if self.include_genome:
+            assert self.genome, '.genome file not specified.'
+            genome_files.append(self.genome)
+            if self.genome_dir:
+                base = os.path.split(self.genome_dir)[1]
+                for filename in os.listdir(self.genome_dir):
+                    genome_files.append((
+                        os.path.join(self.genome_dir, filename),
+                        os.path.join(base, filename)
+                    ))
+        
+        r.p(r.tar('igv-plots.tar.gz',
+           genome_files +
+           glob.glob(plotspace/'*.tdf')
+        ))
+        
+        r.heading('BAM files')
+        
+        r.p('These BAM files contain the alignments of reads to the reference sequences.')
+        
+        r.p('Reads with a poly(A) tail have an \'AA\' attribute.')
+        
+        bam_files = [ ]
+        for name in names:
+            bam_files.append( (workspace/(name,'alignments_filtered_sorted.bam'),name+'.bam') )
+            bam_files.append( (workspace/(name,'alignments_filtered_sorted.bam.bai'),name+'.bam.bai') )
+        r.p(r.tar('bam-files.tar.gz', bam_files))
         
         r.heading('Heatmaps')
         
@@ -501,6 +481,31 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         r.close()
 
+
+    def make_norms(self, workspace):
+        # Make a normalization file for polyA
+        f_in = workspace.open('counts-norm.txt', 'rb')
+        f_out = workspace.open('counts-norm-polyA.txt', 'wb')
+        f_out.write(f_in.readline())
+        for line in f_in:
+            parts = line.rstrip('\n').split('\t')
+            parts[0] += '-polyA'
+            print >> f_out, '\t'.join(parts)            
+        f_in.close()
+        f_out.close()
+
+        # Make a normalization file for all
+        f_in = workspace.open('counts-norm.txt', 'rb')
+        f_out = workspace.open('counts-norm-all.txt', 'wb')
+        f_out.write(f_in.readline())
+        for line in f_in:
+            parts = line.rstrip('\n').split('\t')
+            print >> f_out, '\t'.join(parts)
+            parts[0] += '-polyA'
+            print >> f_out, '\t'.join(parts)            
+        f_in.close()
+        f_out.close()
+    
 
 
 

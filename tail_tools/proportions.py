@@ -74,13 +74,13 @@ class Proportions_heatmap(runr.R_action, config.Action_with_prefix):
     
     
     draw.prop.heatmap <- function(prefix, dend, expr, prop, labels) {
-        n.rows = nrow(expr)
-        n.cols = ncol(expr)
+        n.rows <- nrow(expr)
+        n.cols <- ncol(expr)
         
         res <- 150
         row.labels <- n.rows <= 300        
         height <- if(row.labels) (25*n.rows+600)*res/150 else 2500*res/150    
-        png(sprintf('%s.png',prefix), width=1500*res/150, height=height, res=res)
+        png(sprintf('%s.png',prefix), width=2000*res/150, height=height, res=res)
         
         if (n.rows < 2 || n.cols < 2) {
             plot.new()
@@ -93,21 +93,21 @@ class Proportions_heatmap(runr.R_action, config.Action_with_prefix):
         y2 <- 0.99
         
         dend.x1 <- 0
-        dend.x2 <- 1/6
+        dend.x2 <- 1/9
         
-        prop.x1 <- 1/6
-        prop.x2 <- 2/6 -1/100
+        prop.x1 <- 1/9
+        prop.x2 <- 2/9 -1/100
         
-        expr.x1 <- 2/6
-        expr.x2 <- 3/6 -1/100
+        expr.x1 <- 2/9
+        expr.x2 <- 3/9 -1/100
         
         legend.y2 <- y1*0.75
         legend.y1 <- legend.y2 - 0.03*aspect.ratio()
         
-        prop.legend.x1 <- 11/20
-        prop.legend.x2 <- 14/20
-        expr.legend.x1 <- 15/20
-        expr.legend.x2 <- 18/20
+        prop.legend.x1 <- 11/30
+        prop.legend.x2 <- 14/30
+        expr.legend.x1 <- 15/30
+        expr.legend.x2 <- 18/30
         
         expr.col <- signed.col
         expr.extreme <- max(0.0,abs(expr),na.rm=TRUE)
@@ -131,14 +131,23 @@ class Proportions_heatmap(runr.R_action, config.Action_with_prefix):
         basic.image(1:n.cols,1:n.rows, t(expr[dend$order,]), col=expr.col, breaks=expr.breaks)
         axis(1, at=1:n.cols, labels=colnames(expr), las=2, tick=FALSE)
         
-        if (row.labels)
-            axis(4, at=1:n.rows, labels=labels[dend$order], las=2, tick=FALSE)
+        if (row.labels) {
+            line <- 0
+            for(i in basic.seq(length(labels))) {
+                if (i < length(labels))
+                    l <- trim.labels(labels[[i]])
+                else
+                    l <- as.character(labels[[i]])
+                axis(4, at=1:n.rows, labels=l[dend$order], las=2, tick=FALSE, line=line)
+                line <- line + 0.5 * max(0,nchar(l))
+            }
+        }
         
         put.plot(expr.legend.x1,expr.legend.x2, legend.y1,legend.y2)
         color.legend(expr.col, expr.breaks, 'log2 expression\ndifference from row average\n')
         
         put.plot(prop.legend.x1,prop.legend.x2, legend.y1,legend.y2)
-        color.legend(prop.col, prop.breaks, 'proportion of reads\nwith poly-A tail\n')
+        color.legend(prop.col, prop.breaks, 'proportion of reads\nwith poly(A) tail\n')
         
         dev.off()
     }
@@ -150,35 +159,28 @@ class Proportions_heatmap(runr.R_action, config.Action_with_prefix):
     polya <- polya.dgelist$counts
     proportions <- polya / all
     colnames(proportions) <- colnames(all)
-    #ratios <- polya / (all-polya)
     
     good <- (
         row.apply(all,min) >= min_min & 
         row.apply(all,max) >= min_max &
         row.apply(proportions,max) - row.apply(proportions,min) >= min_diff 
     )  
-    #    row.apply(ratios,min) * min_fold <= row.apply(ratios,max)
-    all.good <- all[good,]
-    #polya.good <- polya[good,]
-    prop.good <- proportions[good,]
+    all.good <- basic.subset(all,good)
+    prop.good <- basic.subset(proportions,good)
     
     expression <- voom(all.dgelist)$E
-    expression.good <- expression[good,]
+    expression.good <- basic.subset(expression,good)
     expression.good.centered <- t(scale(t(expression.good), center=TRUE,scale=FALSE))
     
-    #dend <- do.dendrogram( scale(as.matrix(data.frame(prop.good,t(scale(t(expression.good.centered)))))) )
-    dend <- do.dendrogram( prop.good )
+    dend <- do.dendrogram( t(scale(t(prop.good))) )
              
-    labels.good <- rownames(all.good)
+    label.list <- list( rownames(all.good) )
     annotation <- c('gene', 'product')
     for(colname in annotation)
         if (!all(is.na(all.dgelist$gene[,colname])))
-            labels.good <- paste(
-                labels.good, 
-                all.dgelist$gene[rownames(all.good),colname]
-            )
+            label.list[[ length(label.list)+1 ]] <- all.dgelist$gene[rownames(all.good),colname]
     
-    draw.prop.heatmap(prefix, dend, expression.good.centered, prop.good, labels.good)
+    draw.prop.heatmap(prefix, dend, expression.good.centered, prop.good, label.list)
     
     #res <- 150
     #row.labels <- nrow(heatmap.matrix) <= 500        
