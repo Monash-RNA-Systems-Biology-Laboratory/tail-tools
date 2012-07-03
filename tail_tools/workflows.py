@@ -182,8 +182,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     
     analyse = Analyse_polya()
 
-    @nesoni.stage_function
     def run(self):
+        stage = nesoni.Stage()
+
         names = [
             os.path.splitext(os.path.split(item)[1])[0]
             for item in self.reads
@@ -202,15 +203,15 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         interleaved = [ item2 for item in zip(dirs,polya_dirs) for item2 in item ]
 
         for reads_filename, directory in zip(self.reads, dirs):
-            @nesoni.process
-            def _():
+            stage.process(
                 self.analyse(
                     output_dir=directory,
                     reference=self.reference,
                     reads=reads_filename,
-                ).run()
+                ).run
+            )
 
-        nesoni.barrier()
+        stage.barrier()
         #========================================================================
 
         for prefix, directories in [
@@ -218,7 +219,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             ('counts-polyA', polya_dirs),
             ('counts-both', dirs + polya_dirs),
         ]:
-            @nesoni.process
+            @stage.process
             def _():
                 self.count(
                     prefix = workspace/prefix,
@@ -230,7 +231,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                     tmm=False,
                 ).make()  
 
-        nesoni.barrier()
+        stage.barrier()
         #========================================================================
 
         self.make_norms(workspace)
@@ -248,7 +249,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 genome = self.genome,
                 norm_file = workspace/norm_filename,
                 #delete_igv = False,
-            ).process_make()
+            ).process_make(stage)
 
 
         heatmaps = [ ]
@@ -263,7 +264,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                     min_span = math.log(fold)/math.log(2.0),                        
                 )
                 heatmaps.append(act)
-                act.process_make()
+                act.process_make(stage)
 
 
         both_heatmaps = [ ]
@@ -278,7 +279,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                     min_svd = deviations,                        
                 )
                 both_heatmaps.append(act)
-                act.process_make()
+                act.process_make(stage)
 
         proportion_heatmaps = [ ]
         for min_diff in [ 0.1, 0.25, 0.5 ]:
@@ -298,10 +299,10 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                     min_max=min_max,
                 )
                 proportion_heatmaps.append(act)
-                act.process_make()
+                act.process_make(stage)
 
 
-        nesoni.Stats(*self.reads, output=workspace/'stats.txt').process_make()
+        nesoni.Stats(*self.reads, output=workspace/'stats.txt').process_make(stage)
 
             
         proportions.Proportions(
@@ -309,7 +310,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             workspace/'counts.txt',
             workspace/'counts-polyA.txt',
             norm_file=workspace/'counts-norm.txt'
-        ).process_make()
+        ).process_make(stage)
 
         
         nmfs = self.nmf
@@ -332,12 +333,12 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             order_hint = act.prefix + '.rds'        
 
         #Need to execute in order
-        @nesoni.process
+        @stage.process
         def _():
             for act in nmf_actions:
                 act.make()
 
-        nesoni.barrier() 
+        stage.barrier() 
         #========================================================================
         
         

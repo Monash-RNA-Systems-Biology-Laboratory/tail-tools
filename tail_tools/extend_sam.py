@@ -150,6 +150,7 @@ def alignment_score(qual, seq1, seq2, qual_cutoff):
     min_quality = chr(33+  qual_cutoff  )
 
     best_score = 0
+    best_end = 0
     score = 0
     for i in xrange(len(qual)):
         if qual[i] < min_quality: continue
@@ -157,8 +158,10 @@ def alignment_score(qual, seq1, seq2, qual_cutoff):
             score += 1
         else:
             score -= 4
-        best_score = max(best_score, score)
-    return best_score
+        if score > best_score:
+            best_score = score
+            best_end = i+1
+    return best_score, best_end
 
 
 def cigar_decode(cigar):
@@ -266,13 +269,13 @@ class Extend_sam(config.Action_filter):
                     (alignment_score(
                         qual_tail, seq_tail,
                         solid_encode(bases_ref[:1+i] + 'A'*(n_tail-i)), 
-                        self.quality),
+                        self.quality)[0],
                      i)
                     for i in xrange(n_tail+1)
                 )
                 
                 baseline = max(0, alignment_score(
-                    qual_tail[:tail_pos], seq_tail[:tail_pos], seq_ref[:tail_pos], self.quality))
+                    qual_tail[:tail_pos], seq_tail[:tail_pos], seq_ref[:tail_pos], self.quality)[0])
         
                 if tail_score >= baseline + 3:
                     #Record position of end of transcript in 'AA' (1-based position)
@@ -281,6 +284,11 @@ class Extend_sam(config.Action_filter):
                     else:
                         tail_refpos = al.pos+al.length + tail_pos - 1 
                     al.extra.append('AA:i:%d' % tail_refpos)
+                
+                #Record sequence's poly(A) tail length in AN: from the end of correspondence with the reference sequence to the end of good quality As
+                estimated_tail_length = alignment_score(qual_tail,seq_tail,solid_encode(bases_ref[:1+tail_pos]+'A'*(n_tail-tail_pos)),self.quality)[1] - tail_pos
+                if estimated_tail_length > 0:
+                    al.extra.append('AN:i:%d' % estimated_tail_length)
                 
                 if tail_pos:    
                     read_bases += solid_decode(read_bases[-1], seq_tail[:tail_pos])
