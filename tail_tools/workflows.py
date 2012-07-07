@@ -5,7 +5,7 @@ import nesoni
 from nesoni import config, working_directory, io, reporting, grace
 
 import tail_tools
-from tail_tools import clip_runs, extend_sam, proportions
+from tail_tools import clip_runs, extend_sam, proportions, tail_lengths
 
 
 class Tail_only(config.Action_filter):
@@ -159,6 +159,7 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
 @config.Main_section('reads', 'Fastq files containing SOLiD reads.')
 @config.Configurable_section('analyse', 'Parameters for each "analyse-polya:"')
+@config.Configurable_section('analyse_tail_lengths', 'Parameters for "analyse-tail-lengths:"')
 @config.Configurable_section('count', 'Parameters for "nesoni count:"')
 @config.Section('extra_files', 'Extra files to include in report')
 class Analyse_polya_batch(config.Action_with_output_dir):
@@ -181,7 +182,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     )
     
     analyse = Analyse_polya()
-
+    
+    analyse_tail_lengths = tail_lengths.Analyse_tail_lengths()
+    
     def run(self):
         stage = nesoni.Stage()
 
@@ -236,6 +239,10 @@ class Analyse_polya_batch(config.Action_with_output_dir):
 
         self.make_norms(workspace)
 
+        #========================================================================
+
+        tail_lengths = self.analyse_tail_lengths(prefix=workspace/'tail-lengths', working_dirs=dirs)
+        tail_lengths.process_make()
 
         for plot_name, norm_filename, directories in [
             ('all',   'counts-norm.txt', dirs),
@@ -442,7 +449,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         for heatmap in both_heatmaps:
             r.report_heatmap(heatmap)
             
-        r.heading('Proportion of poly(A) reads')
+        r.heading('Proportion of poly(A) reads [see also new tail lengths heatmaps]')
         
         r.p( r.get(workspace/'proportions.csv') )
         

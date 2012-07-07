@@ -3,7 +3,7 @@ import nesoni
 from nesoni import config, runr
 
 @config.help(
-'Create a file of proportions of poly-A reads.'
+'(Deprecated) Create a file of proportions of poly-A reads.'
 )
 @config.String_flag('norm_file', 'Normalization file.')
 @config.Positional('all', 'Output from "nesoni count:" using all reads.')
@@ -51,7 +51,7 @@ class Proportions(runr.R_action, config.Action_with_prefix):
  
 
 @config.help(
-'Plot heatmap of proportions of reads with poly(A) tails.',
+'(Deprecated) Plot heatmap of proportions of reads with poly(A) tails.',
 )
 @config.Int_flag('min_min', 'For a gene to be included, all samples must have this many reads aligning.')
 @config.Int_flag('min_max', 'For a gene to be included, at least one sample must have this many reads aligning.')

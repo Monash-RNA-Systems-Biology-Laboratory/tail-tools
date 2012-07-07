@@ -1,5 +1,5 @@
 
-VERSION = '0.2'
+VERSION = '0.3'
 
 from fasta_qual_merge import Fasta_qual_merge
 from clip_runs import Clip_runs

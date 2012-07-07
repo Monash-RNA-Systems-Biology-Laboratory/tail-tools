@@ -4,6 +4,10 @@ import itertools, collections
 import nesoni
 from nesoni import annotation, sam, span_index, config, working_directory, io, runr
 
+@config.help(
+'Create file to be used by "aggregate-tail-lengths:".'
+"""
+""")
 @config.String_flag('types', 'Comma separated list of feature types to use.')
 class Tail_lengths(config.Action_with_working_dir):
      types = 'gene'
@@ -64,14 +68,19 @@ class Tail_lengths(config.Action_with_working_dir):
          workspace.set_object(annotations, 'tail-lengths.pickle.gz')
 
 
+@config.help(
+'Aggregate data collected by "tail-lengths:" and produce various CSV tables.',
+"""\
+"""
+)
 @config.Int_flag('saturation', 
      'Duplicate start position saturation level. '
      'Reads that start at the same position will only '
-     'count as up to this many.'
+     'count as up to this many. Zero for no staturation.'
 )
 @config.Main_section('working_dirs')
 class Aggregate_tail_lengths(config.Action_with_prefix):         
-    saturation = None
+    saturation = 1
     working_dirs = [ ]
          
     def run(self):
@@ -104,7 +113,7 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
                 for rel_start,rel_end,tail_length in feature.hits:
                     buckets[ (rel_start,rel_end) ].append(tail_length)
                 for item in buckets.values():
-                    if self.saturation is None or len(item) <= self.saturation:
+                    if self.saturation < 1 or len(item) <= self.saturation:
                         weight = 1.0
                     else:
                         weight = float(self.saturation) / len(item)
@@ -131,16 +140,19 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
         
         
 
-        def annotation_table():
-            for item in annotations:
+        def counts_iter():
+            for i in xrange(len(counts)):
                 row = collections.OrderedDict()
-                row['Feature'] = item.get_id()
-                row['Length'] = item.end - item.start
-                row['Gene'] = item.attr.get('gene','')
-                row['Product'] = item.attr.get('product','')
-                row['Strand'] = str(item.strand)
+                row['Feature'] = annotations[i].get_id()
+                for j in xrange(len(names)):
+                    row[('Count',names[j])] = '%d' % sum(counts[i][j]) 
+
+                row[('Annotation','Length')] = annotations[i].end - annotations[i].start
+                row[('Annotation','gene')] = annotations[i].attr.get('gene','')
+                row[('Annotation','product')] = annotations[i].attr.get('product','')
+                #row[('Annotation','Strand')] = str(annotations[i].strand)
                 yield row
-        io.write_csv(self.prefix + '-annotation.csv', annotation_table())
+        io.write_csv(self.prefix + '-counts.csv', counts_iter())
 
         def raw_columns():
             for i in xrange(len(names)):
@@ -162,15 +174,6 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
                 yield row
         io.write_csv(self.prefix + '-raw.csv', raw())
         
-        def total():
-            for i in xrange(len(counts)):
-                row = collections.OrderedDict()
-                row['Feature'] = annotations[i].get_id()
-                for j in xrange(len(names)):
-                    row[names[j]] = str( sum(counts[i][j]) )
-                yield row
-        io.write_csv(self.prefix + '-total.csv', total())
-
         def pooled():
             for i in xrange(len(counts)):
                 row = collections.OrderedDict()
@@ -211,19 +214,38 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
         io.write_csv(self.prefix + '-mean-length-beyond4.csv', mean4_length())
 
 
+@config.help(
+"""\
+Show a heatmap of the number of reads with different tail lengths in different genes.
+""",
+"""\
+- Reads with an estimated tail length of 3 or less are ignored.
+
+- Reads are pooled over all samples.
+"""
+)
 @config.Positional('aggregate', 'Prefix of output from "aggregate-tail-lengths:"')
 @config.Int_flag('min_tails', 'Minimum number of reads with tails in order to include in heatmap.')
+@config.Float_flag('min_svd', 'Attempt to pick a sample of genes representative of all the different types of variation.')
 class Plot_pooled(runr.R_action, config.Action_with_prefix):
     aggregate = None
     min_tails = 1000
+    min_svd = 0
 
     script = r"""
     library(nesoni)
     
-    ann <- nesoni.read.table(sprintf('%s-annotation.csv',aggregate))
-    pooled <- as.matrix( nesoni.read.table(sprintf('%s-pooled.csv',aggregate)) )
+    # === Load data ===
+        
+    annotation <- read.grouped.table(sprintf('%s-counts.csv',aggregate),require='Annotation')$Annotation
+    pooled <- as.matrix( read.grouped.table(sprintf('%s-pooled.csv',aggregate))$All )
     
     maxtail <- ncol(pooled)
+    
+    
+    # === Normalize by row maximum ===
+
+    # Omit columns for tail length 0,1,2,3    
     skip <- 4
 
     norm.pooled <- pooled[,(skip+1):maxtail,drop=FALSE]
@@ -237,52 +259,77 @@ class Plot_pooled(runr.R_action, config.Action_with_prefix):
         pool.total[i] <- sum(norm.pooled[i,])
         norm.pooled[i,] <- norm.pooled[i,] / max(norm.pooled[i,],1)
     }
-    
-    keep <- pool.total > min_tails
-    kept.ann <- ann[keep,,drop=FALSE]
-    
-    mat <- norm.pooled[keep,]
 
-    n.rows <- nrow(mat)
+
+    # === Pick interesting genes ===
+        
+    keep <- (pool.total > min_tails)
+    
+    if (min_svd > 0) {
+        keep[keep] <- svd.gene.picker( scale(norm.pooled[keep,,drop=FALSE]), min.svd=min_svd )
+    }
+    
+    kept.annotation <- annotation[keep,,drop=FALSE]    
+    kept.norm.pooled <- norm.pooled[keep,,drop=FALSE]
+
+    
+    # === Output ===
+
+    n.rows <- nrow(kept.norm.pooled)
     row.labels <- n.rows <= 300        
     height <- if(row.labels) (25*n.rows+600) else 2500        
     png(sprintf("%s.png",prefix), width=2000, height=height, res=150)
     
     if (row.labels) {
-       labels <- list(rownames(kept.ann), kept.ann[,'Gene'],kept.ann[,'Product'])
+       labels <- list(
+           rownames(kept.annotation), 
+           kept.annotation[,'gene'],
+           kept.annotation[,'product']
+       )
     } else {
        labels <- NULL
     }
     
     nesoni.heatmap( 
-        mat, labels, 
-        sort.mat=mat, signed=FALSE, legend='number of reads\nscaled by row maximum\n')
+        kept.norm.pooled, labels, 
+        sort.mat=kept.norm.pooled, signed=FALSE, legend='number of reads\nscaled by row maximum\n')
 
     dev.off()
     """
 
-
+@config.help(
+'Produce a heatmap comparing average tail lengths between samples for different genes.'
+)
 @config.Positional('aggregate', 'Prefix of output from "aggregate-tail-lengths:"')
-@config.Int_flag('min_tails', 'Minimum number of reads with tails in order to include in heatmap.')
+@config.Int_flag('min_tails', 'Minimum number of reads with tails *in each sample* required in order to include a gene.')
+@config.Float_flag('min_span', 'Minimum difference in average tail lengths required in order to include a gene.')
 class Plot_comparison(runr.R_action, config.Action_with_prefix):
     aggregate = None
     min_tails = 1000
+    min_span = 4
 
     script = r"""
     library(nesoni)
     
-    ann <- nesoni.read.table(sprintf('%s-annotation.csv',aggregate))
-    raw <- as.matrix(nesoni.read.table(sprintf('%s-raw.csv',aggregate)))
+    # === Load data ==
     
-    expression <- voom( as.matrix(nesoni.read.table(sprintf('%s-total.csv',aggregate))), normalize.method='quantile' )$E
+    data <- read.grouped.table(sprintf('%s-counts.csv',aggregate),require=c('Count','Annotation'))
+    annotation <- data$Annotation
+    expression <- voom( as.matrix(data$Count), normalize.method='quantile' )$E
     
-    cols <- as.matrix(nesoni.read.table('test-raw-columns.txt'))   
+    raw <- as.matrix(read.grouped.table(sprintf('%s-raw.csv',aggregate))$All)
+    
+    cols <- as.matrix(read.grouped.table('test-raw-columns.txt')$All)   
     
     n.samples <- nrow(cols)
     n.genes <- nrow(raw)
     n.lengths <- ncol(cols)
     lengths <- basic.seq(n.lengths)-1
+
+
+    # === Calculate mean tail lengths for each sample ===
     
+    # Omit columns for tail length 0,1,2,3    
     skip <- 4
     good.cols <- cols[,(skip+1):n.lengths,drop=FALSE]
     good.lengths <- lengths[(skip+1):n.lengths]
@@ -294,26 +341,39 @@ class Plot_comparison(runr.R_action, config.Action_with_prefix):
         totals[,c] <- rowSums(raw[,good.cols[c,],drop=FALSE])
         means[,c] <- rowSums( t(t(raw[,good.cols[c,],drop=FALSE]) * good.lengths) ) / totals[,c]
     }
+
+
+    # === Choose interesting genes to keep ===
     
     keep <- (
         row.apply(totals,min) > min_tails &
-        row.apply(means,min) <= row.apply(means,max) - 8
+        row.apply(means,min) <= row.apply(means,max) - min_span
     )
     
-    kept.ann <- ann[keep,,drop=FALSE]
+    kept.annotation <- annotation[keep,,drop=FALSE]
     kept.raw <- raw[keep,,drop=FALSE]
-    kept.totals <- totals[keep,,drop=FALSE]
-    
+    kept.totals <- totals[keep,,drop=FALSE]    
     kept.means <- means[keep,,drop=FALSE]
+    kept.expression <- expression[keep,,drop=FALSE]
+
+    # === Cluster and travelling-salesman by tail length ===
+        
     dend.row <- do.dendrogram( t(scale(t(kept.means))) )
+
        
+    # === Output heatmap ===
+    
     n.rows <- sum(keep)
     row.labels <- n.rows <= 300        
     height <- if(row.labels) (25*n.rows+700) else 2500        
     png(sprintf("%s.png",prefix), width=2000, height=height, res=150)
 
     if (row.labels) {
-       labels <- list(rownames(kept.ann)[dend.row$order], kept.ann[dend.row$order,'Gene'],kept.ann[dend.row$order,'Product'])
+       labels <- list(
+           rownames(kept.annotation)[dend.row$order], 
+           kept.annotation[dend.row$order,'gene'],
+           kept.annotation[dend.row$order,'product']
+       )
     } else {
        labels <- NULL
     }
@@ -341,15 +401,15 @@ class Plot_comparison(runr.R_action, config.Action_with_prefix):
         list(
             weight=1,
             type='heatmap',
-            data=t(scale(t( expression[keep,,drop=FALSE][dend.row$order,,drop=FALSE] ),scale=FALSE,center=TRUE)),
+            data=t(scale(t( kept.expression[dend.row$order,,drop=FALSE] ),scale=FALSE,center=TRUE)),
             signed=TRUE,
-            legend='log2 count\nvs row average',
+            legend='log2 count\n(quantile normalized)\nvs row average',
             title='log2 count  -vs-'
         ),
         list(
             weight=0.3,
             type='scatter',
-            data=rowMeans( expression[keep,,drop=FALSE][dend.row$order,,drop=FALSE] ),
+            data=rowMeans( kept.expression[dend.row$order,,drop=FALSE] ),
             title='row\naverage'
         )
     )
@@ -378,23 +438,81 @@ class Plot_comparison(runr.R_action, config.Action_with_prefix):
     )
     
     dev.off()
+
+
+    # === Output CSV ===
+
+    shuffle <- rev(dend.row$order)
+
+    sink(sprintf('%s.csv', prefix))
+    cat('# Tail-length heatmap data\n')
+    cat('#\n')
+    cat('# log2 counts are quantile normalized\n')
+    cat('#\n')
+    
+    frame <- data.frame( 
+        Name = rownames(kept.annotation)[shuffle],
+        Gene = kept.annotation$gene[shuffle],
+        Product = kept.annotation$product[shuffle],
+        'Cluster hierarchy' = rev(dend.row$paths),
+        check.names=FALSE
+    )
+    
+    for(i in basic.seq(n.samples))
+        frame[, paste(colnames(kept.means)[i],'mean tail')] <- kept.means[shuffle,i,drop=FALSE]
+
+    for(i in basic.seq(n.samples))
+        frame[, paste(colnames(kept.means)[i],'log2 count')] <- kept.expression[shuffle,i,drop=FALSE]
+
+    write.csv(frame, row.names=FALSE)
+    sink()
     
     """
 
 
 
-
+@config.help(
+'Analyse tail lengths of a set of samples.'
+"""\
+"""
+)
 @config.String_flag('types', 'Comma separated list of feature types to use.')
 @config.Int_flag('saturation',
      'Duplicate start position saturation level. '
      'Reads that start at the same position will only '
-     'count as up to this many.'
+     'count as up to this many. Zero for no saturation.'
 )
 @config.Main_section('working_dirs')
 class Analyse_tail_lengths(config.Action_with_prefix):         
     types = 'gene'
-    saturation = None
+    saturation = 1
     working_dirs = [ ]
+
+    def get_plot_pooleds(self):
+        return [ 
+        
+            Plot_pooled(
+                prefix = '%s-pooled-min-tails-%d' % (self.prefix, min_tails),
+                aggregate = self.prefix,
+                min_tails = min_tails,
+            )
+            
+            for min_tails in (200,500,1000,2000)
+        ]
+    
+    def get_plot_comparisons(self):
+        return [ 
+        
+            Plot_comparison(
+                prefix = '%s-comparison-min-tails-%d-min-span-%.1f' % (self.prefix, min_tails, min_span),
+                aggregate = self.prefix,
+                min_tails = min_tails,
+                min_span = min_span,
+            )
+            
+            for min_tails in (20,50,100,200)
+            for min_span in (2,4,8)
+        ]
 
     def run(self):
          stage = nesoni.Stage()
@@ -405,13 +523,23 @@ class Analyse_tail_lengths(config.Action_with_prefix):
                  types=self.types,
              ).process_make(stage)    
 
-         stage.barrier()
+         stage.barrier() #=================================================
          
          Aggregate_tail_lengths(
              prefix=self.prefix, 
              working_dirs=self.working_dirs,
              saturation=self.saturation,
-         ).make()
+         ).make()        
+
+         for action in self.get_plot_pooleds() + self.get_plot_comparisons():
+             action.process_make(stage)
+         
+         stage.barrier() #=================================================
+
+
+
+
+
 
 
 
