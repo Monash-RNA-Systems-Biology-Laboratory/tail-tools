@@ -1,5 +1,5 @@
 
-import itertools, collections
+import itertools, collections, math
 
 import nesoni
 from nesoni import annotation, sam, span_index, config, working_directory, io, runr
@@ -319,7 +319,7 @@ class Plot_comparison(runr.R_action, config.Action_with_prefix):
     
     raw <- as.matrix(read.grouped.table(sprintf('%s-raw.csv',aggregate))$All)
     
-    cols <- as.matrix(read.grouped.table('test-raw-columns.txt')$All)   
+    cols <- as.matrix(read.grouped.table(sprintf('%s-raw-columns.csv',aggregate))$All)   
     
     n.samples <- nrow(cols)
     n.genes <- nrow(raw)
@@ -340,13 +340,14 @@ class Plot_comparison(runr.R_action, config.Action_with_prefix):
     for(c in basic.seq(n.samples)) {
         totals[,c] <- rowSums(raw[,good.cols[c,],drop=FALSE])
         means[,c] <- rowSums( t(t(raw[,good.cols[c,],drop=FALSE]) * good.lengths) ) / totals[,c]
+        means[totals[,c] < min_tails,c] <- NA
     }
 
 
     # === Choose interesting genes to keep ===
     
     keep <- (
-        row.apply(totals,min) > min_tails &
+        row.apply(totals,min) >= min_tails &
         row.apply(means,min) <= row.apply(means,max) - min_span
     )
     
@@ -514,6 +515,21 @@ class Analyse_tail_lengths(config.Action_with_prefix):
             for min_span in (2,4,8)
         ]
 
+    def get_heatmaps(self):
+        return [
+            
+            nesoni.Heatmap(
+                prefix = '%s-heatmap-min-fold-%.1f-min-max-%d' % (self.prefix, fold, min_count),
+                counts = self.prefix + '-counts.csv',
+                min_total = 0,
+                min_max = min_count,
+                min_span = math.log(fold)/math.log(2.0),
+            )
+            
+            for fold in [ 1.5, 2.0, 4.0, 6.0, 8.0 ]
+            for min_count in [ 10, 50, 250 ]
+        ]
+
     def run(self):
          stage = nesoni.Stage()
 
@@ -531,8 +547,13 @@ class Analyse_tail_lengths(config.Action_with_prefix):
              saturation=self.saturation,
          ).make()        
 
-         for action in self.get_plot_pooleds() + self.get_plot_comparisons():
+         for action in self.get_plot_pooleds() + self.get_plot_comparisons() + self.get_heatmaps():
              action.process_make(stage)
+         
+         nesoni.Plot_counts(
+             prefix=self.prefix,
+             counts=self.prefix+'-counts.csv',
+         ).process_make(stage)
          
          stage.barrier() #=================================================
 

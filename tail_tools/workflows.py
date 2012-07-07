@@ -154,8 +154,6 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.String_flag('genome', 'IGV .genome file, to produce IGV plots')
 @config.String_flag('genome_dir', 'IGV directory of reference sequences to go with .genome file')
 @config.Bool_flag('include_genome', 'Include genome in IGV plots tarball?')
-@config.Int_flag('nmf', 'Perform non-negative matrix factorization up to this rank. '
-                        'Defaults to the number of twice the samples minus one.')
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
 @config.Main_section('reads', 'Fastq files containing SOLiD reads.')
 @config.Configurable_section('analyse', 'Parameters for each "analyse-polya:"')
@@ -173,8 +171,6 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     include_genome = True
     reference = None
     reads = [ ]
-    
-    nmf = None
     
     count = nesoni.Count(
         filter='existing',
@@ -217,137 +213,11 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         stage.barrier()
         #========================================================================
 
-        for prefix, directories in [
-            ('counts', dirs),
-            ('counts-polyA', polya_dirs),
-            ('counts-both', dirs + polya_dirs),
-        ]:
-            @stage.process
-            def _():
-                self.count(
-                    prefix = workspace/prefix,
-                    filenames = self.count.filenames + directories,
-                ).make()
-                
-                nesoni.Norm_from_counts(
-                    workspace/prefix,            
-                    tmm=False,
-                ).make()  
-
-        stage.barrier()
-        #========================================================================
-
-        self.make_norms(workspace)
-
-        #========================================================================
-
-        tail_lengths = self.analyse_tail_lengths(prefix=workspace/'tail-lengths', working_dirs=dirs)
-        tail_lengths.process_make()
-
-        for plot_name, norm_filename, directories in [
-            ('all',   'counts-norm.txt', dirs),
-            ('polyA', 'counts-norm-polyA.txt', polya_dirs),
-        ]:
-            nesoni.IGV_plots(
-                plotspace/plot_name,
-                working_dirs = directories,
-                raw = False,
-                norm = True,
-                genome = self.genome,
-                norm_file = workspace/norm_filename,
-                #delete_igv = False,
-            ).process_make(stage)
-
-
-        heatmaps = [ ]
-        for fold in [ 1.5, 2.0, 4.0, 6.0, 8.0 ]:
-            for min_count in [ 10, 50, 250 ]:
-                act = nesoni.Heatmap(
-                    heatspace/('heatmap-%.1ffold-%dminmax'% (fold,min_count)),
-                    workspace/'counts.txt',
-                    norm_file = workspace/'counts-norm.txt',
-                    min_total = 0,
-                    min_max = min_count,
-                    min_span = math.log(fold)/math.log(2.0),                        
-                )
-                heatmaps.append(act)
-                act.process_make(stage)
-
-
-        both_heatmaps = [ ]
-        for deviations in [ 2.0,2.5,3.0 ]:
-            for min_count in [ 10, 50, 250 ]:
-                act = nesoni.Heatmap(
-                    heatspace/('both-heatmap-%.1fsvd-%dminmax'% (deviations,min_count)),
-                    workspace/'counts-both.txt',
-                    norm_file = workspace/'counts-both-norm.txt',
-                    min_total = 0,
-                    min_max = min_count,
-                    min_svd = deviations,                        
-                )
-                both_heatmaps.append(act)
-                act.process_make(stage)
-
-        proportion_heatmaps = [ ]
-        for min_diff in [ 0.1, 0.25, 0.5 ]:
-            for min_min, min_max in [
-                (10, 10),
-                (10, 50),
-                (50, 50),
-                (50, 250),
-                (250, 250),
-            ]:
-                act = proportions.Proportions_heatmap(
-                    heatspace/('proportions-heatmap-%.2fmindiff-%dminmin-%dminmax' % (min_diff, min_min, min_max)),
-                    workspace/'counts.txt',
-                    workspace/'counts-polyA.txt',
-                    min_diff=min_diff,
-                    min_min=min_min,
-                    min_max=min_max,
-                )
-                proportion_heatmaps.append(act)
-                act.process_make(stage)
-
-
-        nesoni.Stats(*self.reads, output=workspace/'stats.txt').process_make(stage)
-
-            
-        proportions.Proportions(
-            workspace/'proportions',
-            workspace/'counts.txt',
-            workspace/'counts-polyA.txt',
-            norm_file=workspace/'counts-norm.txt'
-        ).process_make(stage)
-
-        
-        nmfs = self.nmf
-        if nmfs is None:
-            nmfs = len(self.reads)*2-1
-        
-        nmfspace = io.Workspace(workspace/'nmf', must_exist=False)
-        
-        order_hint = None
-        nmf_actions = [ ]
-        for i in xrange(2,nmfs+1):
-            act = nesoni.NMF(
-                nmfspace/('nmf-%d'%i),
-                workspace/'counts-both.txt',
-                norm_file=workspace/'counts-norm-all.txt',
-                rank=i,
-                order_hint = order_hint
-            )
-            nmf_actions.append(act)
-            order_hint = act.prefix + '.rds'        
-
-        #Need to execute in order
-        @stage.process
-        def _():
-            for act in nmf_actions:
-                act.make()
-
-        stage.barrier() 
-        #========================================================================
-        
+        analyse_tail_lengths = self.analyse_tail_lengths(
+            prefix = workspace/'stats',
+            working_dirs = dirs,
+        )
+        analyse_tail_lengths.make()
         
         #===============================================
         #                   Report        
@@ -413,73 +283,70 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             bam_files.append( (workspace/(name,'alignments_filtered_sorted.bam.bai'),name+'.bam.bai') )
         r.p(r.tar('bam-files.tar.gz', bam_files))
         
-        r.heading('Heatmaps')
+        
+        r.heading('Expression levels and tail lengths')
+        
+        saturation = analyse_tail_lengths.saturation
+        if saturation:
+            r.p(
+                'Duplicate read removal: Sets of reads aligning with exactly the start and end position in the reference were counted as a single read.'
+            )
+
+        r.p(
+            'This scatterplot the number of reads aligning to each gene between each pair of samples. '
+            'This can be used to discover poor samples, and possibly to see the effect of overzealous duplicate read removal.'
+        )        
+        
+        r.p( r.get(workspace/'stats-count.png', name='scatterplots.png', image=True) )
         
         r.p(
-            'Genes were selected on based on there being at least some number of reads '
-            'in at least one of the samples (minmax), '
+            'In the heatmaps below, log2 counts have been quantile normalized.'
+        )
+        
+        r.subheading('Poly(A) tail length in reads')
+        
+        r.p(
+            'Some reads contain a poly(A) sequence not found in the reference. '
+            'It is hoped that the lengths of these poly(A) sequences gives an indication of the true length of polyadenylation.'
+        )
+        
+        r.p(
+            'Only reads with a poly(A) sequence of four or more bases are used.'
+        )
+        
+        for heatmap in analyse_tail_lengths.get_plot_pooleds():
+            r.report_heatmap(heatmap, has_csv=False)
+            
+        r.heading('Average poly(A) tail length and its relation to expression levels')
+        
+        r.p(
+            'Only reads with a poly(A) sequence of four or more bases was included in the averages.'
+        )
+        
+        r.p(
+            'Genes were selected based on there being at least some number of reads with poly(A) sequence in <i>each</i> sample (min-tails), '
+            'and on there being at least some amount of difference in average tail length between samples (min-span).'
+        )
+        
+        for heatmap in analyse_tail_lengths.get_plot_comparisons():
+            r.report_heatmap(heatmap)
+        
+        r.subheading('Heatmaps')
+        
+        r.p(
+            'Genes were selected based on there being at least some number of reads '
+            'in at least one of the samples (min-max), '
             'and on there being at least some fold change difference between '
             'some pair of samples (fold).'
         )
         
-        for heatmap in heatmaps:
+        r.p(
+            'The log2 counts have been quantile normalized.'
+        )
+        
+        for heatmap in analyse_tail_lengths.get_heatmaps():
             r.report_heatmap(heatmap)
         
-        r.heading('Heatmaps including poly(A) columns')
-        
-        r.p(
-           'Below is an attempt to include the number of poly-A reads in the heatmap.'
-           'There are columns for both total number of reads and for number of poly-A reads.'
-        )
-        r.p('Gene selection, short version: An attempt was made to select genes that '
-            'represent every different pattern of expression in the data.'
-        )
-        r.p(
-           'Gene selection, long version: Consider each gene as a point in a high-dimensional space, '
-           'with coordinates being the normalized log2 number of reads from each sample, '
-           'with and without poly(A) tails '
-           '(2n dimensions from n samples). '
-           'The distribution of points is assumed to be a multivariate normal distribution, '
-           'which can be pictured as a fuzzy high-dimensional ovoid shape. '
-           'Singular Value Decomposition was used to linearly transform this fuzzy ovoid '
-           'into a fuzzy sphere. '
-           'Points furthest from the center of the sphere were chosen.'
-        )
-
-        for heatmap in both_heatmaps:
-            r.report_heatmap(heatmap)
-            
-        r.heading('Proportion of poly(A) reads [see also new tail lengths heatmaps]')
-        
-        r.p( r.get(workspace/'proportions.csv') )
-        
-        r.p(
-           'Genes were selected based on there being at least some number of reads '
-           'in each sample (minmin), '
-           'a sample with at least some number of reads (minmax), '
-           'and there being a difference in the proportion of poly(A) reads '
-           'between two samples of at least some amount (mindiff).'
-        )
-                        
-        for prop in proportion_heatmaps:
-            r.report_heatmap(prop)
-
-        if nmf_actions:
-            r.heading('Non-negative matrix factorization')
-            
-            r.p(
-                'This is an experimental method of clustering genes and samples.'
-            )
-            
-            r.p(
-                'The best number of clusters to divide the genes and samples into is '
-                'a matter of judgement. Choose the clustering you think is best.'
-            )
-            
-            for act in nmf_actions:
-                for filename in glob.glob(act.prefix + '*'):
-                    g = r.get(filename, prefix='')
-                r.p( r.get(act.prefix+'.html', title='%d clusters' % act.rank) )
 
         r.write('<p/><hr>\n')
         r.p('tail_tools version '+tail_tools.VERSION)
@@ -487,32 +354,6 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.p('SHRiMP version '+grace.get_shrimp_2_version())
         
         r.close()
-
-
-    def make_norms(self, workspace):
-        # Make a normalization file for polyA
-        f_in = workspace.open('counts-norm.txt', 'rb')
-        f_out = workspace.open('counts-norm-polyA.txt', 'wb')
-        f_out.write(f_in.readline())
-        for line in f_in:
-            parts = line.rstrip('\n').split('\t')
-            parts[0] += '-polyA'
-            print >> f_out, '\t'.join(parts)            
-        f_in.close()
-        f_out.close()
-
-        # Make a normalization file for all
-        f_in = workspace.open('counts-norm.txt', 'rb')
-        f_out = workspace.open('counts-norm-all.txt', 'wb')
-        f_out.write(f_in.readline())
-        for line in f_in:
-            parts = line.rstrip('\n').split('\t')
-            print >> f_out, '\t'.join(parts)
-            parts[0] += '-polyA'
-            print >> f_out, '\t'.join(parts)            
-        f_in.close()
-        f_out.close()
-    
 
 
 
