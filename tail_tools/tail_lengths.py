@@ -105,7 +105,10 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
             for rel_start,rel_end,tail_length in feature.hits
         )+1
         
-        for sample in data:
+        for i, sample in enumerate(data):
+            n_alignments = 0
+            n_duplicates = 0
+            n_good = 0
             for feature in sample:
                 feature.tail_counts = [ 0.0 ] * max_length
                 
@@ -113,13 +116,20 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
                 for rel_start,rel_end,tail_length in feature.hits:
                     buckets[ (rel_start,rel_end) ].append(tail_length)
                 for item in buckets.values():
+                    n_alignments += len(item)
+                    n_good += 1
                     if self.saturation < 1 or len(item) <= self.saturation:
                         weight = 1.0
                     else:
                         weight = float(self.saturation) / len(item)
+                        n_duplicates += len(item)
                     for item2 in item:
                         feature.tail_counts[item2] += weight
-                    
+
+            self.log.datum(workspaces[i].name, 'Alignments to genes', n_alignments)
+            if self.saturation >= 1:
+                self.log.datum(workspaces[i].name, 'Proportion of alignments with duplicate start and end position', float(n_duplicates)/max(1,n_alignments))
+                self.log.datum(workspaces[i].name, 'Alignments to genes after deduplication', n_good)
                 
         
         counts = [ ]
@@ -404,8 +414,8 @@ class Plot_comparison(runr.R_action, config.Action_with_prefix):
             type='heatmap',
             data=t(scale(t( kept.expression[dend.row$order,,drop=FALSE] ),scale=FALSE,center=TRUE)),
             signed=TRUE,
-            legend='log2 count\n(quantile normalized)\nvs row average',
-            title='log2 count  -vs-'
+            legend='log2 Reads Per Million\n(quantile normalized)\nvs row average',
+            title='log2 RPM  -vs-'
         ),
         list(
             weight=0.3,

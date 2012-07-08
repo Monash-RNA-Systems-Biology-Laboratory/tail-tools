@@ -153,7 +153,9 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.String_flag('blurb', 'Introductory HTML text for report')
 @config.String_flag('genome', 'IGV .genome file, to produce IGV plots')
 @config.String_flag('genome_dir', 'IGV directory of reference sequences to go with .genome file')
+@config.Bool_flag('include_plots', 'Include plots in report?')
 @config.Bool_flag('include_genome', 'Include genome in IGV plots tarball?')
+@config.Bool_flag('include_bams', 'Include BAM files in report?')
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
 @config.Main_section('reads', 'Fastq files containing SOLiD reads.')
 @config.Configurable_section('analyse', 'Parameters for each "analyse-polya:"')
@@ -168,7 +170,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     
     genome = None
     genome_dir = None
+    include_plots = True
     include_genome = True
+    include_bams = True
     reference = None
     reads = [ ]
     
@@ -210,14 +214,36 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 ).run
             )
 
-        stage.barrier()
-        #========================================================================
+        stage.barrier() #====================================================
+
+        if self.include_plots:
+            for plot_name, directories in [
+                ('all',   dirs),
+                ('polyA', polya_dirs),
+            ]:
+                nesoni.IGV_plots(
+                    plotspace/plot_name,
+                    working_dirs = directories,
+                    raw = False,
+                    norm = True,
+                    genome = self.genome,
+                    #norm_file = workspace/norm_filename,
+                    #delete_igv = False,
+                ).process_make(stage)
+
+        
+        nesoni.Stats(
+            *self.reads, 
+            output=workspace/'stats.txt'
+        ).process_make(stage)
 
         analyse_tail_lengths = self.analyse_tail_lengths(
             prefix = workspace/'stats',
             working_dirs = dirs,
         )
-        analyse_tail_lengths.make()
+        analyse_tail_lengths.process_make(stage)
+        
+        stage.barrier() #====================================================
         
         #===============================================
         #                   Report        
@@ -235,53 +261,49 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.report_logs('alignment-statistics',
             [ workspace/'stats.txt' ] +
             [ os.path.join(item, 'consensus_log.txt') for item in dirs + polya_dirs ] +
-            [ workspace/'counts_log.txt', workspace/'counts-polyA_log.txt' ],
+            [ workspace/'stats_log.txt' ],
             filter=lambda sample, field: (
                 field not in ['fragments','fragments aligned to the reference'] and
                 (not sample.endswith('-polyA') or field not in ['reads with alignments','hit multiple locations'])
             ),
         )
+
+
+        if self.include_plots:        
+            r.heading('IGV plots')
+            
+            r.p('These files show the depth of coverage. They can be viewed with the IGV genome browser.')
+            
+            genome_files = [ ]
+            if self.include_genome:
+                assert self.genome, '.genome file not specified.'
+                genome_files.append(self.genome)
+                if self.genome_dir:
+                    base = os.path.split(self.genome_dir)[1]
+                    for filename in os.listdir(self.genome_dir):
+                        genome_files.append((
+                            os.path.join(self.genome_dir, filename),
+                            os.path.join(base, filename)
+                        ))
+            
+            r.p(r.tar('igv-plots.tar.gz',
+               genome_files +
+               glob.glob(plotspace/'*.tdf')
+            ))
         
-        r.heading('Normalization')
-        
-        r.p( 'Normalization was by total number of reads aligning to genes.' )
-        
-        r.p( r.get(workspace/'counts-raw.png', title='Unnormalized box and whisker plots') )
-        r.p( r.get(workspace/'counts-libsize.png', title='Normalized box and whisker plots') )
-        r.p( r.get(workspace/'counts-norm.txt', title='Normalization spreadsheet') )
-        
-        r.heading('IGV plots')
-        
-        r.p('These files show the depth of coverage. They can be viewed with the IGV genome browser.')
-        
-        genome_files = [ ]
-        if self.include_genome:
-            assert self.genome, '.genome file not specified.'
-            genome_files.append(self.genome)
-            if self.genome_dir:
-                base = os.path.split(self.genome_dir)[1]
-                for filename in os.listdir(self.genome_dir):
-                    genome_files.append((
-                        os.path.join(self.genome_dir, filename),
-                        os.path.join(base, filename)
-                    ))
-        
-        r.p(r.tar('igv-plots.tar.gz',
-           genome_files +
-           glob.glob(plotspace/'*.tdf')
-        ))
-        
-        r.heading('BAM files')
-        
-        r.p('These BAM files contain the alignments of reads to the reference sequences.')
-        
-        r.p('Reads with a poly(A) tail have an \'AA\' attribute.')
-        
-        bam_files = [ ]
-        for name in names:
-            bam_files.append( (workspace/(name,'alignments_filtered_sorted.bam'),name+'.bam') )
-            bam_files.append( (workspace/(name,'alignments_filtered_sorted.bam.bai'),name+'.bam.bai') )
-        r.p(r.tar('bam-files.tar.gz', bam_files))
+
+        if self.include_bams:
+            r.heading('BAM files')
+            
+            r.p('These BAM files contain the alignments of reads to the reference sequences.')
+            
+            r.p('Reads with a poly(A) tail have an \'AA\' attribute.')
+            
+            bam_files = [ ]
+            for name in names:
+                bam_files.append( (workspace/(name,'alignments_filtered_sorted.bam'),name+'.bam') )
+                bam_files.append( (workspace/(name,'alignments_filtered_sorted.bam.bai'),name+'.bam.bai') )
+            r.p(r.tar('bam-files.tar.gz', bam_files))
         
         
         r.heading('Expression levels and tail lengths')
@@ -293,14 +315,14 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             )
 
         r.p(
-            'This scatterplot the number of reads aligning to each gene between each pair of samples. '
+            'This scatterplot show the number of reads aligning to each gene between each pair of samples. '
             'This can be used to discover poor samples, and possibly to see the effect of overzealous duplicate read removal.'
         )        
         
         r.p( r.get(workspace/'stats-count.png', name='scatterplots.png', image=True) )
         
         r.p(
-            'In the heatmaps below, log2 counts have been quantile normalized.'
+            'In the heatmaps below, the read counts have transformed as log2(x+0.5), offset to log2 Reads Per Million (RPM), and then quantile normalized.'
         )
         
         r.subheading('Poly(A) tail length in reads')
