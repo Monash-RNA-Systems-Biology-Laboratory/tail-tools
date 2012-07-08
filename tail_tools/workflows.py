@@ -160,7 +160,7 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.Main_section('reads', 'Fastq files containing SOLiD reads.')
 @config.Configurable_section('analyse', 'Parameters for each "analyse-polya:"')
 @config.Configurable_section('analyse_tail_lengths', 'Parameters for "analyse-tail-lengths:"')
-@config.Configurable_section('count', 'Parameters for "nesoni count:"')
+#@config.Configurable_section('count', 'Parameters for "nesoni count:"')
 @config.Section('extra_files', 'Extra files to include in report')
 class Analyse_polya_batch(config.Action_with_output_dir):
     file_prefix = ''
@@ -176,10 +176,10 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     reference = None
     reads = [ ]
     
-    count = nesoni.Count(
-        filter='existing',
-        strand='forward',
-    )
+    #count = nesoni.Count(
+    #    filter='existing',
+    #    strand='forward',
+    #)
     
     analyse = Analyse_polya()
     
