@@ -1,4 +1,4 @@
-#!/bio/sw/python/bin/pypy
+#!/usr/bin/env python
 
 README = open('README','rb').read()
 
@@ -40,15 +40,14 @@ import os, datetime
 
 import tail_tools
 
-os.environ['PATH'] = '/bio/sw/python/bin:' + os.environ['PATH']
+#os.environ['PATH'] = '/bio/sw/python/bin:' + os.environ['PATH']
+
+pythonpath = os.environ['PYTHONPATH']
 
 # RAGE
 os.system('rm MANIFEST')
 
-assert 0 == os.system('sudo -E /bio/sw/python/bin/pypy setup.py install_scripts --install-dir /bio/sw/python/bin/')
-assert 0 == os.system('sudo -E /bio/sw/python/bin/pypy setup.py install_lib')
-assert 0 == os.system('sudo -E /bio/sw/python/bin/python2.6 setup.py install_lib')
-
+assert 0 == os.system('sudo PYTHONPATH=%s pypy setup.py install --home /bio/sw/python' % pythonpath)
 
 
 
@@ -56,11 +55,14 @@ release_tarball_name = 'tail-tools-%s.tar.gz' % tail_tools.VERSION
 #assert not os.path.exists(release_tarball_name), release_tarball_name + ' already exists'
 date = datetime.date.today().strftime('%e %B %Y')
 
-assert 0 == os.system('/bio/sw/python/bin/python2.6 setup.py sdist')
+assert 0 == os.system('python setup.py sdist')
 
-f = open('/home/torsten/public_html/vicbioinformatics.com/software.tail-tools.shtml','wb')
+f = open('/home/websites/vicbioinformatics.com/software.tail-tools.shtml','wb')
 f.write(PAGE % locals())
 f.close()
 
-assert 0 == os.system('cp dist/%s /home/torsten/public_html/vicbioinformatics.com' % release_tarball_name)
-assert 0 == os.system('cd /home/torsten/public_html/vicbioinformatics.com ; make install')
+assert 0 == os.system('cp dist/%s /home/websites/vicbioinformatics.com' % release_tarball_name)
+
+
+
+
