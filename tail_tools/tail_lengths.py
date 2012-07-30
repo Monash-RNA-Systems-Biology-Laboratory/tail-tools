@@ -262,11 +262,23 @@ class Plot_pooled(runr.R_action, config.Action_with_prefix):
     for(i in basic.seq(ncol(norm.pooled)))
         if (i%%10 != 1)
             colnames(norm.pooled)[i] <- ''
+    
+    col.length <- basic.seq(ncol(norm.pooled)) + (skip-1)
 
-    pool.total <- rep(0,nrow(pooled))        
+    pool.total <- rep(0,nrow(pooled))
+    pool.mean <- rep(0,nrow(pooled))
+    pool.sd <- rep(0,nrow(pooled))        
 
     for(i in basic.seq(nrow(pooled))) {
         pool.total[i] <- sum(norm.pooled[i,])
+
+        pool.mean[i] <- sum(norm.pooled[i,] * col.length) / pool.total[i]
+        
+        if (pool.total[i] > 1) {
+            deviation <- col.length - pool.mean[i]
+            pool.sd[i] <- sqrt( sum( deviation*deviation*norm.pooled[i,] ) / (pool.total[i]-1) )
+        }
+        
         norm.pooled[i,] <- norm.pooled[i,] / max(norm.pooled[i,],1)
     }
 
@@ -281,8 +293,10 @@ class Plot_pooled(runr.R_action, config.Action_with_prefix):
     
     kept.annotation <- annotation[keep,,drop=FALSE]    
     kept.norm.pooled <- norm.pooled[keep,,drop=FALSE]
+    kept.pool.total <- pool.total[keep]
+    kept.pool.mean <- pool.mean[keep]
+    kept.pool.sd <- pool.sd[keep]
 
-    
     # === Output ===
 
     n.rows <- nrow(kept.norm.pooled)
@@ -300,11 +314,37 @@ class Plot_pooled(runr.R_action, config.Action_with_prefix):
        labels <- NULL
     }
     
-    nesoni.heatmap( 
+    result <- nesoni.heatmap( 
         kept.norm.pooled, labels, 
         sort.mat=kept.norm.pooled, signed=FALSE, legend='number of reads\nscaled by row maximum\n')
 
     dev.off()
+
+
+    # === Output CSV ===
+
+    shuffle <- rev(result$dend.row$order)
+
+    sink(sprintf('%s.csv', prefix))
+    cat('# Pooled tail-length heatmap data\n')
+    cat('#\n')
+    cat('# Reads are counted as having a tail if there is a poly-A sequence of length 4 or greater\n')
+    cat('#\n')
+
+    frame <- data.frame( 
+        Name = rownames(kept.annotation)[shuffle],
+        Gene = kept.annotation$gene[shuffle],
+        Product = kept.annotation$product[shuffle],
+        'Cluster hierarchy' = rev(result$dend.row$paths),
+        'Total reads with tails' = kept.pool.total[shuffle],
+        'Mean tail length' = kept.pool.mean[shuffle],
+        'Standard deviation tail length' = kept.pool.sd[shuffle],
+        check.names=FALSE
+    )
+
+    write.csv(frame, row.names=FALSE)
+    sink()
+
     """
 
 @config.help(

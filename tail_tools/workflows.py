@@ -337,7 +337,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         )
         
         for heatmap in analyse_tail_lengths.get_plot_pooleds():
-            r.report_heatmap(heatmap, has_csv=False)
+            r.report_heatmap(heatmap)
             
         r.heading('Average poly(A) tail length and its relation to expression levels')
         
