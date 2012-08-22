@@ -1,11 +1,11 @@
 
-VERSION = '0.4'
+VERSION = '0.5'
 
 from fasta_qual_merge import Fasta_qual_merge
 from clip_runs import Clip_runs
 from extend_sam import Extend_sam
 from proportions import Proportions, Proportions_heatmap 
-from tail_lengths import Tail_lengths, Aggregate_tail_lengths, Plot_pooled, Plot_comparison, Analyse_tail_lengths
+from tail_lengths import Tail_lengths, Aggregate_tail_lengths, Tail_stats, Plot_pooled, Plot_comparison, Analyse_tail_lengths
 from workflows import Analyse_polya, Analyse_polya_batch
 
 __all__ = [

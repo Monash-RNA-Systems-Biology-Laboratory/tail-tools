@@ -14,6 +14,7 @@ nesoni.run_toolbox(
       tail_tools.Proportions_heatmap,
       tail_tools.Tail_lengths,
       tail_tools.Aggregate_tail_lengths,
+      tail_tools.Tail_stats,
       tail_tools.Plot_pooled,
       tail_tools.Plot_comparison,
       

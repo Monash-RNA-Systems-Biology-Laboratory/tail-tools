@@ -280,7 +280,7 @@ class Extend_sam(config.Action_filter):
                 if tail_score >= baseline + 3:
                     #Record position of end of transcript in 'AA' (1-based position)
                     if reverse:
-                        tail_refpos = al.pos - tail_pos + 1
+                        tail_refpos = al.pos - tail_pos
                     else:
                         tail_refpos = al.pos+al.length + tail_pos - 1 
                     al.extra.append('AA:i:%d' % tail_refpos)

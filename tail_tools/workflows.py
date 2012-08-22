@@ -325,6 +325,14 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             'In the heatmaps below, the read counts have transformed as log2(x+0.5), offset to log2 Reads Per Million (RPM), and then quantile normalized.'
         )
         
+        r.subheading('Spreadsheet with statistics for all genes and all samples')
+        
+        if saturation:
+            r.p( 'Note: Reads with the same start and end position sometimes don\'t have the same tail length. '
+                 'After deduplication these can contribute fractionally to the number of reads with tails.' )
+        
+        r.p( r.get(workspace/'stats-statistics.csv', name='statistics.csv') )
+        
         r.subheading('Poly(A) tail length in reads')
         
         r.p(

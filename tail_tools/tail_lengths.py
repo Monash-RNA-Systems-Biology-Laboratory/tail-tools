@@ -225,6 +225,108 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
 
 
 @config.help(
+    'Create a spreadsheet containing various statistics, using the output of "aggregate-tail-lengths:"',
+    'The prefix should be the same as that given to "aggregate-tail-lengths:".'
+)
+class Tail_stats(config.Action_with_prefix, runr.R_action):
+    def log_filename(self):
+        if self.prefix is None: return None
+        return self.prefix + '_tail_stats_log.txt'
+        
+    script = r"""
+    
+    library(nesoni)
+
+    # === Load data ==
+    
+    data <- read.grouped.table(sprintf('%s-counts.csv',prefix),require=c('Count','Annotation'))
+    annotation <- data$Annotation
+    expression <- voom( as.matrix(data$Count), normalize.method='quantile' )$E
+    
+    raw <- as.matrix(read.grouped.table(sprintf('%s-raw.csv',prefix))$All)
+    
+    cols <- as.matrix(read.grouped.table(sprintf('%s-raw-columns.csv',prefix))$All)   
+    
+    row.names <- rownames(annotation)
+    n.samples <- nrow(cols)
+    n.genes <- nrow(raw)
+    n.lengths <- ncol(cols)
+    lengths <- basic.seq(n.lengths)-1
+
+
+    # === Calculate mean tail lengths for each sample ===
+    
+    # Omit columns for tail length 0,1,2,3    
+    skip <- 4
+    good.cols <- cols[,(skip+1):n.lengths,drop=FALSE]
+    good.lengths <- lengths[(skip+1):n.lengths]
+    
+    totals <- matrix(nrow=n.genes,ncol=n.samples) 
+    x.totals <- matrix(nrow=n.genes,ncol=n.samples) 
+    xx.totals <- matrix(nrow=n.genes,ncol=n.samples) 
+    means <- matrix(nrow=n.genes,ncol=n.samples)
+    sds <- matrix(nrow=n.genes,ncol=n.samples)
+    colnames(totals) <- rownames(cols)
+    rownames(totals) <- row.names
+    colnames(means) <- rownames(cols)
+    rownames(means) <- row.names
+    colnames(sds) <- rownames(cols)
+    rownames(sds) <- row.names
+    for(c in basic.seq(n.samples)) {
+        totals[,c] <- rowSums(raw[,good.cols[c,],drop=FALSE])
+        x.totals[,c] <- rowSums( t(t(raw[,good.cols[c,],drop=FALSE]) * good.lengths) )
+        xx.totals[,c] <- rowSums( t(t(raw[,good.cols[c,],drop=FALSE]) * (good.lengths*good.lengths) ) )
+
+        means[,c] <- x.totals[,c] / totals[,c]
+        sds[,c] <- sqrt( totals[,c]/(totals[,c]-1) * (xx.totals[,c]/totals[,c] - means[,c]*means[,c]) )
+        
+        means[totals[,c] < 1,c] <- NA
+        sds[totals[,c] < 2,c] <- NA
+    }
+
+
+    grand.totals <- rowSums(totals)
+    grand.x.totals <- rowSums(x.totals)
+    grand.xx.totals <- rowSums(xx.totals)
+    grand.means <- grand.x.totals / grand.totals
+    grand.sds <- sqrt( grand.totals/(grand.totals-1) * (grand.xx.totals/grand.totals - grand.means*grand.means) )
+    grand.means[ grand.totals < 1 ] <- NA
+    grand.sds[ grand.totals < 2 ] <- NA
+    pool.frame <- data.frame(
+        "Reads" = rowSums(raw),
+        "Tailed reads" = grand.totals,
+        "Mean tail length" = grand.means,
+        "StdDev tail length" = grand.sds,
+        row.names = row.names,
+        check.names = FALSE,
+        check.rows = FALSE
+    )
+
+    # === Output ===
+    
+    write.grouped.table(
+        list(
+            "Annotation" = annotation,
+            "Count" = as.data.frame( data$Count ),
+            "Expression" = as.data.frame( expression ),
+            "Pooled" = pool.frame,
+            "Tail count" = as.data.frame( totals ),
+            "Mean tail length" = as.data.frame( means ),
+            "StdDev tail length" = as.data.frame( sds )
+        ),
+        sprintf("%s-statistics.csv", prefix),
+        comments = c(
+            '',
+            'Expression columns are quantile normalized log2 Reads Per Million as produced by the limma voom function',
+            ''
+        )
+    )
+    
+    """
+
+
+
+@config.help(
 """\
 Show a heatmap of the number of reads with different tail lengths in different genes.
 """,
@@ -539,6 +641,10 @@ class Analyse_tail_lengths(config.Action_with_prefix):
     saturation = 1
     working_dirs = [ ]
 
+    def log_filename(self):
+        if self.prefix is None: return None
+        return self.prefix + '_analyse_tail_lengths_log.txt'
+    
     def get_plot_pooleds(self):
         return [ 
         
@@ -548,7 +654,7 @@ class Analyse_tail_lengths(config.Action_with_prefix):
                 min_tails = min_tails,
             )
             
-            for min_tails in (200,500,1000,2000)
+            for min_tails in (20,50,100,200,500,1000,2000)
         ]
     
     def get_plot_comparisons(self):
@@ -596,6 +702,10 @@ class Analyse_tail_lengths(config.Action_with_prefix):
              working_dirs=self.working_dirs,
              saturation=self.saturation,
          ).make()        
+         
+         Tail_stats(
+             prefix=self.prefix
+         ).make()
 
          for action in self.get_plot_pooleds() + self.get_plot_comparisons() + self.get_heatmaps():
              action.process_make(stage)
