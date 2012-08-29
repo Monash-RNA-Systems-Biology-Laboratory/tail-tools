@@ -159,7 +159,7 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
 @config.Main_section('reads', 'Fastq files containing SOLiD reads.')
 @config.Configurable_section('analyse', 'Parameters for each "analyse-polya:"')
-@config.Configurable_section('analyse_tail_lengths', 'Parameters for "analyse-tail-lengths:"')
+#@config.Configurable_section('analyse_tail_lengths', 'Parameters for "analyse-tail-lengths:"')
 #@config.Configurable_section('count', 'Parameters for "nesoni count:"')
 @config.Section('extra_files', 'Extra files to include in report')
 class Analyse_polya_batch(config.Action_with_output_dir):
@@ -183,7 +183,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     
     analyse = Analyse_polya()
     
-    analyse_tail_lengths = tail_lengths.Analyse_tail_lengths()
+    #analyse_tail_lengths = tail_lengths.Analyse_tail_lengths()
     
     def run(self):
         stage = nesoni.Stage()
@@ -236,14 +236,25 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             *self.reads, 
             output=workspace/'stats.txt'
         ).process_make(stage)
-
-        analyse_tail_lengths = self.analyse_tail_lengths(
-            prefix = workspace/'stats',
-            working_dirs = dirs,
-        )
-        analyse_tail_lengths.process_make(stage)
         
         stage.barrier() #====================================================
+
+        analyse_tail_lengths_0 = tail_lengths.Analyse_tail_lengths(
+            prefix = workspace/'nodedup',
+            working_dirs = dirs,
+            saturation = 0,
+        )
+        analyse_tail_lengths_0.make()
+
+        analyse_tail_lengths_1 = tail_lengths.Analyse_tail_lengths(
+            prefix = workspace/'dedup',
+            working_dirs = dirs,
+            saturation = 1,
+        )
+        analyse_tail_lengths_1.make()
+        
+        #Note: not parallelized, because both will run Tail_lengths on each sample
+        #      (ugh, but not sure what the correct solution is)
         
         #===============================================
         #                   Report        
@@ -261,7 +272,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.report_logs('alignment-statistics',
             [ workspace/'stats.txt' ] +
             [ os.path.join(item, 'consensus_log.txt') for item in dirs + polya_dirs ] +
-            [ workspace/'stats_log.txt' ],
+            [ workspace/'dedup_log.txt' ],
             filter=lambda sample, field: (
                 field not in ['fragments','fragments aligned to the reference'] and
                 (not sample.endswith('-polyA') or field not in ['reads with alignments','hit multiple locations'])
@@ -305,9 +316,25 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 bam_files.append( (workspace/(name,'alignments_filtered_sorted.bam.bai'),name+'.bam.bai') )
             r.p(r.tar('bam-files.tar.gz', bam_files))
         
+        r.write('<div style="background: #ddddff; padding: 1em;">\n')
+        r.heading('Expression levels and tail lengths <b>without</b> read deduplication')        
+        self._report_tail_lengths(r, analyse_tail_lengths_0)
+        r.write('</div>')
+
+        r.write('<div style="background: #ddffdd; padding: 1em;">\n')
+        r.heading('Expression levels and tail lengths <b>with</b> read deduplication')        
+        self._report_tail_lengths(r, analyse_tail_lengths_1)
+        r.write('</div>\n')
+
+        r.write('<p/><hr>\n')
+        r.p('tail_tools version '+tail_tools.VERSION)
+        r.p('nesoni version '+nesoni.VERSION)
+        r.p('SHRiMP version '+grace.get_shrimp_2_version())
         
-        r.heading('Expression levels and tail lengths')
-        
+        r.close()
+
+
+    def _report_tail_lengths(self, r, analyse_tail_lengths):        
         saturation = analyse_tail_lengths.saturation
         if saturation:
             r.p(
@@ -316,10 +343,10 @@ class Analyse_polya_batch(config.Action_with_output_dir):
 
         r.p(
             'This scatterplot show the number of reads aligning to each gene between each pair of samples. '
-            'This can be used to discover poor samples, and possibly to see the effect of overzealous duplicate read removal.'
+            'This can be used to discover poor samples.'
         )        
         
-        r.p( r.get(workspace/'stats-count.png', name='scatterplots.png', image=True) )
+        r.p( r.get(analyse_tail_lengths.prefix + '-count.png', image=True) )
         
         r.p(
             'In the heatmaps below, the read counts have transformed as log2(x+0.5), offset to log2 Reads Per Million (RPM), and then quantile normalized.'
@@ -331,7 +358,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             r.p( 'Note: Reads with the same start and end position sometimes don\'t have the same tail length. '
                  'After deduplication these can contribute fractionally to the number of reads with tails.' )
         
-        r.p( r.get(workspace/'stats-statistics.csv', name='statistics.csv') )
+        r.p( r.get(analyse_tail_lengths.prefix + '-statistics.csv') )
         
         r.subheading('Poly(A) tail length in reads')
         
@@ -347,7 +374,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         for heatmap in analyse_tail_lengths.get_plot_pooleds():
             r.report_heatmap(heatmap)
             
-        r.heading('Average poly(A) tail length and its relation to expression levels')
+        r.subheading('Average poly(A) tail length and its relation to expression levels')
         
         r.p(
             'Only reads with a poly(A) sequence of four or more bases was included in the averages.'
@@ -377,13 +404,6 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         for heatmap in analyse_tail_lengths.get_heatmaps():
             r.report_heatmap(heatmap)
         
-
-        r.write('<p/><hr>\n')
-        r.p('tail_tools version '+tail_tools.VERSION)
-        r.p('nesoni version '+nesoni.VERSION)
-        r.p('SHRiMP version '+grace.get_shrimp_2_version())
-        
-        r.close()
 
 
 
