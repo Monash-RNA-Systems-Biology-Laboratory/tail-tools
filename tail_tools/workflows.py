@@ -159,7 +159,7 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
 @config.Main_section('reads', 'Fastq files containing SOLiD reads.')
 @config.Configurable_section('analyse', 'Parameters for each "analyse-polya:"')
-#@config.Configurable_section('analyse_tail_lengths', 'Parameters for "analyse-tail-lengths:"')
+@config.Configurable_section('analyse_tail_lengths', 'Parameters for "analyse-tail-lengths:"')
 #@config.Configurable_section('count', 'Parameters for "nesoni count:"')
 @config.Section('extra_files', 'Extra files to include in report')
 class Analyse_polya_batch(config.Action_with_output_dir):
@@ -183,7 +183,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     
     analyse = Analyse_polya()
     
-    #analyse_tail_lengths = tail_lengths.Analyse_tail_lengths()
+    analyse_tail_lengths = tail_lengths.Analyse_tail_lengths()
     
     def run(self):
         stage = nesoni.Stage()
@@ -239,14 +239,14 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         stage.barrier() #====================================================
 
-        analyse_tail_lengths_0 = tail_lengths.Analyse_tail_lengths(
+        analyse_tail_lengths_0 = self.analyse_tail_lengths(
             prefix = workspace/'nodedup',
             working_dirs = dirs,
             saturation = 0,
         )
         analyse_tail_lengths_0.make()
 
-        analyse_tail_lengths_1 = tail_lengths.Analyse_tail_lengths(
+        analyse_tail_lengths_1 = self.analyse_tail_lengths(
             prefix = workspace/'dedup',
             working_dirs = dirs,
             saturation = 1,
