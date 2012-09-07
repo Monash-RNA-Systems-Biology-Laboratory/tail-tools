@@ -76,7 +76,8 @@ class Analyse_polya(config.Action_with_output_dir):
         cores = nesoni.coordinator().get_cores()
         
         nesoni.Execute(
-            command = reference.shrimp_command(cs=True, parameters=[ clipped_filename, '-N', str(cores) ]),
+            command = reference.shrimp_command(cs=True, parameters=[ clipped_filename ]),
+            execution_options = [ '-N', str(cores) ],
             output=raw_filename,
             cores=cores,
         ).make()

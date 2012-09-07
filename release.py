@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import sys
+
 README = open('README','rb').read()
 
 PAGE = """
@@ -52,7 +54,7 @@ assert 0 == os.system('sudo PYTHONPATH=%s pypy setup.py install --home /bio/sw/p
 
 
 release_tarball_name = 'tail-tools-%s.tar.gz' % tail_tools.VERSION
-#assert not os.path.exists(release_tarball_name), release_tarball_name + ' already exists'
+assert 'force' in sys.argv[1:] or not os.path.exists('dist/'+release_tarball_name), release_tarball_name + ' already exists'
 date = datetime.date.today().strftime('%e %B %Y')
 
 assert 0 == os.system('python setup.py sdist')
