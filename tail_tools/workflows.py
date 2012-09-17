@@ -39,8 +39,31 @@ class Analyse_polya(config.Action_with_output_dir):
     
     consensus = True
     
+    _workspace_class = working_directory.Working
+    
+    def get_polya_dir(self):
+        return os.path.normpath(self.output_dir) + '-polyA'
+    
+    def get_filter_tool(self):
+        if self.consensus:
+            filter_tool = nesoni.Consensus
+        else:
+            filter_tool = nesoni.Filter
+        return filter_tool(
+            monogamous=False,
+            random=True,
+            infidelity=0,
+            userplots=False,
+        )
+    
+    def get_filter_action(self):
+        return self.get_filter_tool()(working_dir = self.output_dir)
+
+    def get_polya_filter_action(self):
+        return self.get_filter_tool()(working_dir = self.get_polya_dir())
+        
     def run(self):
-        polya_dir = os.path.normpath(self.output_dir) + '-polyA'
+        polya_dir = self.get_polya_dir()
     
         working = working_directory.Working(self.output_dir, must_exist=False)
         working.set_reference(self.reference)
@@ -55,17 +78,6 @@ class Analyse_polya(config.Action_with_output_dir):
         extended_filename = working/'alignments_extended.sam.gz'
         
         polya_filename = working/'alignments_filtered_polyA.sam.gz'
-
-        if self.consensus:
-            filter_tool = nesoni.Consensus
-        else:
-            filter_tool = nesoni.Filter
-        filter_tool = filter_tool(
-            monogamous=False,
-            random=True,
-            infidelity=0,
-            userplots=False,
-        )
 
         
         clip_runs.Clip_runs(
@@ -101,11 +113,8 @@ class Analyse_polya(config.Action_with_output_dir):
             output_dir=self.output_dir,
             reference=[ self.reference ],
         ).make()
-                    
-        filter_tool(
-            working_dir=self.output_dir
-        ).make()
-
+        
+        self.get_filter_action().make()
 
         Tail_only(
             input=working/'alignments_filtered.bam',
@@ -120,12 +129,8 @@ class Analyse_polya(config.Action_with_output_dir):
         
         # This shouldn't actually filter out any alignments.
         # We do it to produce depth of coverage plots
-        # and position-sorted BAM files.        
-        filter_tool(
-            working_dir=polya_dir
-        ).make()
-        
-        
+        # and position-sorted BAM files.
+        self.get_polya_filter_action().make()
         
         #@nesoni.parallel_for([
         #    (extended_filename, self.output_dir),
@@ -205,15 +210,19 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         polya_dirs = [ item + '-polyA' for item in dirs ]
         
         interleaved = [ item2 for item in zip(dirs,polya_dirs) for item2 in item ]
+        
+        filter_logs = [ ]
+        filter_polya_logs = [ ]
 
         for reads_filename, directory in zip(self.reads, dirs):
-            stage.process(
-                self.analyse(
-                    output_dir=directory,
-                    reference=self.reference,
-                    reads=reads_filename,
-                ).run
+            action = self.analyse(
+                output_dir=directory,
+                reference=self.reference,
+                reads=reads_filename,
             )
+            stage.process(action.run)
+            filter_logs.append(action.get_filter_action().log_filename())
+            filter_polya_logs.append(action.get_filter_action().log_filename())
 
         stage.barrier() #====================================================
 
@@ -272,7 +281,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         r.report_logs('alignment-statistics',
             [ workspace/'stats.txt' ] +
-            [ os.path.join(item, 'consensus_log.txt') for item in dirs + polya_dirs ] +
+            filter_logs + filter_polya_logs +
             [ workspace/'dedup_log.txt' ],
             filter=lambda sample, field: (
                 field not in ['fragments','fragments aligned to the reference'] and
