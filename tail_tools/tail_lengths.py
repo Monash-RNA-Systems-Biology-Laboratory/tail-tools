@@ -418,7 +418,7 @@ class Plot_pooled(runr.R_action, config.Action_with_prefix):
     
     result <- nesoni.heatmap( 
         kept.norm.pooled, labels, 
-        sort.mat=kept.norm.pooled, signed=FALSE, legend='number of reads\nscaled by row maximum\n')
+        sort.mat=kept.norm.pooled, signed=FALSE, legend='number of reads\nscaled by row maximum')
 
     dev.off()
 
