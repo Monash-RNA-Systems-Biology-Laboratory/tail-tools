@@ -339,7 +339,7 @@ Show a heatmap of the number of reads with different tail lengths in different g
 @config.Positional('aggregate', 'Prefix of output from "aggregate-tail-lengths:"')
 @config.Int_flag('min_tails', 'Minimum number of reads with tails in order to include in heatmap.')
 @config.Float_flag('min_svd', 'Attempt to pick a sample of genes representative of all the different types of variation.')
-class Plot_pooled(runr.R_action, config.Action_with_prefix):
+class Plot_pooled(config.Action_with_prefix, runr.R_action):
     aggregate = None
     min_tails = 1000
     min_svd = 0
@@ -455,7 +455,7 @@ class Plot_pooled(runr.R_action, config.Action_with_prefix):
 @config.Positional('aggregate', 'Prefix of output from "aggregate-tail-lengths:"')
 @config.Int_flag('min_tails', 'Minimum number of reads with tails *in each sample* required in order to include a gene.')
 @config.Float_flag('min_span', 'Minimum difference in average tail lengths required in order to include a gene.')
-class Plot_comparison(runr.R_action, config.Action_with_prefix):
+class Plot_comparison(config.Action_with_prefix, runr.R_action):
     aggregate = None
     min_tails = 1000
     min_span = 4
