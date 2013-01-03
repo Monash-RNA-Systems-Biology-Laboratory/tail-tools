@@ -5,9 +5,13 @@ reads with poly(A) tails.
 
 Use of PyPy is recommened for speed.
 
-Requirements:
 
-- "nesoni", available from http://vicbioinformatics.com/nesoni.shtml
+Requirements:
+=============
+
+- "nesoni", available from http://vicbioinformatics.com/nesoni.shtml or using
+
+    pip install nesoni
 
   You don't need to install all of nesoni's dependencies, just Python 2.7 
   or later or PyPy.
@@ -15,14 +19,40 @@ Requirements:
 - The "convert" tool from ImageMagick.
 
 
+Installation:
+=============
+
+Easy way:
+
+  pip install tail-tools
+
+From source:
+
+  python setup.py install
+
+For PyPy it seems to be currently easiest to set up in a virtualenv:
+
+  virtualenv -p pypy myenv
+  myenv/bin/pip install tail-tools
+
+
+Usage:
+======
+
 This package contains a number of tools, which can be listed by typing:
 
+  tail-tools
+  
 
-  ./tail-tools
-    
+The package can be used directly from the source directory with:
+
+  python -m tail_tools
+
 
 These tools may also be used as part of a nesoni-style workflow python script.
 
 
 
 Tail-tools is free software, released under the GPL (version 2).
+
+

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env pypy-bio
 
 import sys
 
@@ -49,9 +49,12 @@ pythonpath = os.environ['PYTHONPATH']
 # RAGE
 os.system('rm MANIFEST')
 
-assert 0 == os.system('sudo PYTHONPATH=%s pypy setup.py install --home /bio/sw/python' % pythonpath)
+#assert 0 == os.system('sudo PYTHONPATH=%s pypy setup.py install --home /bio/sw/python' % pythonpath)
 
+assert 0 == os.system('sudo /bio/sw/python/env-pypy/bin/python setup.py install')
+assert 0 == os.system('sudo /bio/sw/python/env-python/bin/python setup.py install')
 
+os.system('sudo rm -r tail_tools.egg-info')
 
 release_tarball_name = 'tail-tools-%s.tar.gz' % tail_tools.VERSION
 assert 'force' in sys.argv[1:] or not os.path.exists('dist/'+release_tarball_name), release_tarball_name + ' already exists'
@@ -65,6 +68,6 @@ f.close()
 
 assert 0 == os.system('cp dist/%s /home/websites/vicbioinformatics.com' % release_tarball_name)
 
-
+os.system('python setup.py sdist upload')
 
 
