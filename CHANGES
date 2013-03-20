@@ -1,0 +1,17 @@
+
+0.11 - Update to use newer nesoni features, such as sample tags
+
+0.10 - use distribute
+
+0.9 - R+ doesn't like trailing newlines in text in plots sometimes, apparently
+
+0.8 - use report from correct log files when using consensus=False
+
+0.7 - don't re-run everything if number of cores changes
+
+0.6 - analysis is now performed both with and without deduplication
+
+0.5 - add "tail-stats:" tool
+      extend_sam: fix out by one error for AA:i: attribute on reverse strand
+
+0.4 - plot-pooled now produces a spreadsheet

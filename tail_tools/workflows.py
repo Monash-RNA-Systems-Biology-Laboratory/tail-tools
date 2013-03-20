@@ -2,7 +2,7 @@
 import os, math, glob
 
 import nesoni
-from nesoni import config, working_directory, io, reporting, grace
+from nesoni import config, working_directory, reference_directory, io, reporting, grace
 
 import tail_tools
 from tail_tools import clip_runs, extend_sam, proportions, tail_lengths
@@ -31,13 +31,16 @@ imported into a nesoni working directory.
 Directories are created both using all reads and for reads with a poly-A tail.
 """)
 @config.Bool_flag('consensus', 'Look for SNPs and indels.')
+#@config.String_flag('types', 'Comma separated list of feature types to use.')
+@config.Section('tags', 'Tags for this sample. (See "nesoni tag:".)')
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
-@config.Positional('reads', 'Fastq file containing SOLiD reads.')
+@config.Section('reads', 'Fastq files containing SOLiD reads.')
 class Analyse_polya(config.Action_with_output_dir):
     reference = None
-    reads = None
-    
+    tags = [ ]
+    reads = [ ]    
     consensus = True
+    #types = 'gene'
     
     _workspace_class = working_directory.Working
     
@@ -61,7 +64,7 @@ class Analyse_polya(config.Action_with_output_dir):
 
     def get_polya_filter_action(self):
         return self.get_filter_tool()(working_dir = self.get_polya_dir())
-        
+    
     def run(self):
         polya_dir = self.get_polya_dir()
     
@@ -81,11 +84,11 @@ class Analyse_polya(config.Action_with_output_dir):
 
         
         clip_runs.Clip_runs(
-            self.reads,
+            filenames=self.reads,
             output=clipped_filename,
         ).make()
         
-        cores = nesoni.coordinator().get_cores()
+        cores = min(nesoni.coordinator().get_cores(), 8)
         
         nesoni.Execute(
             command = reference.shrimp_command(cs=True, parameters=[ clipped_filename ]),
@@ -97,7 +100,7 @@ class Analyse_polya(config.Action_with_output_dir):
         extend_sam.Extend_sam(
             input=raw_filename,
             output=extended_filename,
-            reads_filename=self.reads,
+            reads=self.reads,
             reference_filenames=[ reference.reference_fasta_filename() ],
         ).make()
         
@@ -132,6 +135,14 @@ class Analyse_polya(config.Action_with_output_dir):
         # and position-sorted BAM files.
         self.get_polya_filter_action().make()
         
+        nesoni.Tag(self.output_dir, tags=self.tags).make()
+        nesoni.Tag(polya_dir, tags=self.tags).make()
+
+        #tail_tools.Tail_lengths(
+        #    working_dir=self.output_dir, 
+        #    types=self.types,
+        #    ).make()    
+        
         #@nesoni.parallel_for([
         #    (extended_filename, self.output_dir),
         #    (polya_filename, polya_dir),
@@ -163,10 +174,17 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.Bool_flag('include_genome', 'Include genome in IGV plots tarball?')
 @config.Bool_flag('include_bams', 'Include BAM files in report?')
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
-@config.Main_section('reads', 'Fastq files containing SOLiD reads.')
-@config.Configurable_section('analyse', 'Parameters for each "analyse-polya:"')
+@config.Configurable_section('template', 
+    'Common options for each "sample:". '
+    'Put this section before the actual "sample:" sections.',
+    presets = [ ('default', lambda obj: Analyse_polya(), 'default "analyse-polya:" options') ],
+    )
+@config.Configurable_section_list('samples',
+    'Samples for analysis. Give one "sample:" section for each sample.',
+    templates = [ ],
+    sections = [ ('sample', lambda obj: obj.template, 'A sample, parameters as per "analyse-polya:".') ],
+    )
 @config.Configurable_section('analyse_tail_lengths', 'Parameters for "analyse-tail-lengths:"')
-#@config.Configurable_section('count', 'Parameters for "nesoni count:"')
 @config.Section('extra_files', 'Extra files to include in report')
 class Analyse_polya_batch(config.Action_with_output_dir):
     file_prefix = ''
@@ -180,49 +198,56 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     include_genome = True
     include_bams = True
     reference = None
-    reads = [ ]
-    
-    #count = nesoni.Count(
-    #    filter='existing',
-    #    strand='forward',
-    #)
-    
-    analyse = Analyse_polya()
+    samples = [ ]
     
     analyse_tail_lengths = tail_lengths.Analyse_tail_lengths()
     
     def run(self):
         stage = nesoni.Stage()
 
-        names = [
-            os.path.splitext(os.path.split(item)[1])[0]
-            for item in self.reads
-        ]
+        names = [ sample.output_dir for sample in self.samples ]
+            #os.path.splitext(os.path.split(item)[1])[0]
+            #for item in self.reads
+            #]
+        
+        reference = reference_directory.Reference(self.reference, must_exist=True)
         
         workspace = io.Workspace(self.output_dir, must_exist=False)
+        samplespace = io.Workspace(workspace/'samples', must_exist=False)
         plotspace = io.Workspace(workspace/'plots', must_exist=False)
-        heatspace = io.Workspace(workspace/'heatmaps', must_exist=False)
+        expressionspace = io.Workspace(workspace/'expression', must_exist=False)
 
-        dirs = [
-            workspace/item
-            for item in names
-        ]
-        polya_dirs = [ item + '-polyA' for item in dirs ]
+        #dirs = [
+        #    workspace/item
+        #    for item in names
+        #]
+
+        samples = [ ]
+        for sample in self.samples:
+            samples.append(sample(
+                samplespace / sample.output_dir,
+                reference = self.reference,
+                ))
         
+        dirs = [ item.output_dir for item in samples ]
+        polya_dirs = [ item + '-polyA' for item in dirs ]        
         interleaved = [ item2 for item in zip(dirs,polya_dirs) for item2 in item ]
         
-        filter_logs = [ ]
-        filter_polya_logs = [ ]
+        filter_logs = [ item.get_filter_action().log_filename() for item in samples ]
+        filter_polya_logs = [ item.get_polya_filter_action().log_filename() for item in samples ]
+        
+        for item in samples:
+            item.process_make(stage)
 
-        for reads_filename, directory in zip(self.reads, dirs):
-            action = self.analyse(
-                output_dir=directory,
-                reference=self.reference,
-                reads=reads_filename,
-            )
-            stage.process(action.run)
-            filter_logs.append(action.get_filter_action().log_filename())
-            filter_polya_logs.append(action.get_filter_action().log_filename())
+        #for reads_filename, directory in zip(self.reads, dirs):
+        #    action = self.analyse(
+        #        output_dir=directory,
+        #        reference=self.reference,
+        #        reads=reads_filename,
+        #    )
+        #    stage.process(action.run)
+        #    filter_logs.append(action.get_filter_action().log_filename())
+        #    filter_polya_logs.append(action.get_filter_action().log_filename())
 
         stage.barrier() #====================================================
 
@@ -242,29 +267,28 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 ).process_make(stage)
 
         
-        nesoni.Stats(
-            *self.reads, 
-            output=workspace/'stats.txt'
-        ).process_make(stage)
+        #nesoni.Stats(
+        #    *self.reads, 
+        #    output=workspace/'stats.txt'
+        #).process_make(stage)
         
         stage.barrier() #====================================================
 
         analyse_tail_lengths_0 = self.analyse_tail_lengths(
-            prefix = workspace/'nodedup',
+            prefix = expressionspace/'nodedup',
             working_dirs = dirs,
             saturation = 0,
         )
-        analyse_tail_lengths_0.make()
+        analyse_tail_lengths_0.process_make(stage)
 
         analyse_tail_lengths_1 = self.analyse_tail_lengths(
-            prefix = workspace/'dedup',
+            prefix = expressionspace/'dedup',
             working_dirs = dirs,
             saturation = 1,
         )
-        analyse_tail_lengths_1.make()
+        analyse_tail_lengths_1.process_make(stage)
         
-        #Note: not parallelized, because both will run Tail_lengths on each sample
-        #      (ugh, but not sure what the correct solution is)
+        stage.barrier() #====================================================
         
         #===============================================
         #                   Report        
@@ -280,9 +304,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.heading('Alignment to reference')
         
         r.report_logs('alignment-statistics',
-            [ workspace/'stats.txt' ] +
+            #[ workspace/'stats.txt' ] +
             filter_logs + filter_polya_logs +
-            [ workspace/'dedup_log.txt' ],
+            [ expressionspace/'dedup_log.txt' ],
             filter=lambda sample, field: (
                 field not in ['fragments','fragments aligned to the reference'] and
                 (not sample.endswith('-polyA') or field not in ['reads with alignments','hit multiple locations'])
@@ -322,18 +346,18 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             
             bam_files = [ ]
             for name in names:
-                bam_files.append( (workspace/(name,'alignments_filtered_sorted.bam'),name+'.bam') )
-                bam_files.append( (workspace/(name,'alignments_filtered_sorted.bam.bai'),name+'.bam.bai') )
+                bam_files.append( (samplespace/(name,'alignments_filtered_sorted.bam'),name+'.bam') )
+                bam_files.append( (samplespace/(name,'alignments_filtered_sorted.bam.bai'),name+'.bam.bai') )
             r.p(r.tar('bam-files.tar.gz', bam_files))
         
         r.write('<div style="background: #ddddff; padding: 1em;">\n')
         r.heading('Expression levels and tail lengths <b>without</b> read deduplication')        
-        self._report_tail_lengths(r, analyse_tail_lengths_0)
+        analyse_tail_lengths_0.report_tail_lengths(r)
         r.write('</div>')
 
         r.write('<div style="background: #ddffdd; padding: 1em;">\n')
         r.heading('Expression levels and tail lengths <b>with</b> read deduplication')        
-        self._report_tail_lengths(r, analyse_tail_lengths_1)
+        analyse_tail_lengths_1.self._report_tail_lengths(r)
         r.write('</div>\n')
 
         r.write('<p/><hr>\n')
@@ -343,77 +367,6 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         r.close()
 
-
-    def _report_tail_lengths(self, r, analyse_tail_lengths):        
-        saturation = analyse_tail_lengths.saturation
-        if saturation:
-            r.p(
-                'Duplicate read removal: Sets of reads aligning with exactly the start and end position in the reference were counted as a single read.'
-            )
-
-        r.p(
-            'This scatterplot show the number of reads aligning to each gene between each pair of samples. '
-            'This can be used to discover poor samples.'
-        )        
-        
-        r.p( r.get(analyse_tail_lengths.prefix + '-count.png', image=True) )
-        
-        r.p(
-            'In the heatmaps below, the read counts have transformed as log2(x+0.5), offset to log2 Reads Per Million (RPM), and then quantile normalized.'
-        )
-        
-        r.subheading('Spreadsheet with statistics for all genes and all samples')
-        
-        if saturation:
-            r.p( 'Note: Reads with the same start and end position sometimes don\'t have the same tail length. '
-                 'After deduplication these can contribute fractionally to the number of reads with tails.' )
-        
-        r.p( r.get(analyse_tail_lengths.prefix + '-statistics.csv') )
-        
-        r.subheading('Poly(A) tail length in reads')
-        
-        r.p(
-            'Some reads contain a poly(A) sequence not found in the reference. '
-            'It is hoped that the lengths of these poly(A) sequences gives an indication of the true length of polyadenylation.'
-        )
-        
-        r.p(
-            'Only reads with a poly(A) sequence of four or more bases are used.'
-        )
-        
-        for heatmap in analyse_tail_lengths.get_plot_pooleds():
-            r.report_heatmap(heatmap)
-            
-        r.subheading('Average poly(A) tail length and its relation to expression levels')
-        
-        r.p(
-            'Only reads with a poly(A) sequence of four or more bases was included in the averages.'
-        )
-        
-        r.p(
-            'Genes were selected based on there being at least some number of reads with poly(A) sequence in <i>each</i> sample (min-tails), '
-            'and on there being at least some amount of difference in average tail length between samples (min-span).'
-        )
-        
-        for heatmap in analyse_tail_lengths.get_plot_comparisons():
-            r.report_heatmap(heatmap)
-        
-        r.subheading('Heatmaps')
-        
-        r.p(
-            'Genes were selected based on there being at least some number of reads '
-            'in at least one of the samples (min-max), '
-            'and on there being at least some fold change difference between '
-            'some pair of samples (fold).'
-        )
-        
-        r.p(
-            'The log2 counts have been quantile normalized.'
-        )
-        
-        for heatmap in analyse_tail_lengths.get_heatmaps():
-            r.report_heatmap(heatmap)
-        
 
 
 

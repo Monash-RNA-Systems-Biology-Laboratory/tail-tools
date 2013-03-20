@@ -193,11 +193,11 @@ Stream SAM records from stdin to stdout.
 SAM records of reads that have a tail of at least three bases are tagged with an 'AA' attribute.
 """)
 @config.Int_flag('quality', 'Minimum quality.')
-@config.Positional('reads_filename', 'Original reads in FASTQ format.')
 @config.Main_section('reference_filenames', 'Reference sequences in FASTA format.')
+@config.Section('reads', 'Original reads in FASTQ format.')
 class Extend_sam(config.Action_filter):
     quality = 20
-    reads_filename = None
+    reads = [ ]
     reference_filenames = [ ]
 
     def cores_required(self):
@@ -212,10 +212,11 @@ class Extend_sam(config.Action_filter):
             for name, seq in util.read_fasta(open(filename,'rb')):
                 references[name] = seq
         
-        print >> sys.stderr, 'Load', self.reads_filename
         reads = { }
-        for name, seq, qual in util.read_fastq(open(self.reads_filename,'rb')):
-            reads[name] = (seq, qual)
+        for filename in self.reads:
+            print >> sys.stderr, 'Load', filename
+            for name, seq, qual in util.read_fastq(open(filename,'rb')):
+                reads[name] = (seq, qual)
         
         print >> sys.stderr, 'Begin'
         

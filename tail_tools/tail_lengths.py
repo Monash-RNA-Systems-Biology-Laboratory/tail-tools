@@ -2,27 +2,37 @@
 import itertools, collections, math
 
 import nesoni
-from nesoni import annotation, sam, span_index, config, working_directory, io, runr
+from nesoni import annotation, sam, span_index, config, working_directory, workspace, io, runr, reporting
+
+import cPickle as pickle
 
 @config.help(
 'Create file to be used by "aggregate-tail-lengths:".'
-"""
-""")
+)
+@config.String_flag('annotations', 'Filename containing annotations. Defaults to annotations in reference directory.')
 @config.String_flag('types', 'Comma separated list of feature types to use.')
-class Tail_lengths(config.Action_with_working_dir):
+@config.Positional('working_dir', 'Working directory to use as input.')
+class Tail_lengths(config.Action_with_prefix):
+     annotations = None
      types = 'gene'
+     working_dir = None
 
-     _workspace_class = working_directory.Working
+     #_workspace_class = working_directory.Working
 
      def run(self):
-         workspace = self.get_workspace()
-         reference = workspace.get_reference()
+         #workspace = self.get_workspace()
+         workspace = working_directory.Working(self.working_dir, must_exist=True)
+         if self.annotations == None:
+             reference = workspace.get_reference()
+             annotations_filename = reference.annotations_filename()
+         else:
+             annotations_filename = self.annotations
          
          types = [ item.lower() for item in self.types.split(',') ]
      
          annotations = [ 
              item 
-             for item in annotation.read_annotations(reference.annotations_filename())
+             for item in annotation.read_annotations(annotations_filename)
              if item.type.lower() in types
          ]
          
@@ -65,7 +75,11 @@ class Tail_lengths(config.Action_with_working_dir):
                          
                          gene.hits.append( (rel_start,rel_end,tail_length) )
                                   
-         workspace.set_object(annotations, 'tail-lengths.pickle.gz')
+         #workspace.set_object(annotations, 'tail-lengths.pickle.gz')
+         f = io.open_possibly_compressed_writer(self.prefix + '.pickle.gz')
+         pickle.dump((workspace.name, workspace.get_tags(), annotations), f, pickle.HIGHEST_PROTOCOL)
+         f.close()
+         
 
 
 @config.help(
@@ -78,23 +92,42 @@ class Tail_lengths(config.Action_with_working_dir):
      'Reads that start at the same position will only '
      'count as up to this many. Zero for no staturation.'
 )
-@config.Main_section('working_dirs')
+@config.Main_section('pickles')
 class Aggregate_tail_lengths(config.Action_with_prefix):         
     saturation = 1
-    working_dirs = [ ]
+    pickles = [ ]
+
+    def log_filename(self):
+        if self.prefix is None: return None
+        return self.prefix + '_aggregate_log.txt'
+
+    def state_filename(self):
+        return self.prefix + '_aggregate.state'
          
     def run(self):
-        workspaces = [ 
-            working_directory.Working(item) 
-            for item in self.working_dirs 
-        ]
+        #workspaces = [ 
+        #    working_directory.Working(item) 
+        #    for item in self.working_dirs 
+        #]
+        #
+        #data = [ 
+        #    item.get_object('tail-lengths.pickle.gz') 
+        #    for item in workspaces
+        #]        
+        #
+        #names = [ item.name for item in workspaces ]
         
-        data = [ 
-            item.get_object('tail-lengths.pickle.gz') 
-            for item in workspaces
-        ]        
+        data = [ ]
+        names = [ ]
+        sample_tags = [ ]
         
-        names = [ item.name for item in workspaces ]
+        for item in self.pickles:
+            f = io.open_possibly_compressed_file(item)
+            name, tags, datum = pickle.load(f)
+            f.close()
+            data.append(datum)
+            names.append(name)
+            sample_tags.append(tags)
         
         annotations = data[0]
         
@@ -126,10 +159,10 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
                     for item2 in item:
                         feature.tail_counts[item2] += weight
 
-            self.log.datum(workspaces[i].name, 'Alignments to genes', n_alignments)
+            self.log.datum(names[i], 'Alignments to genes', n_alignments)
             if self.saturation >= 1:
-                self.log.datum(workspaces[i].name, 'Proportion of alignments with duplicate start and end position', float(n_duplicates)/max(1,n_alignments))
-                self.log.datum(workspaces[i].name, 'Alignments to genes after deduplication', n_good)
+                self.log.datum(names[i], 'Proportion of alignments with duplicate start and end position', float(n_duplicates)/max(1,n_alignments))
+                self.log.datum(names[i], 'Alignments to genes after deduplication', n_good)
                 
         
         counts = [ ]
@@ -148,7 +181,10 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
         #            item.append(0)
         
         
-        
+        comments = [ '#Counts' ] + [
+            '#sampleTags='+','.join(tags)
+            for tags in sample_tags
+            ]
 
         def counts_iter():
             for i in xrange(len(counts)):
@@ -162,7 +198,7 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
                 row[('Annotation','product')] = annotations[i].attr.get('product','')
                 #row[('Annotation','Strand')] = str(annotations[i].strand)
                 yield row
-        io.write_csv(self.prefix + '-counts.csv', counts_iter())
+        io.write_csv(self.prefix + '-counts.csv', counts_iter(), comments=comments)
 
         def raw_columns():
             for i in xrange(len(names)):
@@ -229,6 +265,9 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
     'The prefix should be the same as that given to "aggregate-tail-lengths:".'
 )
 class Tail_stats(config.Action_with_prefix, runr.R_action):
+    def state_filename(self):
+        return self.prefix + '_tail_stats.state'
+
     def log_filename(self):
         if self.prefix is None: return None
         return self.prefix + '_tail_stats_log.txt'
@@ -455,19 +494,25 @@ class Plot_pooled(config.Action_with_prefix, runr.R_action):
 @config.Positional('aggregate', 'Prefix of output from "aggregate-tail-lengths:"')
 @config.Int_flag('min_tails', 'Minimum number of reads with tails *in each sample* required in order to include a gene.')
 @config.Float_flag('min_span', 'Minimum difference in average tail lengths required in order to include a gene.')
+@config.Float_flag('glog_moderation', 'Amount of moderation used in log transformation of expression level.')
 class Plot_comparison(config.Action_with_prefix, runr.R_action):
     aggregate = None
-    min_tails = 1000
-    min_span = 4
+    min_tails = 100
+    min_span = 4.0
+    glog_moderation = 5.0
 
     script = r"""
     library(nesoni)
     
     # === Load data ==
     
-    data <- read.grouped.table(sprintf('%s-counts.csv',aggregate),require=c('Count','Annotation'))
-    annotation <- data$Annotation
-    expression <- voom( as.matrix(data$Count), normalize.method='quantile' )$E
+    #data <- read.grouped.table(sprintf('%s-counts.csv',aggregate),require=c('Count','Annotation'))
+    #annotation <- data$Annotation
+    #expression <- voom( as.matrix(data$Count), normalize.method='quantile' )$E
+    
+    dgelist <- read.counts(sprintf('%s-counts.csv',aggregate))
+    expression <- glog2.rpm.counts(dgelist, glog_moderation)$E
+    annotation <- dgelist$genes
     
     raw <- as.matrix(read.grouped.table(sprintf('%s-raw.csv',aggregate))$All)
     
@@ -629,6 +674,7 @@ class Plot_comparison(config.Action_with_prefix, runr.R_action):
 """\
 """
 )
+@config.String_flag('annotations', 'Filename containing annotations. Defaults to annotations in reference directory.')
 @config.String_flag('types', 'Comma separated list of feature types to use.')
 @config.Int_flag('saturation',
      'Duplicate start position saturation level. '
@@ -637,6 +683,7 @@ class Plot_comparison(config.Action_with_prefix, runr.R_action):
 )
 @config.Main_section('working_dirs')
 class Analyse_tail_lengths(config.Action_with_prefix):         
+    annotations = None
     types = 'gene'
     saturation = 1
     working_dirs = [ ]
@@ -675,23 +722,33 @@ class Analyse_tail_lengths(config.Action_with_prefix):
         return [
             
             nesoni.Heatmap(
-                prefix = '%s-heatmap-min-fold-%.1f-min-max-%d' % (self.prefix, fold, min_count),
+                #prefix = '%s-heatmap-min-fold-%.1f-min-max-%d' % (self.prefix, fold, min_count),
+                prefix = '%s-heatmap-min-fold-%.1f' % (self.prefix, fold),
                 counts = self.prefix + '-counts.csv',
                 min_total = 0,
-                min_max = min_count,
+                #min_max = min_count,
                 min_span = math.log(fold)/math.log(2.0),
             )
             
-            for fold in [ 1.5, 2.0, 4.0, 6.0, 8.0 ]
-            for min_count in [ 10, 50, 250 ]
+            for fold in [ 1.5, 2.0, 4.0, 6.0, 8.0, 10.0, 20.0 ]
+            #for min_count in [ 10, 50, 250 ]
         ]
 
     def run(self):
          stage = nesoni.Stage()
+         
+         names = [ ]
+         
+         pickle_workspace = workspace.Workspace(self.prefix + '-pickles')
+         pickle_filenames = [ ]
 
          for dir in self.working_dirs:
+             working = working_directory.Working(dir, must_exist=True)
+             pickle_filenames.append(pickle_workspace/working.name+'.pickle.gz')
              Tail_lengths(
+                 pickle_workspace/working.name,
                  working_dir=dir, 
+                 annotations=self.annotations,
                  types=self.types,
              ).process_make(stage)    
 
@@ -699,7 +756,8 @@ class Analyse_tail_lengths(config.Action_with_prefix):
          
          Aggregate_tail_lengths(
              prefix=self.prefix, 
-             working_dirs=self.working_dirs,
+             #working_dirs=self.working_dirs,
+             pickles=pickle_filenames,
              saturation=self.saturation,
          ).make()        
          
@@ -717,8 +775,100 @@ class Analyse_tail_lengths(config.Action_with_prefix):
          
          stage.barrier() #=================================================
 
+         r = reporting.Reporter(self.prefix + '-report', 
+             '3\'seq expression analysis ' + ('with read deduplication' if self.saturation else 'without read deduplication'), 
+             '')         
+         self.report_tail_lengths(r)
+         r.close()
 
 
+
+    def report_tail_lengths(self, r):        
+        saturation = self.saturation
+        if saturation:
+            r.p(
+                'Duplicate read removal: Sets of reads aligning with exactly the start and end position in the reference were counted as a single read.'
+            )
+
+        r.p(
+            'This scatterplot show the number of reads aligning to each gene between each pair of samples. '
+            'This can be used to discover poor samples.'
+        )        
+        
+        r.p( r.get(self.prefix + '-count.png', image=True) )
+        
+        r.p('Counts are converted to '
+            'log2 Reads Per Million using a variance stabilised transformation. '
+            'Let the generalised logarithm with moderation m be')
+        
+        r.p('glog(x,m) = log2((x+sqrt(x*x+4*m*m))/2)')
+        
+        r.p('then the transformed values will be')
+        
+        r.p('glog( count/library_size*1e6, log_moderation/mean_library_size*1e6 )')
+        
+        r.p('where log_moderation is a parameter, here 5. '
+            'The library sizes used are effective library sizes after TMM normalization.')
+        
+        
+        r.subheading('Spreadsheet with statistics for all genes and all samples')
+        
+        if saturation:
+            r.p( 'Note: Reads with the same start and end position sometimes don\'t have the same tail length. '
+                 'After deduplication these can contribute fractionally to the number of reads with tails.' )
+        
+        r.p( r.get(self.prefix + '-statistics.csv') )
+        
+        r.subheading('Poly(A) tail length in reads')
+        
+        r.p(
+            'Some reads contain a poly(A) sequence not found in the reference. '
+            'It is hoped that the lengths of these poly(A) sequences gives an indication of the true length of polyadenylation.'
+        )
+        
+        r.p(
+            'Only reads with a poly(A) sequence of four or more bases are used.'
+        )
+        
+        for heatmap in self.get_plot_pooleds():
+            r.report_heatmap(heatmap)
+            
+        r.subheading('Average poly(A) tail length and its relation to expression levels')
+        
+        r.p(
+            'Only reads with a poly(A) sequence of four or more bases was included in the averages.'
+        )
+        
+        r.p(
+            'Genes were selected based on there being at least some number of reads with poly(A) sequence in <i>each</i> sample (min-tails), '
+            'and on there being at least some amount of difference in average tail length between samples (min-span).'
+        )
+        
+        for heatmap in self.get_plot_comparisons():
+            r.report_heatmap(heatmap)
+        
+        r.subheading('Heatmaps')
+        
+        r.p(
+            'Genes were selected based on there being '
+            #'at least some number of reads '
+            #'in at least one of the samples (min-max), '
+            #'and '
+            'on there being at least some fold change difference between '
+            'some pair of samples.'
+        )
+        
+        #r.p(
+        #    'The log2 counts have been quantile normalized.'
+        #)
+        
+        for heatmap in self.get_heatmaps():
+            r.report_heatmap(heatmap)
+
+        r.heading('Raw data')
+        
+        r.p(r.get(self.prefix + '-counts.csv'))
+        
 
 
 

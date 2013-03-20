@@ -37,10 +37,11 @@ pre { line-height: 100%%; font-size: 130%%; }
 <!--#include virtual="bot.html" -->
 """
 
-
 import os, datetime
 
 import tail_tools
+
+def sh(cmd): assert 0 == os.system(cmd)
 
 #os.environ['PATH'] = '/bio/sw/python/bin:' + os.environ['PATH']
 
@@ -51,8 +52,8 @@ os.system('rm MANIFEST')
 
 #assert 0 == os.system('sudo PYTHONPATH=%s pypy setup.py install --home /bio/sw/python' % pythonpath)
 
-assert 0 == os.system('sudo /bio/sw/python/env-pypy/bin/python setup.py install')
-assert 0 == os.system('sudo /bio/sw/python/env-python/bin/python setup.py install')
+#assert 0 == os.system('sudo /bio/sw/python/env-pypy/bin/python setup.py install')
+#assert 0 == os.system('sudo /bio/sw/python/env-python/bin/python setup.py install')
 
 os.system('sudo rm -r tail_tools.egg-info')
 
@@ -66,8 +67,9 @@ f = open('/home/websites/vicbioinformatics.com/software.tail-tools.shtml','wb')
 f.write(PAGE % locals())
 f.close()
 
-assert 0 == os.system('cp dist/%s /home/websites/vicbioinformatics.com' % release_tarball_name)
+sh('cp dist/%s /home/websites/vicbioinformatics.com' % release_tarball_name)
 
-os.system('python setup.py sdist upload')
-
+sh('python setup.py sdist upload')
+sh('sudo -H /bio/sw/python/env-pypy/bin/pip install --upgrade tail-tools')
+sh('sudo -H /bio/sw/python/env-python/bin/pip install --upgrade tail-tools')
 
