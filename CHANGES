@@ -1,4 +1,22 @@
 
+0.17 - Assignment of reads to features made more deterministic in "tail-lengths:"
+
+0.16 - Thread tail statistics through outputs.
+       "tail_length:" now only ever counts reads once, 
+           uses only the feature with the greatest overlap of a read 
+           rather than all features with overlaps.
+       "compare-peaks:" now ranks by "interestingness".
+
+0.15 - Added "compare-peaks:" tool.
+
+0.14 - Extend_sam now requires 4 bases of tail rather than 3 to be marked AA,
+       to be consistent with tail length tools (and observation that this is a better cutoff).
+
+0.13 - Don't call file igv-plots.tar.gz.tar.gz,
+       a single .tar.gz is sufficient.
+
+0.12 - Bugfixes
+
 0.11 - Update to use newer nesoni features, such as sample tags
 
 0.10 - use distribute

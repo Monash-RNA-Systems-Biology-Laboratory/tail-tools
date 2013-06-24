@@ -63,9 +63,20 @@ class Tail_lengths(config.Action_with_prefix):
                          tail_length = int(item[5:])
                  
                  if fragment[0].rname in index:
-                     for gene in index[fragment[0].rname].get(start,end):
-                         if gene.strand != strand: continue
-                         
+                     hits = [ 
+                         gene
+                         for gene in index[fragment[0].rname].get(start,end)
+                         if gene.strand == strand
+                         ]                         
+                     if hits:
+                         hits.sort(key=lambda gene: gene.get_id()) #Ensure a deterministic order
+                         gene = max(hits, key=lambda gene: 
+                             (min(end,gene.end)-max(start,gene.start),
+                              abs((start+end)-(gene.start+gene.end)))
+                             ) 
+                             #Maximum overlap hit
+                             #(failing that, closest middles)
+                             
                          if strand > 0:
                              rel_start = start - gene.start
                              rel_end = end - gene.start
@@ -74,7 +85,7 @@ class Tail_lengths(config.Action_with_prefix):
                              rel_end = gene.end - start
                          
                          gene.hits.append( (rel_start,rel_end,tail_length) )
-                                  
+
          #workspace.set_object(annotations, 'tail-lengths.pickle.gz')
          f = io.open_possibly_compressed_writer(self.prefix + '.pickle.gz')
          pickle.dump((workspace.name, workspace.get_tags(), annotations), f, pickle.HIGHEST_PROTOCOL)
@@ -91,10 +102,22 @@ class Tail_lengths(config.Action_with_prefix):
      'Duplicate start position saturation level. '
      'Reads that start at the same position will only '
      'count as up to this many. Zero for no staturation.'
-)
+     )
+@config.Int_flag('tail',
+     'Minimum tail length to count as having a tail.'
+     )
+@config.Int_flag('ntail',
+     'Minimum number of observed tails lengths needed to call a mean tail length.'
+     )
+@config.Int_flag('nprop',
+     'Minimum number of observed reads to call a proportion of reads with tails.'
+     )
 @config.Main_section('pickles')
-class Aggregate_tail_lengths(config.Action_with_prefix):         
+class Aggregate_tail_lengths(config.Action_with_prefix):             
     saturation = 1
+    tail = 4
+    ntail = 10
+    nprop = 10
     pickles = [ ]
 
     def log_filename(self):
@@ -131,12 +154,17 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
         
         annotations = data[0]
         
-        max_length = max( 
+        all_lengths = [ 
             tail_length
             for sample in data
             for feature in sample
             for rel_start,rel_end,tail_length in feature.hits
-        )+1
+            ]
+        if all_lengths: 
+            max_length = max(all_lengths)+1
+        else:
+            max_length = 1
+        del all_lengths
         
         for i, sample in enumerate(data):
             n_alignments = 0
@@ -157,7 +185,7 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
                         weight = float(self.saturation) / len(item)
                         n_duplicates += len(item)
                     for item2 in item:
-                        feature.tail_counts[item2] += weight
+                        feature.tail_counts[item2] += weight                
 
             self.log.datum(names[i], 'Alignments to genes', n_alignments)
             if self.saturation >= 1:
@@ -165,7 +193,7 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
                 self.log.datum(names[i], 'Alignments to genes after deduplication', n_good)
                 
         
-        counts = [ ]
+        counts = [ ]  # [feature][sample][taillength]
         
         for item in data: 
             assert len(item) == len(data[0])
@@ -173,17 +201,102 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
             this_counts = [ item.tail_counts for item in row ]
             counts.append(this_counts)
         
+        totals = [ ]          # [feature][sample]  Total count
+        sample_prop = [ ]     # [feature][sample]  Proportion of reads with tail
+        sample_tail = [ ]     # [feature][sample]  Mean tail length in each sample
+        overall_prop = [ ]    # [feature]          Overall proportion with tail
+        overall_tail = [ ]    # [feature]          Overall mean tail length
+        overall_n_tail = [ ]
+        for row in counts:
+            this_totals = [ ]
+            this_prop = [ ]
+            this_tail = [ ]
+            this_n = 0.0
+            this_n_tail = 0.0
+            this_total_tail = 0.0
+            for item in row:
+                this_this_n = sum(item)
+                this_totals.append( this_this_n )
+                this_this_n_tail = sum(item[self.tail:])
+                this_this_total_tail = sum( item[i]*i for i in xrange(self.tail,max_length) )
+                if this_this_n < self.nprop:
+                    this_prop.append(None)
+                else:
+                    this_prop.append(float(this_this_n_tail)/this_this_n)
+                if this_this_n_tail < self.ntail:
+                    this_tail.append(None)
+                else:
+                    this_tail.append(this_this_total_tail/this_this_n_tail)
+                this_n += this_this_n
+                this_n_tail += this_this_n_tail
+                this_total_tail += this_this_total_tail
+
+            totals.append(this_totals)
+            sample_prop.append(this_prop)
+            sample_tail.append(this_tail)
+            overall_n_tail.append(this_n_tail)
+            if this_n < self.nprop:
+                overall_prop.append(None)
+            else:
+                overall_prop.append(float(this_n_tail)/this_n)
+            if this_n_tail < self.ntail:
+                overall_tail.append(None)
+            else:
+                overall_tail.append(this_total_tail/this_n_tail)
+             
+        for i, name in enumerate(names):
+            this_total = 0.0            
+            this_n = 0
+            for row in sample_tail:
+                if row[i] is not None:
+                    this_total += row[i]
+                    this_n += 1
+            if this_n:
+                self.log.datum(name, 'Average poly-A tail', this_total/this_n)
+                
+        for i, name in enumerate(names):
+            this_total = 0.0
+            this_n = 0
+            for row in sample_prop:
+                if row[i] is not None:
+                    this_total += row[i]
+                    this_n += 1
+            if this_n:
+                self.log.datum(name, 'Average proportion of reads with tail', this_total/this_n)
+            
+        
         #max_length = max(max(len(item) for item in row) for row in counts)
         #
         #for row in counts:
         #    for item in row:
         #        while len(item) < max_length:
         #            item.append(0)
+                
+        
+        with open(self.prefix+'.gff','wb') as f:
+            annotation.write_gff3_header(f)
+            for i, item in enumerate(annotations):
+                item.attr['mean_tail'] = '%.1f'%overall_tail[i] if overall_tail[i] else 'NA'
+                item.attr['proportion_with_tail'] = '%.2f'%overall_prop[i] if overall_prop[i] else 'NA'
+                
+                if overall_tail[i] is None:
+                    item.attr['color'] = '#444444'
+                else:
+                    a = (overall_tail[i]-self.tail)/max(1,max_length-self.tail)
+                    item.attr['color'] = '#%02x%02x%02x' % (int(a*255),int((1-abs(a*2-1))*255),255-int(a*255))
+                #item.attr['color'] = ...                
+                print >> f, item.as_gff()
         
         
         comments = [ '#Counts' ] + [
             '#sampleTags='+','.join(tags)
             for tags in sample_tags
+            ] + [
+            'n-with-tail = Number of reads with a poly-A tail of length at least %d' % self.tail,
+            'mean-tail = Mean poly-A tail length, for reads with a tail of length at least %d, if there were at least %d such reads' % (self.tail, self.ntail),
+            'proportion-with-tail = Proportion of reads with a tail of length at least %d, if there were at least %d total reads' % (self.tail, self.nprop),
+            '"Tail" group is mean tail per sample, as above',
+            '"Proportion" group is proportion of reads with tail per sample, as above',
             ]
 
         def counts_iter():
@@ -191,12 +304,19 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
                 row = collections.OrderedDict()
                 row['Feature'] = annotations[i].get_id()
                 for j in xrange(len(names)):
-                    row[('Count',names[j])] = '%d' % sum(counts[i][j]) 
+                    row[('Count',names[j])] = '%d' % totals[i][j] #sum(counts[i][j]) 
 
                 row[('Annotation','Length')] = annotations[i].end - annotations[i].start
                 row[('Annotation','gene')] = annotations[i].attr.get('gene','')
                 row[('Annotation','product')] = annotations[i].attr.get('product','')
                 #row[('Annotation','Strand')] = str(annotations[i].strand)
+                row[('Annotation','n-with-tail')] = str(overall_n_tail[i])
+                row[('Annotation','mean-tail')] = str(overall_tail[i]) if overall_tail[i] is not None else 'NA'
+                row[('Annotation','proportion-with-tail')] = str(overall_prop[i]) if overall_prop[i] is not None else 'NA'
+                for j in xrange(len(names)):
+                    row[('Tail',names[j])] = str(sample_tail[i][j]) if sample_tail[i][j] is not None else 'NA'
+                for j in xrange(len(names)):
+                    row[('Proportion',names[j])] = str(sample_prop[i][j]) if sample_prop[i][j] is not None else 'NA'
                 yield row
         io.write_csv(self.prefix + '-counts.csv', counts_iter(), comments=comments)
 
@@ -228,140 +348,140 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
                     row[str(j)] = str( sum( counts[i][k][j] for k in xrange(len(names)) ) )
                 yield row
         io.write_csv(self.prefix + '-pooled.csv', pooled())
-
-        #Note: zero if zero count
-        def mean_length():
-            for i in xrange(len(counts)):
-                row = collections.OrderedDict()
-                row['Feature'] = annotations[i].get_id()
-                for j in xrange(len(names)):
-                    a = 0
-                    b = 0
-                    for pos,count in enumerate(counts[i][j]):
-                        a += pos*count
-                        b += count
-                    row[names[j]] = str( float(a)/max(1,b) )
-                yield row
-        io.write_csv(self.prefix + '-mean-length.csv', mean_length())
-
-        def mean4_length():
-            for i in xrange(len(counts)):
-                row = collections.OrderedDict()
-                row['Feature'] = annotations[i].get_id()
-                for j in xrange(len(names)):
-                    a = 0
-                    b = 0
-                    for pos,count in enumerate(counts[i][j]):
-                        if pos < 4: continue
-                        a += pos*count
-                        b += count
-                    row[names[j]] = str( float(a)/max(1,b) )
-                yield row
-        io.write_csv(self.prefix + '-mean-length-beyond4.csv', mean4_length())
-
-
-@config.help(
-    'Create a spreadsheet containing various statistics, using the output of "aggregate-tail-lengths:"',
-    'The prefix should be the same as that given to "aggregate-tail-lengths:".'
-)
-class Tail_stats(config.Action_with_prefix, runr.R_action):
-    def state_filename(self):
-        return self.prefix + '_tail_stats.state'
-
-    def log_filename(self):
-        if self.prefix is None: return None
-        return self.prefix + '_tail_stats_log.txt'
         
-    script = r"""
-    
-    library(nesoni)
-
-    # === Load data ==
-    
-    data <- read.grouped.table(sprintf('%s-counts.csv',prefix),require=c('Count','Annotation'))
-    annotation <- data$Annotation
-    expression <- voom( as.matrix(data$Count), normalize.method='quantile' )$E
-    
-    raw <- as.matrix(read.grouped.table(sprintf('%s-raw.csv',prefix))$All)
-    
-    cols <- as.matrix(read.grouped.table(sprintf('%s-raw-columns.csv',prefix))$All)   
-    
-    row.names <- rownames(annotation)
-    n.samples <- nrow(cols)
-    n.genes <- nrow(raw)
-    n.lengths <- ncol(cols)
-    lengths <- basic.seq(n.lengths)-1
-
-
-    # === Calculate mean tail lengths for each sample ===
-    
-    # Omit columns for tail length 0,1,2,3    
-    skip <- 4
-    good.cols <- cols[,(skip+1):n.lengths,drop=FALSE]
-    good.lengths <- lengths[(skip+1):n.lengths]
-    
-    totals <- matrix(nrow=n.genes,ncol=n.samples) 
-    x.totals <- matrix(nrow=n.genes,ncol=n.samples) 
-    xx.totals <- matrix(nrow=n.genes,ncol=n.samples) 
-    means <- matrix(nrow=n.genes,ncol=n.samples)
-    sds <- matrix(nrow=n.genes,ncol=n.samples)
-    colnames(totals) <- rownames(cols)
-    rownames(totals) <- row.names
-    colnames(means) <- rownames(cols)
-    rownames(means) <- row.names
-    colnames(sds) <- rownames(cols)
-    rownames(sds) <- row.names
-    for(c in basic.seq(n.samples)) {
-        totals[,c] <- rowSums(raw[,good.cols[c,],drop=FALSE])
-        x.totals[,c] <- rowSums( t(t(raw[,good.cols[c,],drop=FALSE]) * good.lengths) )
-        xx.totals[,c] <- rowSums( t(t(raw[,good.cols[c,],drop=FALSE]) * (good.lengths*good.lengths) ) )
-
-        means[,c] <- x.totals[,c] / totals[,c]
-        sds[,c] <- sqrt( totals[,c]/(totals[,c]-1) * (xx.totals[,c]/totals[,c] - means[,c]*means[,c]) )
-        
-        means[totals[,c] < 1,c] <- NA
-        sds[totals[,c] < 2,c] <- NA
-    }
+        ##Note: zero if zero count
+        #def mean_length():
+        #    for i in xrange(len(counts)):
+        #        row = collections.OrderedDict()
+        #        row['Feature'] = annotations[i].get_id()
+        #        for j in xrange(len(names)):
+        #            a = 0
+        #            b = 0
+        #            for pos,count in enumerate(counts[i][j]):
+        #                a += pos*count
+        #                b += count
+        #            row[names[j]] = str( float(a)/max(1,b) )
+        #        yield row
+        #io.write_csv(self.prefix + '-mean-length.csv', mean_length())
+        #
+        #def mean4_length():
+        #    for i in xrange(len(counts)):
+        #        row = collections.OrderedDict()
+        #        row['Feature'] = annotations[i].get_id()
+        #        for j in xrange(len(names)):
+        #            a = 0
+        #            b = 0
+        #            for pos,count in enumerate(counts[i][j]):
+        #                if pos < 4: continue
+        #                a += pos*count
+        #                b += count
+        #            row[names[j]] = str( float(a)/max(1,b) )
+        #        yield row
+        #io.write_csv(self.prefix + '-mean-length-beyond4.csv', mean4_length())
 
 
-    grand.totals <- rowSums(totals)
-    grand.x.totals <- rowSums(x.totals)
-    grand.xx.totals <- rowSums(xx.totals)
-    grand.means <- grand.x.totals / grand.totals
-    grand.sds <- sqrt( grand.totals/(grand.totals-1) * (grand.xx.totals/grand.totals - grand.means*grand.means) )
-    grand.means[ grand.totals < 1 ] <- NA
-    grand.sds[ grand.totals < 2 ] <- NA
-    pool.frame <- data.frame(
-        "Reads" = rowSums(raw),
-        "Tailed reads" = grand.totals,
-        "Mean tail length" = grand.means,
-        "StdDev tail length" = grand.sds,
-        row.names = row.names,
-        check.names = FALSE,
-        check.rows = FALSE
-    )
-
-    # === Output ===
-    
-    write.grouped.table(
-        list(
-            "Annotation" = annotation,
-            "Count" = as.data.frame( data$Count ),
-            "Expression" = as.data.frame( expression ),
-            "Pooled" = pool.frame,
-            "Tail count" = as.data.frame( totals ),
-            "Mean tail length" = as.data.frame( means ),
-            "StdDev tail length" = as.data.frame( sds )
-        ),
-        sprintf("%s-statistics.csv", prefix),
-        comments = c(
-            '',
-            'Expression columns are quantile normalized log2 Reads Per Million as produced by the limma voom function',
-            ''
-        )
-    )
-    
-    """
+#@config.help(
+#    'Create a spreadsheet containing various statistics, using the output of "aggregate-tail-lengths:"',
+#    'The prefix should be the same as that given to "aggregate-tail-lengths:".'
+#)
+#class Tail_stats(config.Action_with_prefix, runr.R_action):
+#    def state_filename(self):
+#        return self.prefix + '_tail_stats.state'
+#
+#    def log_filename(self):
+#        if self.prefix is None: return None
+#        return self.prefix + '_tail_stats_log.txt'
+#        
+#    script = r"""
+#    
+#    library(nesoni)
+#
+#    # === Load data ==
+#    
+#    data <- read.grouped.table(sprintf('%s-counts.csv',prefix),require=c('Count','Annotation'))
+#    annotation <- data$Annotation
+#    expression <- voom( as.matrix(data$Count), normalize.method='quantile' )$E
+#    
+#    raw <- as.matrix(read.grouped.table(sprintf('%s-raw.csv',prefix))$All)
+#    
+#    cols <- as.matrix(read.grouped.table(sprintf('%s-raw-columns.csv',prefix))$All)   
+#    
+#    row.names <- rownames(annotation)
+#    n.samples <- nrow(cols)
+#    n.genes <- nrow(raw)
+#    n.lengths <- ncol(cols)
+#    lengths <- basic.seq(n.lengths)-1
+#
+#
+#    # === Calculate mean tail lengths for each sample ===
+#    
+#    # Omit columns for tail length 0,1,2,3    
+#    skip <- 4
+#    good.cols <- cols[,(skip+1):n.lengths,drop=FALSE]
+#    good.lengths <- lengths[(skip+1):n.lengths]
+#    
+#    totals <- matrix(nrow=n.genes,ncol=n.samples) 
+#    x.totals <- matrix(nrow=n.genes,ncol=n.samples) 
+#    xx.totals <- matrix(nrow=n.genes,ncol=n.samples) 
+#    means <- matrix(nrow=n.genes,ncol=n.samples)
+#    sds <- matrix(nrow=n.genes,ncol=n.samples)
+#    colnames(totals) <- rownames(cols)
+#    rownames(totals) <- row.names
+#    colnames(means) <- rownames(cols)
+#    rownames(means) <- row.names
+#    colnames(sds) <- rownames(cols)
+#    rownames(sds) <- row.names
+#    for(c in basic.seq(n.samples)) {
+#        totals[,c] <- rowSums(raw[,good.cols[c,],drop=FALSE])
+#        x.totals[,c] <- rowSums( t(t(raw[,good.cols[c,],drop=FALSE]) * good.lengths) )
+#        xx.totals[,c] <- rowSums( t(t(raw[,good.cols[c,],drop=FALSE]) * (good.lengths*good.lengths) ) )
+#
+#        means[,c] <- x.totals[,c] / totals[,c]
+#        sds[,c] <- sqrt( totals[,c]/(totals[,c]-1) * (xx.totals[,c]/totals[,c] - means[,c]*means[,c]) )
+#        
+#        means[totals[,c] < 1,c] <- NA
+#        sds[totals[,c] < 2,c] <- NA
+#    }
+#
+#
+#    grand.totals <- rowSums(totals)
+#    grand.x.totals <- rowSums(x.totals)
+#    grand.xx.totals <- rowSums(xx.totals)
+#    grand.means <- grand.x.totals / grand.totals
+#    grand.sds <- sqrt( grand.totals/(grand.totals-1) * (grand.xx.totals/grand.totals - grand.means*grand.means) )
+#    grand.means[ grand.totals < 1 ] <- NA
+#    grand.sds[ grand.totals < 2 ] <- NA
+#    pool.frame <- data.frame(
+#        "Reads" = rowSums(raw),
+#        "Tailed reads" = grand.totals,
+#        "Mean tail length" = grand.means,
+#        "StdDev tail length" = grand.sds,
+#        row.names = row.names,
+#        check.names = FALSE,
+#        check.rows = FALSE
+#    )
+#
+#    # === Output ===
+#    
+#    write.grouped.table(
+#        list(
+#            "Annotation" = annotation,
+#            "Count" = as.data.frame( data$Count ),
+#            "Expression" = as.data.frame( expression ),
+#            "Pooled" = pool.frame,
+#            "Tail count" = as.data.frame( totals ),
+#            "Mean tail length" = as.data.frame( means ),
+#            "StdDev tail length" = as.data.frame( sds )
+#        ),
+#        sprintf("%s-statistics.csv", prefix),
+#        comments = c(
+#            '',
+#            'Expression columns are quantile normalized log2 Reads Per Million as produced by the limma voom function',
+#            ''
+#        )
+#    )
+#    
+#    """
 
 
 
@@ -761,9 +881,9 @@ class Analyse_tail_lengths(config.Action_with_prefix):
              saturation=self.saturation,
          ).make()        
          
-         Tail_stats(
-             prefix=self.prefix
-         ).make()
+         #Tail_stats(
+         #    prefix=self.prefix
+         #).make()
 
          for action in self.get_plot_pooleds() + self.get_plot_comparisons() + self.get_heatmaps():
              action.process_make(stage)
@@ -817,7 +937,8 @@ class Analyse_tail_lengths(config.Action_with_prefix):
             r.p( 'Note: Reads with the same start and end position sometimes don\'t have the same tail length. '
                  'After deduplication these can contribute fractionally to the number of reads with tails.' )
         
-        r.p( r.get(self.prefix + '-statistics.csv') )
+        #r.p( r.get(self.prefix + '-statistics.csv') )
+        r.p( r.get(self.prefix + '-counts.csv') )
         
         r.subheading('Poly(A) tail length in reads')
         

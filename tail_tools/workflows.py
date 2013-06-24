@@ -31,7 +31,6 @@ imported into a nesoni working directory.
 Directories are created both using all reads and for reads with a poly-A tail.
 """)
 @config.Bool_flag('consensus', 'Look for SNPs and indels.')
-#@config.String_flag('types', 'Comma separated list of feature types to use.')
 @config.Section('tags', 'Tags for this sample. (See "nesoni tag:".)')
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
 @config.Section('reads', 'Fastq files containing SOLiD reads.')
@@ -40,7 +39,6 @@ class Analyse_polya(config.Action_with_output_dir):
     tags = [ ]
     reads = [ ]    
     consensus = True
-    #types = 'gene'
     
     _workspace_class = working_directory.Working
     
@@ -75,7 +73,8 @@ class Analyse_polya(config.Action_with_output_dir):
         polya_working = working_directory.Working(polya_dir, must_exist=False)
         polya_working.set_reference(self.reference)
         
-        clipped_filename = working.object_filename('clipped_reads.csfastq')
+        clipped_prefix = working/'clipped_reads'
+        clipped_filename = clipped_prefix+'.csfastq.gz'
         
         raw_filename = working/'alignments_raw.sam.gz'
         extended_filename = working/'alignments_extended.sam.gz'
@@ -85,7 +84,8 @@ class Analyse_polya(config.Action_with_output_dir):
         
         clip_runs.Clip_runs(
             filenames=self.reads,
-            output=clipped_filename,
+            prefix=clipped_prefix,
+            sample=working.name,
         ).make()
         
         cores = min(nesoni.coordinator().get_cores(), 8)
@@ -259,6 +259,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 nesoni.IGV_plots(
                     plotspace/plot_name,
                     working_dirs = directories,
+                    label_prefix = plot_name+' ',
                     raw = False,
                     norm = True,
                     genome = self.genome,
@@ -306,7 +307,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.report_logs('alignment-statistics',
             #[ workspace/'stats.txt' ] +
             filter_logs + filter_polya_logs +
-            [ expressionspace/'dedup_log.txt' ],
+            [ expressionspace/'dedup_aggregate_log.txt' ],
             filter=lambda sample, field: (
                 field not in ['fragments','fragments aligned to the reference'] and
                 (not sample.endswith('-polyA') or field not in ['reads with alignments','hit multiple locations'])
@@ -331,7 +332,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                             os.path.join(base, filename)
                         ))
             
-            r.p(r.tar('igv-plots.tar.gz',
+            r.p(r.tar('igv-plots',
                genome_files +
                glob.glob(plotspace/'*.tdf')
             ))
@@ -357,7 +358,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
 
         r.write('<div style="background: #ddffdd; padding: 1em;">\n')
         r.heading('Expression levels and tail lengths <b>with</b> read deduplication')        
-        analyse_tail_lengths_1.self._report_tail_lengths(r)
+        analyse_tail_lengths_1.report_tail_lengths(r)
         r.write('</div>\n')
 
         r.write('<p/><hr>\n')

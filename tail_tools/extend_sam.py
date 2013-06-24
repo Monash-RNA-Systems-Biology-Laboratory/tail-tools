@@ -190,20 +190,23 @@ the reference truly does contain a poly-A run, extend the alignment.',
 """\
 Stream SAM records from stdin to stdout.
 
-SAM records of reads that have a tail of at least three bases are tagged with an 'AA' attribute.
+SAM records of reads that have a tail of at least <--tail> bases are tagged with an 'AA' attribute. \
+The actual tail length is stored in an 'AN' attribute.
 """)
 @config.Int_flag('quality', 'Minimum quality.')
+@config.Int_flag('tail', 'Minimum tail length.')
 @config.Main_section('reference_filenames', 'Reference sequences in FASTA format.')
 @config.Section('reads', 'Original reads in FASTQ format.')
 class Extend_sam(config.Action_filter):
     quality = 20
+    tail = 4
     reads = [ ]
     reference_filenames = [ ]
 
-    def cores_required(self):
-        # This is memory intensive, so require it to be exclusive
-        # (ideally there would be some sort of memory resource management...)
-        return nesoni.coordinator().get_cores()
+    #def cores_required(self):
+    #    # This is memory intensive, so require it to be exclusive
+    #    # (ideally there would be some sort of memory resource management...)
+    #    return nesoni.coordinator().get_cores()
 
     def run(self):
         references = { }
@@ -278,7 +281,7 @@ class Extend_sam(config.Action_filter):
                 baseline = max(0, alignment_score(
                     qual_tail[:tail_pos], seq_tail[:tail_pos], seq_ref[:tail_pos], self.quality)[0])
         
-                if tail_score >= baseline + 3:
+                if tail_score >= baseline + self.tail:
                     #Record position of end of transcript in 'AA' (1-based position)
                     if reverse:
                         tail_refpos = al.pos - tail_pos
