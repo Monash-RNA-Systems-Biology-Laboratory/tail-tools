@@ -2,10 +2,91 @@
 import os, math, glob
 
 import nesoni
-from nesoni import config, working_directory, reference_directory, io, reporting, grace
+from nesoni import config, workspace, working_directory, reference_directory, io, reporting, grace
 
 import tail_tools
 from tail_tools import clip_runs, extend_sam, proportions, tail_lengths
+
+
+@config.help(
+    'Call peaks in depth of coverage indicating transcription end sites.',
+    'Note that you must specify --select (the annotation type to use from the annotation file), '
+    '--shift-start, and --shift-end.'
+    '\n\n'
+    'Operates as follows:'
+    '\n\n'
+    '- Call end points using "nesoni modes: --what 3prime".\n'
+    '- Extend called modes back by --peak-length.\n'
+    '- Collapse any overlapping annotations down to a single annotation.\n'
+    '- Relate resultant peaks to the given (collapsed) annotations.\n'
+    '\n'
+    'Note: As this is a workflow, you may need to specify "--make-do all" to force everything to recompute if an input file is changed. '
+    'Use "--make-do -modes" to recompute everything but the peak calling.'
+    )
+@config.Int_flag('lap', '--lap value for "nesoni modes:". How fuzzy the pileup of 3\' ends can be when calling a peak.')
+@config.Int_flag('radius', '--radius value for "nesoni modes:". How close peaks can be to one another.')
+@config.Int_flag('min_depth', '--min-depth value for "nesoni modes:".')
+@config.Int_flag('peak_length', 'Number of bases to extend peak back from 3\' end point.')
+@config.String_flag('annotations', 'Annotation file.')
+@config.String_flag('types', 'What feature types from annotation file to relate peaks to (comma separated list).')
+@config.Int_flag('shift_start', 'How far downstrand of the start of features do peaks need to end to be related to a feature.')
+@config.Int_flag('shift_end', 'How far downstrand of the end of the feature can a peak start in order to be related to a feature.')
+@config.Main_section('polyas', 'List of ...-polyA directories as produced by "analyse-polya:" or "analyse-polya-batch:".')
+class Call_peaks(config.Action_with_output_dir):
+    lap = 10
+    radius = 50
+    min_depth = 10
+    peak_length = 100
+    
+    annotations = None
+    types = None # Must specify
+    shift_start = None # Must specify
+    shift_end = None
+    
+    
+    polyas = [ ]
+    
+    def run(self):
+        assert self.shift_start is not None, '--shift-start must be specified'
+        assert self.shift_end is not None, '--shift-end must be specified'
+        assert self.types is not None, '--select must be specified'
+        assert self.annotations is not None, '--annotations must be specified'
+    
+        outspace = self.get_workspace()
+        working = workspace.Workspace(outspace / 'working', must_exist=False)
+        
+        nesoni.Modes(
+            working/'modes',
+            filenames = self.polyas,
+            what = '3prime',
+            lap = self.lap,
+            radius = self.radius,
+            min_depth = self.min_depth,
+            ).make()
+        
+        nesoni.Modify_features(
+            working/'peaks',
+            working/'modes.gff',
+            shift_start = str(-self.peak_length),
+            ).make()
+        
+        nesoni.Collapse_features(
+            working/'collapsed',
+            self.annotations,
+            select = '/'.join(self.types.split(',')),
+            ).make()
+        
+        nesoni.Relate_features(
+            outspace/'relation',
+            parent = working/'collapsed.gff',
+            child = working/'peaks.gff',
+            upstrand = -self.shift_start,
+            downstrand = self.shift_end,
+            use = 'in/upstrand/downstrand',
+            to_child = 'gene/product',
+            ).make()
+        
+
 
 
 class Tail_only(config.Action_filter):
@@ -64,6 +145,11 @@ class Analyse_polya(config.Action_with_output_dir):
         return self.get_filter_tool()(working_dir = self.get_polya_dir())
     
     def run(self):
+        assert self.reads, 'No read files given.'
+        colorspace = [ io.is_colorspace(item) for item in self.reads ]
+        assert len(set(colorspace)) == 1, 'Mixture of colorspace and basespace reads is not currently supported.'
+        colorspace = colorspace[0]
+        
         polya_dir = self.get_polya_dir()
     
         working = working_directory.Working(self.output_dir, must_exist=False)
@@ -74,43 +160,50 @@ class Analyse_polya(config.Action_with_output_dir):
         polya_working.set_reference(self.reference)
         
         clipped_prefix = working/'clipped_reads'
-        clipped_filename = clipped_prefix+'.csfastq.gz'
+        clipped_filename = clipped_prefix+('.csfastq.gz' if colorspace else '.fastq.gz')
         
         raw_filename = working/'alignments_raw.sam.gz'
         extended_filename = working/'alignments_extended.sam.gz'
         
         polya_filename = working/'alignments_filtered_polyA.sam.gz'
 
-        
-        clip_runs.Clip_runs(
-            filenames=self.reads,
-            prefix=clipped_prefix,
-            sample=working.name,
-        ).make()
-        
+        if colorspace:
+            clip_runs.Clip_runs_colorspace(
+                filenames=self.reads,
+                prefix=clipped_prefix,
+                sample=working.name,
+            ).make()
+        else:
+            clip_runs.Clip_runs_basespace(
+                filenames=self.reads,
+                prefix=clipped_prefix,
+                sample=working.name,
+            ).make()        
+
         cores = min(nesoni.coordinator().get_cores(), 8)
         
         nesoni.Execute(
-            command = reference.shrimp_command(cs=True, parameters=[ clipped_filename ]),
-            execution_options = [ '-N', str(cores) ],
+            command = reference.shrimp_command(cs=colorspace, parameters=[ clipped_filename ]),
+            execution_options = [ '-N', str(cores) ] + [ '--qv-offset', '33' ] if not colorspace else [ ],
             output=raw_filename,
             cores=cores,
         ).make()
                 
-        extend_sam.Extend_sam(
-            input=raw_filename,
-            output=extended_filename,
-            reads=self.reads,
-            reference_filenames=[ reference.reference_fasta_filename() ],
-        ).make()
+        if colorspace:
+            extend_sam.Extend_sam_colorspace(
+                input=raw_filename,
+                output=extended_filename,
+                reads=self.reads,
+                reference_filenames=[ reference.reference_fasta_filename() ],
+            ).make()
+        else:    
+            extend_sam.Extend_sam_basespace(
+                input=raw_filename,
+                output=extended_filename,
+                clips=[ clipped_prefix+'.clips.gz' ],
+                reference_filenames=[ reference.reference_fasta_filename() ],
+            ).make()
         
-        #Tail_only(
-        #    input=extended_filename,
-        #    output=polya_filename,
-        #).make()
-        
-        
-
         nesoni.Import(
             input=extended_filename,
             output_dir=self.output_dir,
@@ -137,26 +230,6 @@ class Analyse_polya(config.Action_with_output_dir):
         
         nesoni.Tag(self.output_dir, tags=self.tags).make()
         nesoni.Tag(polya_dir, tags=self.tags).make()
-
-        #tail_tools.Tail_lengths(
-        #    working_dir=self.output_dir, 
-        #    types=self.types,
-        #    ).make()    
-        
-        #@nesoni.parallel_for([
-        #    (extended_filename, self.output_dir),
-        #    (polya_filename, polya_dir),
-        #])
-        #def _((sam_filename, directory)):
-        #    nesoni.Import(
-        #        input=sam_filename,
-        #        output_dir=directory,
-        #        reference=[ self.reference ],
-        #    ).make()
-        #                
-        #    tool(
-        #        working_dir=directory
-        #    ).make()
 
 
 
@@ -250,20 +323,33 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         #    filter_polya_logs.append(action.get_filter_action().log_filename())
 
         stage.barrier() #====================================================
+        
+        
+        nesoni.Norm_from_samples(
+            workspace/'norm',
+            working_dirs = dirs
+            ).make()
+
+        def writer():
+            for row in io.read_table(workspace/'norm.csv'):
+                row['Name'] = row['Name']+'-polyA'
+                yield row
+        io.write_csv(workspace/'norm-polyA.csv', writer(), comments=['Normalization'])
+
 
         if self.include_plots:
-            for plot_name, directories in [
-                ('all',   dirs),
-                ('polyA', polya_dirs),
+            for plot_name, directories, norm_filename in [
+                ('all',   dirs,       workspace/'norm.csv'),
+                ('polyA', polya_dirs, workspace/'norm-polyA.csv'),
             ]:
                 nesoni.IGV_plots(
                     plotspace/plot_name,
                     working_dirs = directories,
                     label_prefix = plot_name+' ',
-                    raw = False,
+                    raw = True,
                     norm = True,
                     genome = self.genome,
-                    #norm_file = workspace/norm_filename,
+                    norm_file = norm_filename,
                     #delete_igv = False,
                 ).process_make(stage)
 

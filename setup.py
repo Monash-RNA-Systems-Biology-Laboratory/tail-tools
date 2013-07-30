@@ -20,6 +20,13 @@ setup(
     packages = [ 
         'tail_tools' 
         ],
+        
+    package_data = {
+        'tail_tools' : [
+            'web/*',
+            'web/third_party/*',
+            ],
+        },
 
     entry_points = {
         'console_scripts' : [

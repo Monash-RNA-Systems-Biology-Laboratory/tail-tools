@@ -1,4 +1,9 @@
 
+0.18 - Basespace read support.
+       "call-peaks:" pipeline.
+       "compare-peaks:" tool.
+       "geneview-webapp:" gene expression viewer.
+
 0.17 - Assignment of reads to features made more deterministic in "tail-lengths:"
 
 0.16 - Thread tail statistics through outputs.

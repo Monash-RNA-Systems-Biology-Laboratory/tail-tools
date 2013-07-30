@@ -4,8 +4,15 @@ Test for shift of expression from one tail to another within a gene.
 
 """
 
+import json
+
 import nesoni
-from nesoni import config, io, annotation, runr
+from nesoni import config, io, annotation, runr, reference_directory
+
+def _float_or_none(text):
+    if text == 'NA':
+        return None
+    return float(text)
 
 def _annotation_sorter(item):
     if item.strand < 0:
@@ -80,17 +87,23 @@ sink()
     'This can be used as input to "nesoni test-counts:".\n'
     )
 @config.String_flag('norm_file', 'Use normalization produced by "norm-from-counts:".')
+@config.Positional('reference', 'Reference directory')
 @config.Positional('parents', 'Annotation file containing parent genes.')
 @config.Positional('children', 'Annotation file containing child peaks. "Parent" property should be set.')
 @config.Positional('counts', 'Counts file as produced by tail-stats.')
 class Compare_peaks(config.Action_with_prefix):
     fdr = 0.05
     norm_file = None
+    reference = None
     parents = None
     children = None
     counts = None
     
     def run(self):
+        # Reference genome
+        
+        chromosome_lengths = reference_directory.Reference(self.reference, must_exist=True).get_lengths()
+        
         # Normalization files
         
         if self.norm_file:
@@ -120,8 +133,13 @@ class Compare_peaks(config.Action_with_prefix):
         parents = list(annotation.read_annotations(self.parents))
         children = list(annotation.read_annotations(self.children))
         
-        count_table = io.read_grouped_table(self.counts, [('Count',int),('Annotation',str)])
-        counts = count_table['Count']
+        count_table = io.read_grouped_table(self.counts, [
+            ('Count',int),
+            ('Tail',_float_or_none),
+            ('Proportion',_float_or_none),
+            ('Annotation',str)
+            ])
+        counts = count_table['Count']        
         
         id_to_parent = { }
         for item in parents:
@@ -145,6 +163,72 @@ class Compare_peaks(config.Action_with_prefix):
                     relation[item_parent].append(item)
         for id in relation:
             relation[id].sort(key=_annotation_sorter)
+        
+        
+        # JSON output
+        
+        j_data = { }
+        j_genes = j_data['genes'] = { }
+        
+        j_genes['__comment__'] = 'start is 0-based'
+        j_genes['name'] = [ ]
+        j_genes['chromosome'] = [ ]
+        j_genes['strand'] = [ ]
+        j_genes['start'] = [ ]
+        j_genes['end'] = [ ]
+        j_genes['gene'] = [ ]
+        j_genes['product'] = [ ]
+        j_genes['peaks'] = [ ]
+        for item in parents:
+            j_genes['name'].append( item.get_id() )
+            j_genes['chromosome'].append( item.seqid )
+            j_genes['strand'].append( item.strand )
+            j_genes['start'].append( item.start )
+            j_genes['end'].append( item.end )
+            j_genes['gene'].append( item.attr.get('gene','') )
+            j_genes['product'].append( item.attr.get('product','') )
+            j_genes['peaks'].append( [ item2.get_id() for item2 in relation.get(item.get_id(), []) ] )
+        
+        j_peaks = j_data['peaks'] = { }
+        j_peaks['__comment__'] = 'start is 0-based'
+        j_peaks['name'] = [ ]
+        j_peaks['chromosome'] = [ ]
+        j_peaks['strand'] = [ ]
+        j_peaks['start'] = [ ]
+        j_peaks['end'] = [ ]
+        j_peaks['parents'] = [ ]
+        j_peaks['counts'] = [ ]
+        j_peaks['tail_lengths'] = [ ]
+        j_peaks['proportion_tailed'] = [ ]
+        for item in children:
+            j_peaks['name'].append( item.get_id() )
+            j_peaks['chromosome'].append( item.seqid )
+            j_peaks['strand'].append( item.strand )
+            j_peaks['start'].append( item.start )
+            j_peaks['end'].append( item.end )
+            j_peaks['parents'].append( item.attr['Parent'].split(',') if 'Parent' in item.attr else [ ])
+            j_peaks['counts'].append( counts[item.get_id()].values() )
+            j_peaks['tail_lengths'].append( count_table['Tail'][item.get_id()].values() )
+            j_peaks['proportion_tailed'].append( count_table['Proportion'][item.get_id()].values() )
+        
+        j_samples = j_data['samples'] = { }
+        j_samples['name'] = [ ]
+        j_samples['tags'] = [ ]
+        j_samples['normalizing_multiplier'] = [ ]
+        for name in samples:
+            j_samples['name'].append(name)
+            j_samples['tags'].append(sample_tags[name])
+            j_samples['normalizing_multiplier'].append(norms[name]['Normalizing.multiplier'])
+        
+        j_chromosomes = j_data['chromosomes'] = { }
+        j_chromosomes['name'] = [ ]
+        j_chromosomes['length'] = [ ]
+        for name, length in chromosome_lengths:
+            j_chromosomes['name'].append(name)
+            j_chromosomes['length'].append(length)        
+        
+        with open(self.prefix + '.json','wb') as f:
+            json.dump(j_data, f)
         
         
         # Output paired peak file

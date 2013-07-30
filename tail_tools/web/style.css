@@ -1,0 +1,6 @@
+
+body { font-family: sans-serif; }
+
+input { width: 30em; background: #eeffee; margin: 0.5em; }
+
+div.result { margin: 0.5em; border: solid 1px black; padding: 0.5em; }

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+
+<style>
+INCLUDE style.css
+</style>
+
+<title>Gene viewer</title>
+
+</head>
+
+<body>
+<h1 style="float: right">Gene viewer</h1>
+
+<form id="goform">
+    <p>
+    JSON data file
+    <br/>
+    <input name="json" />
+    
+    <p>
+    Gene or peak name
+    <br/>
+    <input name="search" />
+    
+    <p>
+    <button>Go</button>
+</form>
+
+<div id="result"> </div>
+
+<script type="text/javascript">
+
+INCLUDE third_party/d3.min.js
+
+INCLUDE third_party/jquery.min.js
+
+deserialize = function (str) {
+    var pairs = str.split("&"),
+        h = {};
+    for(var i = 0; i < pairs.length; i++) {
+        var kv = pairs[i].split('=');
+        kv[0] = decodeURIComponent(kv[0]);
+        kv[1] = decodeURIComponent(kv[1].replace(/\+/g, "%20"));
+        h[kv[0]] = kv[1];
+    }
+    return h;
+};
+
+make = function(str) { return $("<"+str+"/"+">"); }
+
+
+var Form = $("#goform");
+
+var Datapath = "";
+var Data = { };
+var Gene_index = { }; // normalize(gene or peak) -> [ gene_id ]
+var Peak_index = { }; // normalize(peak) -> peak_id
+var Peak_id = { }; // peak -> peak_id
+var Max_tail = 1;
+
+normalize = function(str) {
+     return $.trim( str.toLowerCase() );
+}
+
+index_data = function() {
+    Gene_index = { };
+    Peak_index = { };
+    Peak_id = { };
+    Max_tail = 1;
+    
+    if (Data == undefined) return;
+    
+    var add = function(str,index) {
+        str = normalize(str);
+        if (str.length == 0) 
+            return;
+        if (Gene_index[str] == undefined) 
+            Gene_index[str] = [ ];
+        if ($.inArray(index, Gene_index[str]) == -1)
+            Gene_index[str].push(index);
+    }
+    
+    for(var i=0;i<Data['genes']['name'].length;i++) {
+        add(Data['genes']['name'][i], i);
+        add(Data['genes']['gene'][i], i);
+        
+        $.each( Data['genes']['name'][i].split("/"), function(j,part) { 
+            add(part, i); 
+        });
+        
+        $.each( Data['genes']['peaks'][i], function(j,peak) { 
+            add(peak, i); 
+        });
+    }
+    
+    for(var i=0;i<Data['peaks']['name'].length;i++) {
+        Peak_index[normalize(Data['peaks']['name'][i])] = i;
+        Peak_id[Data['peaks']['name'][i]] = i;
+        
+        for(var j=0;j<Data['peaks']['tail_lengths'][i].length;j++) {
+            var tail = Data['peaks']['tail_lengths'][i][j];
+            if (tail != undefined && tail > Max_tail) Max_tail = tail;
+        }
+    }
+}
+
+
+describe_peak = function(index, into) {
+    //var result = into.append("div")
+    //    .attr("class","result");
+    //
+    //result.append("div")
+    //    .text(
+    //    Data['peaks']['name'][index] + " " + 
+    //    Data['peaks']['chromosome'][index] + " " +
+    //    (Data['peaks']['start'][index]+1) + ".." + Data['peaks']['end'][index] + " " +
+    //    (Data['peaks']['strand'][index] < 0 ? "-" : "+")
+    //    );
+    //
+    //for(var i=0;i<Data['samples']['name'].length;i++)
+    //    result.append("div")
+    //        .text(
+    //        Data['samples']['name'][i] + " " +
+    //        Data['peaks']['counts'][index][i] + " " +
+    //        Data['peaks']['counts'][index][i] * Data['samples']['normalizing-multiplier'][i] + " " +
+    //        Data['peaks']['proportion-tailed'][index][i] + " " +
+    //        Data['peaks']['tail-lengths'][index][i]
+    //        );
+
+    describe_inner({
+        name : Data.peaks.name[index],
+        gene : "",
+        product : "",
+        chromosome : Data.peaks.chromosome[index],
+        start : Data.peaks.start[index],
+        end : Data.peaks.end[index],
+        strand : Data.peaks.strand[index],
+        peaks : [ index ],
+    }, into);
+}
+
+
+describe_gene = function(index, into) {
+    describe_inner({
+        name : Data.genes.name[index],
+        gene : Data.genes.gene[index],
+        product : Data.genes.product[index],
+        chromosome : Data.genes.chromosome[index],
+        start : Data.genes.start[index],
+        end : Data.genes.end[index],
+        strand : Data.genes.strand[index],
+        peaks : $.map(Data.genes.peaks[index], function(peak_name) { return Peak_id[peak_name]; }),
+    }, into);
+}
+
+describe_inner = function(gene, into) {
+    var result = into.append("div")
+        .attr("class","result");
+
+    result.append("h2")
+        .text(
+            gene.name + " " + 
+            (gene.gene.length == 0 ? "" : "("+gene.gene+") ") 
+        );
+    
+    result.append("p")
+        .text(
+            ((gene.end-gene.start)/1000.0).toFixed(1)+"kb "+
+            gene.chromosome + " " +
+            (gene.start+1) + ".." + gene.end + " " +
+            (gene.strand < 0 ? "-" : "+")
+        );
+    
+    result.append("p")
+        .text( gene.product );
+
+    var container = result.append("div")
+        .style("position","relative");
+
+    var svg_div = container.append("div");
+    var svg = svg_div.append("svg")
+        .attr({
+          //title: "Figure",
+          version: "1.1",
+          xmlns: "http://www.w3.org/2000/svg",
+        });
+
+    var download = result.append("a");
+    download
+        .text("Download in SVG format")
+        .attr("download","figure.svg")
+        .attr("href","")
+        .on("click",function() {
+            download.attr("href","data:image/svg+xml;base64," + btoa(svg_div.node().innerHTML));
+        });
+
+    var hover = container.append("pre")
+        .style("position","absolute");
+    
+    var peaks = gene.peaks;
+    var n_peaks = peaks.length;
+    var n_samples = Data.samples.name.length;
+    
+    var norm_counts = [ ];
+    var max_norm_count = 1.0;
+    for(var i=0;i<n_samples;i++) {
+        var row = [ ];
+        for(var j=0;j<peaks.length;j++) {
+            var peak = peaks[j];
+            var norm_count = Data.peaks.counts[peak][i] * Data.samples.normalizing_multiplier[i];
+            max_norm_count = Math.max(max_norm_count, norm_count);
+            row.push(norm_count);
+        }
+        norm_counts.push(row);
+    }
+    
+    var x_left = 200;
+    var y_top = 100;
+    
+    var x_bands = d3.scale.ordinal()
+        .domain(d3.range(peaks.length))
+        .rangeBands([x_left, x_left + peaks.length * 50], 0.2);
+    
+    var y_bands = d3.scale.ordinal()
+        .domain(d3.range(n_samples))
+        .rangeBands([y_top, y_top + n_samples * 40], 0.2);
+    
+    
+    var genome_scale = d3.scale.linear()
+        .domain([0,1000])
+        .range([x_left+0,x_left+100]);
+        
+    svg.append("svg:rect")
+        .attr("x", genome_scale(0))
+        .attr("y", 0)
+        .attr("width", genome_scale(gene.end-gene.start) - genome_scale(0) )
+        .attr("height", 10)
+        .attr("fill", "#8888ff");
+    $.each(peaks, function(i,peak) {
+        var start, end;
+        if (gene.strand < 0) {
+            start = gene.end - Data.peaks.end[peak];
+            end = gene.end - Data.peaks.start[peak];
+        } else {
+            start = Data.peaks.start[peak] - gene.start;
+            end = Data.peaks.end[peak] - gene.start;
+        }
+        svg.append("svg:rect")
+            .attr("x", genome_scale(start))
+            .attr("y", 5.0)
+            .attr("width", genome_scale(end)-genome_scale(start))
+            .attr("height", 5)
+            .attr("fill", "#000000");
+        svg.append("svg:line")
+            .attr("x1", genome_scale((start+end)*0.5))
+            .attr("y1", 15.0)
+            .attr("x2", x_bands(i)+x_bands.rangeBand()*0.5)
+            .attr("y2", y_top)
+            .attr("stroke-width", 1)
+            .attr("stroke", "black");
+    });
+    
+    
+    for(var i=0;i<n_samples;i++) {
+        svg.append("svg:text")
+            .attr("x", x_left)
+            .attr("y", y_bands(i)+y_bands.rangeBand())
+            .attr("text-anchor", "end")
+//            .attr("dy", "0.3em")
+            .text(Data.samples.name[i]);
+    }
+    
+    $.each(peaks, function(i,peak) {
+        var x = x_bands(i)+x_bands.rangeBand()*0.5;
+        var y = y_bands.rangeExtent()[1];
+        svg.append("svg:text")
+            .attr("x", x)
+            .attr("y", y)
+            .attr("transform", "rotate(45,"+x+","+y+")")
+            .attr("text-anchor", "start")
+            .attr("dy", "1.0em")
+            .text(Data.peaks.name[peak]);
+        
+        for(var j=0;j<n_samples;j++) {
+            var height = norm_counts[j][i]/max_norm_count * y_bands.rangeBand();
+            
+            var tail_length = Data.peaks.tail_lengths[peak][j];
+            var tail_proportion = Data.peaks.proportion_tailed[peak][j];
+            var sub_width = (tail_length == undefined ? 0.0 : x_bands.rangeBand() * tail_length / Max_tail);
+            var sub_height = (tail_proportion == undefined ? 0.0 : height * tail_proportion);
+            
+            svg.append("svg:rect")
+                .attr("x", x_bands(i))
+                .attr("y", y_bands(j) + y_bands.rangeBand()-height)
+                .attr("width", x_bands.rangeBand())
+                .attr("height", height)
+                .attr("fill", "#ffffff")
+                .attr("stroke", "black")
+                .attr("stroke-width", 1.0);
+            svg.append("svg:rect")
+                .attr("x", x_bands(i))
+                .attr("y", y_bands(j) + y_bands.rangeBand() - sub_height)
+                .attr("width", x_bands.rangeBand())
+                .attr("height", sub_height)
+                .attr("fill", "#000000");
+            if (tail_length != undefined)
+                svg.append("svg:rect")
+                    .attr("x", x_bands(i) + x_bands.rangeBand() - sub_width)
+                    .attr("y", y_bands(j) + y_bands.rangeBand() + 2)
+                    .attr("width", sub_width)
+                    .attr("height", 3.0)
+                    .attr("fill", "#008800");
+            //if (tail_proportion != undefined)
+            //    svg.append("svg:rect")
+            //        .attr("x", x_bands(i) + x_bands.rangeBand())
+            //        .attr("y", y_bands(j) + y_bands.rangeBand() - sub_height - 0.5)
+            //        .attr("width", 5.0)
+            //        .attr("height", 1.0)
+            //        .attr("fill", "#888888");
+
+        }
+    });
+    
+    var bbox = svg.node().getBBox();
+    svg.attr("width", bbox.x+bbox.width);
+    svg.attr("height", bbox.y+bbox.height);
+
+    svg.on("mouseout", function() {
+        hover.text("");
+    });
+    
+    svg.on("mousemove", function() {
+        var pos = d3.mouse(svg[0][0]);
+        
+        // no easy way to invert rangeBand scales
+        var peak = undefined, sample = undefined;
+        for(var i=0;i<n_peaks;i++)
+           if (pos[0] >= x_bands(i) && pos[0] <= x_bands(i)+x_bands.rangeBand()) {
+               peak = i;
+               break;
+           }
+        for(var i=0;i<n_samples;i++)
+           if (pos[1] >= y_bands(i) && pos[1] <= y_bands(i)+y_bands.rangeBand()) {
+               sample = i;
+               break; 
+           }
+        
+        if (peak == undefined || sample == undefined)
+            hover.text("");
+        else {
+            var tail_proportion = Data.peaks.proportion_tailed[peaks[peak]][sample];
+            var tail_length = Data.peaks.tail_lengths[peaks[peak]][sample];
+            hover
+            .text(
+                "" +
+                Data.samples.name[sample] + "\n" +
+                Data.peaks.name[peaks[peak]] + "\n" +
+                "Raw count:            " + Data.peaks.counts[peaks[peak]][sample] + "\n" +
+                "Normalized count:     " + (Data.peaks.counts[peaks[peak]][sample]*Data.samples.normalizing_multiplier[sample]).toFixed(1) + "\n" +
+                "Proportion with tail: " + (tail_proportion == undefined ? "insufficient data" : tail_proportion.toFixed(3)) + "\n" +
+                "Average tail length:  " + (tail_length == undefined ? "insufficient data" : tail_length.toFixed(1)) + "\n"
+            )
+            .style("left", ""+svg.attr("width")+"px")
+            .style("top", ""+pos[1]+"px");
+        }
+    });    
+}
+
+
+load = function() {
+    var param = deserialize(window.location.search.substring(1));
+    Form.find("[name='json']").val( param["json"] );
+    Form.find("[name='search']").val( param["search"] );
+    
+    if (Datapath != param["json"]) {
+        d3.json(param["json"], function (error, value) {
+            Datapath = param["json"];
+            Data = value;
+            index_data();
+            load();
+        });
+        return;
+    }
+    
+    var search = normalize(param["search"]);
+    
+    var result = d3.select("#result");
+    result.html("");
+    
+    var any = false;
+    
+    if (Gene_index[search] != undefined) {
+        any = true;
+        
+        $.each(Gene_index[search], function(i,index) {
+            describe_gene(index, result);
+        });
+    }
+
+    if (Peak_index[search] != undefined) {
+        any = true;
+        
+        describe_peak(Peak_index[search], result);
+    }    
+    
+    if (!any)
+        result.html("<div>Not found.</div>");
+}
+
+
+
+
+Form.submit(function (event) {
+    event.preventDefault();
+    history.pushState({}, "", "?" + Form.serialize());
+    load();
+});
+
+$(document).ready(load);
+$(window).bind("popstate", load);
+</script>
+</body>
+
+

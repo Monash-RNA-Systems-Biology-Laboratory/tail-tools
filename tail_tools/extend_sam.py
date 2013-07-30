@@ -1,6 +1,6 @@
 
 import nesoni
-from nesoni import config
+from nesoni import config, io
 
 import util
 
@@ -197,7 +197,7 @@ The actual tail length is stored in an 'AN' attribute.
 @config.Int_flag('tail', 'Minimum tail length.')
 @config.Main_section('reference_filenames', 'Reference sequences in FASTA format.')
 @config.Section('reads', 'Original reads in FASTQ format.')
-class Extend_sam(config.Action_filter):
+class Extend_sam_colorspace(config.Action_filter):
     quality = 20
     tail = 4
     reads = [ ]
@@ -313,7 +313,103 @@ class Extend_sam(config.Action_filter):
         
         self.end_output(out_file)
         self.end_input(in_file)
-                   
+
+
+@config.help(
+'Having aligned clipped reads the reference, if the clipping was too enthusiastic and \
+the reference truly does contain a poly-A run, extend the alignment.', 
+"""\
+Stream SAM records from stdin to stdout.
+
+SAM records of reads that have a tail of at least <--tail> bases are tagged with an 'AA' attribute. \
+The actual tail length is stored in an 'AN' attribute.
+""")
+@config.Int_flag('tail', 'Minimum tail length.')
+@config.Main_section('reference_filenames', 'Reference sequences in FASTA format.')
+@config.Section('clips', '.clips.gz file produced by "clip-reads-basespace:".')
+class Extend_sam_basespace(config.Action_filter):
+    tail = 4
+    reference_filenames = [ ]
+    clips = [ ]
+    
+    def run(self):
+        references = { }
+        for filename in self.reference_filenames:
+            for name, seq in util.read_fasta(open(filename,'rb')):
+                references[name] = seq
+        
+        tail_lengths = { }
+        for filename in self.clips:
+            with io.open_possibly_compressed_file(filename) as f:
+                for line in f:
+                    if line.startswith('#'): continue
+                    parts = line.rstrip('\n').split('\t')
+                    tail_lengths[parts[0].split()[0]] = int(parts[3])-int(parts[2])
+        
+        in_file = self.begin_input()
+        out_file = self.begin_output()
+        
+        for line in in_file:
+            line = line.rstrip()
+            if line.startswith('@'):
+                print >> out_file, line
+                continue
+            
+            al = Alignment(line)
+
+            ref = references[al.rname]
+
+            reverse = al.flag & FLAG_REVERSE
+            if reverse:
+                read_bases = rev_comp(al.seq)
+                read_qual = al.qual[::-1]
+                cigar = cigar_decode(al.cigar)[::-1]
+            else:
+                read_bases = al.seq
+                read_qual = al.qual
+                cigar = cigar_decode(al.cigar)
+            
+            n_tail = tail_lengths[al.qname]
+            
+            if reverse:
+                if al.pos-1-n_tail < 0: continue #TODO: handle tail extending beyond end of reference
+                bases_ref = rev_comp(ref[al.pos-1-n_tail:al.pos-1])    
+            else:
+                if al.pos-1+al.length+n_tail > len(ref): continue #TODO: handle tail extending beyond end of reference
+                bases_ref = ref[al.pos-1+al.length:al.pos-1+al.length+n_tail]
+            
+            extension = 0
+            while extension < n_tail and bases_ref[extension] == 'A':
+                extension += 1
+            
+            if n_tail-extension > 0:
+                al.extra.append('AN:i:%d' % (n_tail-extension))
+            if n_tail-extension >= self.tail:
+                if reverse:
+                    tail_refpos = al.pos-extension
+                else:
+                    tail_refpos = al.pos+al.length+extension-1 
+                al.extra.append('AA:i:%d'%tail_refpos)
+            
+            cigar += 'M' * extension
+            read_bases += 'A' * extension
+            read_qual += chr(33+20) * extension #Arbitrarily give quality 20
+            al.length += extension
+            if reverse:
+                al.pos -= extension
+                al.seq = rev_comp(read_bases)
+                al.qual = read_qual[::-1]
+                al.cigar = cigar_encode(cigar[::-1])
+            else: 
+                al.seq = read_bases
+                al.qual = read_qual
+                al.cigar = cigar_encode(cigar)
+
+            print >> out_file, al
+    
+        self.end_output(out_file)
+        self.end_input(in_file)
+                       
 if __name__ == '__main__':
     config.shell_run(Extend_sam(), sys.argv[1:], sys.executable + ' ' + __file__)
 

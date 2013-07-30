@@ -187,10 +187,10 @@ class Aggregate_tail_lengths(config.Action_with_prefix):
                     for item2 in item:
                         feature.tail_counts[item2] += weight                
 
-            self.log.datum(names[i], 'Alignments to genes', n_alignments)
+            self.log.datum(names[i], 'Alignments to features', n_alignments)
             if self.saturation >= 1:
                 self.log.datum(names[i], 'Proportion of alignments with duplicate start and end position', float(n_duplicates)/max(1,n_alignments))
-                self.log.datum(names[i], 'Alignments to genes after deduplication', n_good)
+                self.log.datum(names[i], 'Alignments to features after deduplication', n_good)
                 
         
         counts = [ ]  # [feature][sample][taillength]
@@ -721,7 +721,7 @@ class Plot_comparison(config.Action_with_prefix, runr.R_action):
             type='heatmap',
             data=t(scale(t( kept.expression[dend.row$order,,drop=FALSE] ),scale=FALSE,center=TRUE)),
             signed=TRUE,
-            legend='log2 Reads Per Million\n(quantile normalized)\nvs row average',
+            legend='log2 Reads Per Million\nvs row average',
             title='log2 RPM  -vs-'
         ),
         list(
@@ -731,24 +731,6 @@ class Plot_comparison(config.Action_with_prefix, runr.R_action):
             title='row\naverage'
         )
     )
-    
-    #for(i in basic.seq(n.samples)) {
-    #    data <- (kept.raw[,good.cols[i,],drop=FALSE] / kept.totals[,i])[dend.row$order,,drop=FALSE]
-    #    
-    #    #if (nrow(data) > 0) {
-    #    #    for(j in basic.seq(ncol(data)))
-    #    #        data[,j] <- data[,j]*ncol(data)
-    #    #}
-    #    
-    #    colnames(data) <- rep('', ncol(data))
-    #    colnames(data)[1] <- rownames(cols)[i]
-    #    plots[[length(plots)+1]] <- list(
-    #        weight=1/n.samples,
-    #        type='heatmap',
-    #        data=data,
-    #        signed=FALSE
-    #    )
-    #}
     
     multiplot(
         plots,
@@ -764,8 +746,6 @@ class Plot_comparison(config.Action_with_prefix, runr.R_action):
 
     sink(sprintf('%s.csv', prefix))
     cat('# Tail-length heatmap data\n')
-    cat('#\n')
-    cat('# log2 counts are quantile normalized\n')
     cat('#\n')
     
     frame <- data.frame( 
@@ -784,28 +764,34 @@ class Plot_comparison(config.Action_with_prefix, runr.R_action):
 
     write.csv(frame, row.names=FALSE)
     sink()
-    
+        
     """
 
 
 
 @config.help(
-'Analyse tail lengths of a set of samples.'
+'Analyse expression levels and tail lengths of a set of samples.'
 """\
 """
 )
 @config.String_flag('annotations', 'Filename containing annotations. Defaults to annotations in reference directory.')
 @config.String_flag('types', 'Comma separated list of feature types to use.')
+@config.String_flag('spike_in', 'Comma separated list of spike-in "genes".')
 @config.Int_flag('saturation',
      'Duplicate start position saturation level. '
      'Reads that start at the same position will only '
      'count as up to this many. Zero for no saturation.'
-)
+     )
+@config.Float_flag('glog_moderation',
+     'Moderation amount for heatmaps.'
+     )
 @config.Main_section('working_dirs')
 class Analyse_tail_lengths(config.Action_with_prefix):         
     annotations = None
     types = 'gene'
+    spike_in = ''
     saturation = 1
+    glog_moderation = 5.0
     working_dirs = [ ]
 
     def log_filename(self):
@@ -832,10 +818,11 @@ class Analyse_tail_lengths(config.Action_with_prefix):
                 aggregate = self.prefix,
                 min_tails = min_tails,
                 min_span = min_span,
+                glog_moderation = self.glog_moderation,
             )
             
             for min_tails in (20,50,100,200)
-            for min_span in (2,4,8)
+            for min_span in (2,4,8,10,15,20,25,30)
         ]
 
     def get_heatmaps(self):
@@ -848,9 +835,10 @@ class Analyse_tail_lengths(config.Action_with_prefix):
                 min_total = 0,
                 #min_max = min_count,
                 min_span = math.log(fold)/math.log(2.0),
+                glog_moderation = self.glog_moderation,
             )
             
-            for fold in [ 1.5, 2.0, 4.0, 6.0, 8.0, 10.0, 20.0 ]
+            for fold in [ 1.5, 2.0, 4.0, 6.0, 8.0, 10.0, 20.0, 30.0, 40.0 ]
             #for min_count in [ 10, 50, 250 ]
         ]
 
@@ -891,6 +879,7 @@ class Analyse_tail_lengths(config.Action_with_prefix):
          nesoni.Plot_counts(
              prefix=self.prefix,
              counts=self.prefix+'-counts.csv',
+             spike_in=self.spike_in,
          ).process_make(stage)
          
          stage.barrier() #=================================================
