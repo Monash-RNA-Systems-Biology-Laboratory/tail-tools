@@ -1,4 +1,6 @@
 
+0.19 - Fix setup.py
+
 0.18 - Basespace read support.
        "call-peaks:" pipeline.
        "compare-peaks:" tool.
