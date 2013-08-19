@@ -74,20 +74,14 @@ Tail-tools is free software, released under the GPL (version 2).
 Peak calling and statistics:
 ============================
 
+tail-tools call-peaks: peaks $SAMPLES_POLYA --types gene --shift-start 0 --shift-end 1000
 
-nesoni modes: mymodes $SAMPLES_POLYA --what 3prime --lap 10 --radius 50 --min-depth 10
-# --lap 10 => nearby 3' read ends count toward same peak
-# --min-depth 10 => slightly higher threshold for calling a peak
+tail-tools analyse-tail-lengths: myanalysis $SAMPLES_ALL --annotations peaks/relation-child.gff --types peak --saturation 0 --make-do all
 
-nesoni modify-features: mypeaks mymodes.gff --shift-start -100
+tail-tools compare-peaks: mycomparison $REFERENCE peaks/relation-parent.gff peaks/relation-child.gff myanalysis-counts.csv
 
-nesoni relate-features: myrelation $ANNOTATION mypeaks.gff \
-    --upstrand -100 --downstrand 200 --use in/downstrand --to-child gene/product
+tail-tools geneview-webapp: geneviewer
 
-tail-tools analyse-tail-lengths: myanalysis $SAMPLES_ALL --annotations myrelation-child.gff --types peak --saturation 0 --make-do all
-# --saturation 0 => keep duplicate reads
-# Now outputs myanalysis.gff -- peaks annotated and colored with tail lengths
 
-tail-tools compare-peaks: mycomparison myrelation-parent.gff myrelation-child.gff myanalysis-counts.csv
 
 
