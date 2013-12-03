@@ -5,8 +5,6 @@ from nesoni import config, io, grace
 
 import sys
 
-import util
-
 
 State = collections.namedtuple('State','state score a_start a_end') 
 
@@ -42,7 +40,7 @@ class Clip_runs_colorspace(config.Action_with_prefix):
             total_before = 0
             total_clipped = 0
             for filename in self.filenames:
-                for name, seq, qual in util.read_fastq(io.open_possibly_compressed_file(filename)):
+                for name, seq, qual in io.read_sequences(filename, qualities='required'):
                     
                     score = 0
                     start = 0
@@ -123,7 +121,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
             total_clipped = 0
 
             for filename in self.filenames:
-                for name, seq, qual in util.read_fastq(io.open_possibly_compressed_file(filename)):
+                for name, seq, qual in io.read_sequences(filename, qualities='required'):
                     best_score = 0
                     best_a_start = len(seq)
                     best_a_end = len(seq)

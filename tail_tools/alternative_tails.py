@@ -4,10 +4,10 @@ Test for shift of expression from one tail to another within a gene.
 
 """
 
-import json
+import json, collections
 
 import nesoni
-from nesoni import config, io, annotation, runr, reference_directory
+from nesoni import config, io, bio, annotation, runr, reference_directory
 
 def _float_or_none(text):
     if text == 'NA':
@@ -37,6 +37,10 @@ result <- data.frame(
     product = PRODUCTS,
     mean.tail = MEAN_TAILS,
     proportion.with.tail = PROP_TAILS,
+    chromosome = CHROMOSOME_NAMES,
+    strand = STRANDS,
+    transcription_stops = TRANSCRIPTION_STOPS,
+    interpeak_seq = INTERPEAK_SEQS,
     row.names = names(data)
     )
 
@@ -67,7 +71,13 @@ result[,'FDR'] <- p.adjust(result$p.value, method='BH')
 
 reordering <- order(result$interestingness, decreasing=TRUE)
 
-output <- result[reordering, c('name','interestingness','peaks','df','chisq','FDR','gene','product','mean.tail','proportion.with.tail')]
+output <- result[
+    reordering, 
+    c('name','interestingness','peaks','df','chisq','FDR',
+      'gene','product','mean.tail','proportion.with.tail',
+      'chromosome','strand','transcription_stops','interpeak_seq'
+      )
+    ]
 
 sink(OUTPUT_FILENAME)
 cat('##Compare-peaks chi-square tests\n')
@@ -87,13 +97,25 @@ sink()
     'This can be used as input to "nesoni test-counts:".\n'
     )
 @config.String_flag('norm_file', 'Use normalization produced by "norm-from-counts:".')
-@config.Positional('reference', 'Reference directory')
+@config.String_flag('parent_type', 'Type of parent genes in parents annotation file.')
+@config.Bool_flag('utr_only', 
+    'Only use peaks in the 3\' UTR. '
+    'Feature must have a property three_prime_UTR_start giving the 1-based position of the start of the UTR.'
+    )
+@config.Int_flag('top',
+    'Only use top n most expressed peaks. 0 = use all.'
+    )
+@config.Positional('reference', 
+    'Reference sequences.')
 @config.Positional('parents', 'Annotation file containing parent genes.')
 @config.Positional('children', 'Annotation file containing child peaks. "Parent" property should be set.')
 @config.Positional('counts', 'Counts file as produced by tail-stats.')
 class Compare_peaks(config.Action_with_prefix):
     fdr = 0.05
     norm_file = None
+    parent_type = 'gene'
+    utr_only = True
+    top = 0
     reference = None
     parents = None
     children = None
@@ -102,12 +124,22 @@ class Compare_peaks(config.Action_with_prefix):
     def run(self):
         # Reference genome
         
-        chromosome_lengths = reference_directory.Reference(self.reference, must_exist=True).get_lengths()
+        #chromosome_lengths = reference_directory.Reference(self.reference, must_exist=True).get_lengths()
+        chromosomes = collections.OrderedDict(io.read_sequences(self.reference))
+
+        def get_interpeak_seq(peaks):
+            start = min(item.transcription_stop for item in peaks)
+            end = max(item.transcription_stop for item in peaks)
+            if end-start > 10000: return ''
+            if peaks[0].strand >= 0:
+                return chromosomes[peaks[0].seqid][start:end]
+            else:
+                return bio.reverse_complement(chromosomes[peaks[0].seqid][start:end])
         
         # Normalization files
         
         if self.norm_file:
-            norm_file = norm_file
+            norm_file = self.norm_file
         else:
             nesoni.Norm_from_counts(self.prefix+'-norm', self.counts).run()
             norm_file = self.prefix+'-norm.csv'
@@ -130,7 +162,7 @@ class Compare_peaks(config.Action_with_prefix):
 
         # Read data
         
-        parents = list(annotation.read_annotations(self.parents))
+        annotations = list(annotation.read_annotations(self.parents))
         children = list(annotation.read_annotations(self.children))
         
         count_table = io.read_grouped_table(self.counts, [
@@ -139,13 +171,8 @@ class Compare_peaks(config.Action_with_prefix):
             ('Proportion',_float_or_none),
             ('Annotation',str)
             ])
-        counts = count_table['Count']        
+        counts = count_table['Count']
         
-        id_to_parent = { }
-        for item in parents:
-            assert item.get_id() not in id_to_parent, 'Duplicate id in parent file: '+item.get_id()
-            id_to_parent[item.get_id()] = item
-
         samples = counts.value_type().keys()
         sample_tags = { }
         for line in count_table.comments:
@@ -154,15 +181,68 @@ class Compare_peaks(config.Action_with_prefix):
                 assert parts[0] not in sample_tags
                 sample_tags[parts[0]] = parts
         
-        relation = { }
         for item in children:
+            item.weight = sum( counts[item.get_id()][name] * float(norms[name]['Normalizing.multiplier']) for name in samples )
+        
+        parents = [ ]
+        id_to_parent = { }
+        for item in annotations:
+            if item.type != self.parent_type: continue
+            assert item.get_id() not in id_to_parent, 'Duplicate id in parent file: '+item.get_id()
+            parents.append(item)
+            id_to_parent[item.get_id()] = item
+            item.children = [ ]
+            #item.cds = [ ]
+
+
+        #for item in parents:
+        #    if item.type != 'CDS': continue
+        #    if 'Parent' not in item.attr or item.attr['Parent'] not in id_to_parent: continue
+        #    parent = id_to_parent[item.attr['Parent']]
+        #    assert item.seqid == parent.seqid and item.strand == parent.strand
+        #    if item.strand < 0:
+        #        cds = (parent.end-item.end, parent.end-item.start)
+        #    else:
+        #        cds = (item.start-parent.start, item.end-parent.start)            
+        #    id_to_parent[item.attr['Parent']].cds.append(cds)            
+        #
+        #for item in parents:
+        #    item.cds.sort()
+        #    if item.cds:
+        #        item.cds_start = min(a for a,b in item.cds)
+        #        item.cds_end = max(a for a,b in item.cds)
+        #    else:
+        #        item.cds_start = 0
+        #        item.cds_end = item.end-item.start
+            
+        for item in children:
+            item.transcription_stop = item.end if item.strand >= 0 else item.start #End of transcription, 0-based, ie between-positions based
+            
             if 'Parent' in item.attr:
                 for item_parent in item.attr['Parent'].split(','):
-                    if item_parent not in relation:
-                        relation[item_parent] = [ ]
-                    relation[item_parent].append(item)
-        for id in relation:
-            relation[id].sort(key=_annotation_sorter)
+                    parent = id_to_parent[item_parent]
+                    parent.children.append(item)
+                    
+
+        for item in parents:
+            item.children.sort(key=_annotation_sorter)
+            
+            relevant = list(item.children)
+            if self.utr_only:
+                if item.strand <= 0:
+                    relative_utr_start = item.end - int(item.attr['three_prime_UTR_start'])
+                else:
+                    relative_utr_start = int(item.attr['three_prime_UTR_start'])-1 - item.start
+            
+                def relative_start(peak):
+                    return item.end-peak.end if item.strand < 0 else peak.start-item.start
+                relevant = [ peak for peak in relevant if relative_start(peak) >= relative_utr_start ]
+            if self.top:
+                relevant.sort(key=lambda peak:peak.weight, reverse=True)
+                relevant = relevant[:self.top]
+            relevant.sort(key=_annotation_sorter)
+            item.relevant_children = relevant
+        
         
         
         # JSON output
@@ -179,6 +259,10 @@ class Compare_peaks(config.Action_with_prefix):
         j_genes['gene'] = [ ]
         j_genes['product'] = [ ]
         j_genes['peaks'] = [ ]
+        j_genes['relevant_peaks'] = [ ]
+        #j_genes['cds'] = [ ]
+        #j_genes['cds_start'] = [ ]
+        #j_genes['cds_end'] = [ ]
         for item in parents:
             j_genes['name'].append( item.get_id() )
             j_genes['chromosome'].append( item.seqid )
@@ -187,7 +271,11 @@ class Compare_peaks(config.Action_with_prefix):
             j_genes['end'].append( item.end )
             j_genes['gene'].append( item.attr.get('gene','') )
             j_genes['product'].append( item.attr.get('product','') )
-            j_genes['peaks'].append( [ item2.get_id() for item2 in relation.get(item.get_id(), []) ] )
+            j_genes['peaks'].append( [ item2.get_id() for item2 in item.children ] )
+            j_genes['relevant_peaks'].append( [ item2.get_id() for item2 in item.relevant_children ] )
+            #j_genes['cds'].append( item.cds )
+            #j_genes['cds_start'].append( item.cds_start )
+            #j_genes['cds_end'].append( item.cds_end )
         
         j_peaks = j_data['peaks'] = { }
         j_peaks['__comment__'] = 'start is 0-based'
@@ -218,14 +306,14 @@ class Compare_peaks(config.Action_with_prefix):
         for name in samples:
             j_samples['name'].append(name)
             j_samples['tags'].append(sample_tags[name])
-            j_samples['normalizing_multiplier'].append(norms[name]['Normalizing.multiplier'])
+            j_samples['normalizing_multiplier'].append(float(norms[name]['Normalizing.multiplier']))
         
         j_chromosomes = j_data['chromosomes'] = { }
         j_chromosomes['name'] = [ ]
         j_chromosomes['length'] = [ ]
-        for name, length in chromosome_lengths:
+        for name, seq in chromosomes.iteritems():
             j_chromosomes['name'].append(name)
-            j_chromosomes['length'].append(length)        
+            j_chromosomes['length'].append(len(seq))        
         
         with open(self.prefix + '.json','wb') as f:
             json.dump(j_data, f)
@@ -244,26 +332,31 @@ class Compare_peaks(config.Action_with_prefix):
         
         output_names = [ ]
         output_counts = [ ]
-        output_annotation_fields = [ 'gene', 'product', 'mean-tail-1', 'mean-tail-2' ]
+        output_annotation_fields = [ 'gene', 'product', 'mean_tail_1', 'mean_tail_2', 'chromosome', 'strand', 'transcription_stops', 'interpeak_seq' ]
         output_annotations = [ ]
             
-        for id in relation:
-            peaks = relation[id]
+        for item in parents:
+            peaks = item.relevant_children
             for i in xrange(len(peaks)-1):
                 for j in xrange(i+1, len(peaks)):
                     id_i = peaks[i].get_id()
                     id_j = peaks[j].get_id()
-                    id_pair = id + '-'+id_i+'-'+id_j
+                    id_pair = item.get_id() + '-'+id_i+'-'+id_j
                     output_names.append(id_pair)
                     row = [ ]
                     row.extend(counts[id_i].values())
                     row.extend(counts[id_j].values())
                     output_counts.append(row)
                     output_annotations.append([
-                        id_to_parent[id].attr.get('gene',''),
-                        id_to_parent[id].attr.get('product',''),
+                        item.attr.get('gene',''),
+                        item.attr.get('product',''),
                         count_table['Annotation'][id_i]['mean-tail'],
-                        count_table['Annotation'][id_j]['mean-tail']
+                        count_table['Annotation'][id_j]['mean-tail'],
+                        
+                        item.seqid,
+                        str(item.strand),
+                        '%d, %d' % (peaks[i].transcription_stop,peaks[j].transcription_stop),
+                        get_interpeak_seq([peaks[i],peaks[j]]),
                         ])
         
         output_count_table = io.named_matrix_type(output_names,output_samples)(output_counts)
@@ -287,8 +380,15 @@ class Compare_peaks(config.Action_with_prefix):
         products = [ ]
         mean_tails = [ ]
         prop_tails = [ ]
-        for id in relation:
-            peaks = relation[id]
+
+        chromosome_names = [ ]
+        strands = [ ]
+        transcription_stops = [ ]
+        interpeak_seqs = [ ]
+
+        for parent in parents:
+            id = parent.get_id()
+            peaks = parent.relevant_children
             if len(peaks) < 2: continue
             
             matrix = [ ]
@@ -300,18 +400,23 @@ class Compare_peaks(config.Action_with_prefix):
                 runr.R_literal(matrix)
                 )
             
-            genes.append(id_to_parent[id].attr.get('gene',''))
-            products.append(id_to_parent[id].attr.get('product',''))
+            genes.append(parent.attr.get('gene',''))
+            products.append(parent.attr.get('product',''))
             
             def format_mean(s):
                 if s == 'NA': return 'NA'
                 return '%.1f' % float(s)
-            mean_tails.append(','.join( format_mean(count_table['Annotation'][item.get_id()]['mean-tail']) for item in peaks ))
+            mean_tails.append(', '.join( format_mean(count_table['Annotation'][item.get_id()]['mean-tail']) for item in peaks ))
             
             def format_prop(s):
                 if s == 'NA': return 'NA'
                 return '%.2f' % float(s)
-            prop_tails.append(','.join( format_prop(count_table['Annotation'][item.get_id()]['proportion-with-tail']) for item in peaks ))
+            prop_tails.append(', '.join( format_prop(count_table['Annotation'][item.get_id()]['proportion-with-tail']) for item in peaks ))
+            
+            chromosome_names.append(parent.seqid)
+            strands.append(parent.strand)
+            transcription_stops.append(', '.join(str(item.transcription_stop) for item in peaks))
+            interpeak_seqs.append(get_interpeak_seq(peaks))
             
             #if len(mats) >= 10: break
         
@@ -325,9 +430,24 @@ class Compare_peaks(config.Action_with_prefix):
             PRODUCTS = products,
             MEAN_TAILS = mean_tails,
             PROP_TAILS = prop_tails,
+            CHROMOSOME_NAMES = chromosome_names,
+            STRANDS = strands,
+            TRANSCRIPTION_STOPS = transcription_stops,
+            INTERPEAK_SEQS = interpeak_seqs,
             )
         
             
+        ## Inter-peak sequences
+        #
+        #stats = io.read_grouped_table(self.prefix+'.csv', [('All',str)])['All']
+        #for ident in stats.keys():
+        #    parent = id_to_parent[ident]
+        #    ...etc...
+        
+        
+        
+        
+        
         
         
         

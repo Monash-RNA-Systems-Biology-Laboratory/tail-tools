@@ -1,4 +1,11 @@
 
+0.21 - Major refactoring
+       - define reference annotation to be GFF3
+       - UCSC genome downloader
+
+0.20 - "nodedup" -> "dup"
+       Changes to reports.
+
 0.19 - Fix setup.py
 
 0.18 - Basespace read support.

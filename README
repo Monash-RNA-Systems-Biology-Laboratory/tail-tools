@@ -30,7 +30,12 @@ Requirements:
   You don't need to install all of nesoni's dependencies, just Python 2.7 
   or later or PyPy.
 
+- bowtie2
+  (SHRiMP for legacy color-space data)
+
 - The "convert" tool from ImageMagick.
+
+- rsync (for downloads from UCSC browser)
 
 
 Installation:
@@ -67,20 +72,114 @@ These tools may also be used as part of a nesoni-style workflow python script.
 
 
 
-Tail-tools is free software, released under the GPL (version 2).
-
 
 
 Peak calling and statistics:
 ============================
 
-tail-tools call-peaks: peaks $SAMPLES_POLYA --types gene --shift-start 0 --shift-end 1000
+tail-tools call-peaks: peaks $SAMPLES_POLYA \
+    --types gene --shift-start 0 --shift-end 1000
+#
+#  --shift-end should be chosen appropriate to the genome
+#
 
-tail-tools analyse-tail-lengths: myanalysis $SAMPLES_ALL --annotations peaks/relation-child.gff --types peak --saturation 0 --make-do all
+tail-tools analyse-tail-lengths: myanalysis $SAMPLES_ALL \
+    --annotations peaks/relation-child.gff --types peak \
+    --saturation 0 --make-do all
+#
+#  --saturation 1 to de-duplicate alignments
+#
 
-tail-tools compare-peaks: mycomparison $REFERENCE peaks/relation-parent.gff peaks/relation-child.gff myanalysis-counts.csv
+
+tail-tools compare-peaks: mycomparison $REFERENCE \
+    peaks/relation-parent.gff peaks/relation-child.gff myanalysis-counts.csv
 
 tail-tools geneview-webapp: geneviewer
+
+
+
+
+Reference format
+================
+
+Before processing any reads, you need to create a "tail-tools reference directory".
+
+References are most easily downloaed from the UCSC browser using:
+
+   tail-tools make-ucsc-reference: \
+       <output_dir> \
+       <ucsc_reference_name> \
+       --extension <extension_length>
+
+If creating your own reference, it needs to consist of:
+
+- sequences, eg in FASTA format
+- annotations in GFF3 format
+
+The reference directory is then created with the command:
+
+  tail-tools make-tt-reference: \
+      <output_dir> \
+      <sequence_file> \
+      <annotations_file> \
+      --extension <extension_length>
+
+--extension determines how far downstrand of a gene a read (or peak) can be and 
+still be counted as belonging to that gene.
+
+Annotations shall include the following feature types and attributes:
+
+gene
+    required attributes:
+    - ID      - unique identifier
+    optional attributes:
+    - Name    - nomenclature name
+    - Product - short description
+
+mRNA
+    required attributes:
+    - ID      - unique identifier
+    - Parent  - gene ID
+
+CDS
+    required attributes:
+    - Parent  - mRNA ID
+
+exon
+    required attributes:
+    - Parent  - mRNA ID
+
+
+
+
+GTF appears to be the standard used by
+htseq
+cufflinks etc
+
+
+iGenomes as a data source?
+
+
+produces 
+reference.gff           - GFF3 file, mRNA attributes have group attribute refers to reference-collapsed.gff
+reference-collapsed.gff - 
+reference-3utr.gff      - 3' UTR regions of collapsed genes 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

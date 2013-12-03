@@ -150,6 +150,7 @@ describe_gene = function(index, into) {
         chromosome : Data.genes.chromosome[index],
         start : Data.genes.start[index],
         end : Data.genes.end[index],
+        cds : [ ],
         strand : Data.genes.strand[index],
         peaks : $.map(Data.genes.peaks[index], function(peak_name) { return Peak_id[peak_name]; }),
     }, into);
@@ -229,7 +230,7 @@ describe_inner = function(gene, into) {
     
     
     var genome_scale = d3.scale.linear()
-        .domain([0,1000])
+        .domain([0,20000])
         .range([x_left+0,x_left+100]);
         
     svg.append("svg:rect")

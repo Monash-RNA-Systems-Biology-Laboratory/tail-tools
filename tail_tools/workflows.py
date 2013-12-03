@@ -1,11 +1,12 @@
 
 import os, math, glob
+from os.path import join
 
 import nesoni
 from nesoni import config, workspace, working_directory, reference_directory, io, reporting, grace
 
 import tail_tools
-from tail_tools import clip_runs, extend_sam, proportions, tail_lengths
+from . import clip_runs, extend_sam, proportions, tail_lengths
 
 
 @config.help(
@@ -119,7 +120,7 @@ class Analyse_polya(config.Action_with_output_dir):
     reference = None
     tags = [ ]
     reads = [ ]    
-    consensus = True
+    consensus = False
     
     _workspace_class = working_directory.Working
     
@@ -182,12 +183,28 @@ class Analyse_polya(config.Action_with_output_dir):
 
         cores = min(nesoni.coordinator().get_cores(), 8)
         
-        nesoni.Execute(
-            command = reference.shrimp_command(cs=colorspace, parameters=[ clipped_filename ]),
-            execution_options = [ '-N', str(cores) ] + [ '--qv-offset', '33' ] if not colorspace else [ ],
-            output=raw_filename,
-            cores=cores,
-        ).make()
+        if colorspace:
+            nesoni.Execute(
+                command = reference.shrimp_command(cs=colorspace, parameters=[ clipped_filename ]),
+                execution_options = [ '-N', str(cores) ] + [ '--qv-offset', '33' ] if not colorspace else [ ],
+                output=raw_filename,
+                cores=cores,
+                ).make()
+        
+        else:
+            nesoni.Execute(
+                command = [ 
+                    'bowtie2', 
+                    '--rg-id', '1',
+                    '--rg', 'SM:'+working.name,
+                    '-k', '10', #Up to 10 alignments per read
+                    '-x', reference.get_bowtie_index_prefix(),
+                    '-U', clipped_filename,
+                    ],
+                execution_options = [ '--threads', str(cores) ],
+                output=raw_filename,
+                cores=cores,
+                ).make()
                 
         if colorspace:
             extend_sam.Extend_sam_colorspace(
@@ -238,11 +255,12 @@ class Analyse_polya(config.Action_with_output_dir):
 """\
 
 """)
-@config.String_flag('title', 'Analysis report title')
-@config.String_flag('file_prefix', 'Prefix for report files')
-@config.String_flag('blurb', 'Introductory HTML text for report')
-@config.String_flag('genome', 'IGV .genome file, to produce IGV plots')
-@config.String_flag('genome_dir', 'IGV directory of reference sequences to go with .genome file')
+@config.String_flag('title', 'Analysis report title.')
+@config.String_flag('file_prefix', 'Prefix for report filenames.')
+@config.Int_flag('extension', 'How far downstrand of the given annotations a read or peak belonging to a gene might be.')
+#@config.String_flag('blurb', 'Introductory HTML text for report')
+#@config.String_flag('genome', 'IGV .genome file, to produce IGV plots')
+#@config.String_flag('genome_dir', 'IGV directory of reference sequences to go with .genome file')
 @config.Bool_flag('include_plots', 'Include plots in report?')
 @config.Bool_flag('include_genome', 'Include genome in IGV plots tarball?')
 @config.Bool_flag('include_bams', 'Include BAM files in report?')
@@ -257,27 +275,27 @@ class Analyse_polya(config.Action_with_output_dir):
     templates = [ ],
     sections = [ ('sample', lambda obj: obj.template, 'A sample, parameters as per "analyse-polya:".') ],
     )
-@config.Configurable_section('analyse_tail_lengths', 'Parameters for "analyse-tail-lengths:"')
-@config.Section('extra_files', 'Extra files to include in report')
+#@config.Configurable_section('analyse_tail_lengths', 'Parameters for "analyse-tail-lengths:"')
+#@config.Section('extra_files', 'Extra files to include in report')
 class Analyse_polya_batch(config.Action_with_output_dir):
     file_prefix = ''
-    title = '3\'seq analysis'
-    blurb = ''
-    extra_files = [ ]
+    title = 'PAT-Seq analysis'
+    #blurb = ''
+    #extra_files = [ ]
     
-    genome = None
-    genome_dir = None
+    extension = 1000
+    
+    #genome = None
+    #genome_dir = None
     include_plots = True
-    include_genome = True
+    include_genome = False
     include_bams = True
     reference = None
     samples = [ ]
     
-    analyse_tail_lengths = tail_lengths.Analyse_tail_lengths()
+    #analyse_tail_lengths = tail_lengths.Analyse_tail_lengths()
     
     def run(self):
-        stage = nesoni.Stage()
-
         names = [ sample.output_dir for sample in self.samples ]
             #os.path.splitext(os.path.split(item)[1])[0]
             #for item in self.reads
@@ -289,6 +307,11 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         samplespace = io.Workspace(workspace/'samples', must_exist=False)
         plotspace = io.Workspace(workspace/'plots', must_exist=False)
         expressionspace = io.Workspace(workspace/'expression', must_exist=False)
+        
+        file_prefix = self.file_prefix
+        if file_prefix and not file_prefix.endswith('-'):
+            file_prefix += '-'
+
 
         #dirs = [
         #    workspace/item
@@ -308,21 +331,18 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         filter_logs = [ item.get_filter_action().log_filename() for item in samples ]
         filter_polya_logs = [ item.get_polya_filter_action().log_filename() for item in samples ]
+
+        analyse_template = tail_lengths.Analyse_tail_counts(
+            working_dirs = dirs,
+            saturation = 0,
+            extension = self.extension,
+            )
         
-        for item in samples:
-            item.process_make(stage)
 
-        #for reads_filename, directory in zip(self.reads, dirs):
-        #    action = self.analyse(
-        #        output_dir=directory,
-        #        reference=self.reference,
-        #        reads=reads_filename,
-        #    )
-        #    stage.process(action.run)
-        #    filter_logs.append(action.get_filter_action().log_filename())
-        #    filter_polya_logs.append(action.get_filter_action().log_filename())
+        with nesoni.Stage() as stage:        
+            for item in samples:
+                item.process_make(stage)
 
-        stage.barrier() #====================================================
         
         
         nesoni.Norm_from_samples(
@@ -337,63 +357,65 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         io.write_csv(workspace/'norm-polyA.csv', writer(), comments=['Normalization'])
 
 
-        if self.include_plots:
-            for plot_name, directories, norm_filename in [
-                ('all',   dirs,       workspace/'norm.csv'),
-                ('polyA', polya_dirs, workspace/'norm-polyA.csv'),
-            ]:
-                nesoni.IGV_plots(
-                    plotspace/plot_name,
-                    working_dirs = directories,
-                    label_prefix = plot_name+' ',
-                    raw = True,
-                    norm = True,
-                    genome = self.genome,
-                    norm_file = norm_filename,
-                    #delete_igv = False,
+        with nesoni.Stage() as stage:
+            if self.include_plots:        
+                for plot_name, directories, norm_filename in [
+                      ('all',   dirs,       workspace/'norm.csv'),
+                      ('polyA', polya_dirs, workspace/'norm-polyA.csv'),
+                      ]:
+                    nesoni.IGV_plots(
+                        plotspace/plot_name,
+                        working_dirs = directories,
+                        label_prefix = plot_name+' ',
+                        raw = True,
+                        norm = True,
+                        genome = reference.get_genome_filename(),
+                        norm_file = norm_filename,
+                        #delete_igv = False,
+                        ).process_make(stage)
+
+            analyse_gene_counts_0 = analyse_template(
+                output_dir = expressionspace/'gene',
+                saturation = 0,
+                extension = self.extension,
+                title = 'Genewise expression - ' + self.title,
+                file_prefix = file_prefix+'genewise-',
+                )
+            analyse_gene_counts_0.process_make(stage)
+            
+            analyse_gene_counts_1 = analyse_template(
+                output_dir = expressionspace/'gene-dedup',
+                working_dirs = dirs,
+                saturation = 1,
+                title = 'Genewise expression with read deduplication - ' + self.title,
+                file_prefix = file_prefix+'genewise-dedup-',
+                )
+            analyse_gene_counts_1.process_make(stage)
+            
+            
+            Call_peaks(
+                workspace/'peaks',
+                annotations = reference/'utr.gff',
+                shift_start = 0,
+                shift_end = self.extension,
+                types = 'three_prime_utr',
+                polyas = polya_dirs,
                 ).process_make(stage)
-
+            
         
-        #nesoni.Stats(
-        #    *self.reads, 
-        #    output=workspace/'stats.txt'
-        #).process_make(stage)
-        
-        stage.barrier() #====================================================
-
-        analyse_tail_lengths_0 = self.analyse_tail_lengths(
-            prefix = expressionspace/'nodedup',
-            working_dirs = dirs,
-            saturation = 0,
-        )
-        analyse_tail_lengths_0.process_make(stage)
-
-        analyse_tail_lengths_1 = self.analyse_tail_lengths(
-            prefix = expressionspace/'dedup',
-            working_dirs = dirs,
-            saturation = 1,
-        )
-        analyse_tail_lengths_1.process_make(stage)
-        
-        stage.barrier() #====================================================
         
         #===============================================
         #                   Report        
         #===============================================
 
         r = reporting.Reporter(os.path.join(self.output_dir, 'report'), self.title, self.file_prefix)
-        
-        r.write(self.blurb)
-        
-        for filename in self.extra_files:
-            r.p( r.get(filename) )
-        
+                    
         r.heading('Alignment to reference')
         
         r.report_logs('alignment-statistics',
             #[ workspace/'stats.txt' ] +
             filter_logs + filter_polya_logs +
-            [ expressionspace/'dedup_aggregate_log.txt' ],
+            [ expressionspace/('gene-dedup','aggregate-tail-counts_log.txt') ],
             filter=lambda sample, field: (
                 field not in ['fragments','fragments aligned to the reference'] and
                 (not sample.endswith('-polyA') or field not in ['reads with alignments','hit multiple locations'])
@@ -408,20 +430,19 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             
             genome_files = [ ]
             if self.include_genome:
-                assert self.genome, '.genome file not specified.'
-                genome_files.append(self.genome)
-                if self.genome_dir:
-                    base = os.path.split(self.genome_dir)[1]
-                    for filename in os.listdir(self.genome_dir):
-                        genome_files.append((
-                            os.path.join(self.genome_dir, filename),
-                            os.path.join(base, filename)
+                genome_files.append(reference.get_genome_filename())
+                genome_dir = reference.get_genome_dir()
+                base = os.path.split(self.genome_dir)[1]
+                for filename in os.listdir(genome_dir):
+                    genome_files.append((
+                        os.path.join(genome_dir, filename),
+                        os.path.join(base, filename)
                         ))
             
             r.p(r.tar('igv-plots',
-               genome_files +
-               glob.glob(plotspace/'*.tdf')
-            ))
+                genome_files +
+                glob.glob(plotspace/'*.tdf')
+                ))
         
 
         if self.include_bams:
@@ -437,20 +458,22 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 bam_files.append( (samplespace/(name,'alignments_filtered_sorted.bam.bai'),name+'.bam.bai') )
             r.p(r.tar('bam-files.tar.gz', bam_files))
         
-        r.write('<div style="background: #ddddff; padding: 1em;">\n')
-        r.heading('Expression levels and tail lengths <b>without</b> read deduplication')        
-        analyse_tail_lengths_0.report_tail_lengths(r)
-        r.write('</div>')
+        io.symbolic_link(source=join(analyse_gene_counts_0.output_dir,'report'),link_name=r.workspace/'genewise')
+        r.heading('<a href="genewise/index.html">&gt; Genewise expression</a>')
 
-        r.write('<div style="background: #ddffdd; padding: 1em;">\n')
-        r.heading('Expression levels and tail lengths <b>with</b> read deduplication')        
-        analyse_tail_lengths_1.report_tail_lengths(r)
-        r.write('</div>\n')
+        io.symbolic_link(source=join(analyse_gene_counts_1.output_dir, 'report'),link_name=r.workspace/'genewise-dedup')
+        r.heading('<a href="genewise-dedup/index.html">&gt; Genewise expression with read deduplication</a>')
 
         r.write('<p/><hr>\n')
-        r.p('tail_tools version '+tail_tools.VERSION)
+        
+        r.p('This set of genes was used in the analysis:')
+        
+        r.p(r.get(reference/'reference.gff') + ' - Reference annotations in GFF3 format')
+        r.p(r.get(reference/'utr.gff') + ' - 3\' UTR regions')
+
+        r.p('tail-tools version '+tail_tools.VERSION)
         r.p('nesoni version '+nesoni.VERSION)
-        r.p('SHRiMP version '+grace.get_shrimp_2_version())
+        #r.p('SHRiMP version '+grace.get_shrimp_2_version())
         
         r.close()
 

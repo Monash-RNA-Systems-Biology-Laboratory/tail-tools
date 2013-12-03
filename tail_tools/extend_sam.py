@@ -2,8 +2,6 @@
 import nesoni
 from nesoni import config, io
 
-import util
-
 import sys, os, array, itertools
 
 FLAG_PAIRED = 1
@@ -212,13 +210,13 @@ class Extend_sam_colorspace(config.Action_filter):
         references = { }
         for filename in self.reference_filenames:
             print >> sys.stderr, 'Load', filename
-            for name, seq in util.read_fasta(open(filename,'rb')):
+            for name, seq in io.read_sequences(filename):
                 references[name] = seq
         
         reads = { }
         for filename in self.reads:
             print >> sys.stderr, 'Load', filename
-            for name, seq, qual in util.read_fastq(open(filename,'rb')):
+            for name, seq, qual in io.read_sequences(filename):
                 reads[name] = (seq, qual)
         
         print >> sys.stderr, 'Begin'
@@ -233,6 +231,9 @@ class Extend_sam_colorspace(config.Action_filter):
                 continue
             
             al = Alignment(line)
+            
+            if al.flag & FLAG_UNMAPPED:
+                continue
             
             reverse = al.flag & FLAG_REVERSE
             if reverse:
@@ -335,7 +336,7 @@ class Extend_sam_basespace(config.Action_filter):
     def run(self):
         references = { }
         for filename in self.reference_filenames:
-            for name, seq in util.read_fasta(open(filename,'rb')):
+            for name, seq in io.read_sequences(filename):
                 references[name] = seq
         
         tail_lengths = { }
@@ -356,6 +357,9 @@ class Extend_sam_basespace(config.Action_filter):
                 continue
             
             al = Alignment(line)
+            
+            if al.flag & FLAG_UNMAPPED:
+                continue
 
             ref = references[al.rname]
 
