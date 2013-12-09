@@ -171,12 +171,14 @@ action = tail_tools.Analyse_polya_batch(
         # Reference directory you created earlier
         reference = 'sacCer3',
         
-        # Allow reads/peaks this far downstrand of the annotated transcript end point
-        # For sparser genomes then yeast, perhaps use 1000
+        # Allow reads/peaks this far downstrand of 
+        # the annotated transcript end point
+        # For sparser genomes than yeast, perhaps use 1000
         extension = 200,
         
         # Whether to include .genome file for IGV in plots tarball
-        # Not necessary if for model organisms where IGV already provides the genome
+        # Not necessary if for model organisms where IGV 
+        # already provides the genome.
         include_genome = False,
         
         # List of instances of tail_tools.Analyse_polya
@@ -185,7 +187,8 @@ action = tail_tools.Analyse_polya_batch(
         # List of sample groups
         # A sample group is specified as <nesoni-selection-expression>=<name>
         # See nesoni help for description of selection expressions,
-        # this uses the tags given to each sample to concisely specify sets of samples.
+        # this uses the tags given to each sample to concisely 
+        # specify sets of samples.
         groups = [ 'BY=BY', 'ccr4=ccr4', 'ypeg=ypeg', 'gal=gal', 'glu10=glu10' ],
         )
 
