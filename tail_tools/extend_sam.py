@@ -216,7 +216,7 @@ class Extend_sam_colorspace(config.Action_filter):
         reads = { }
         for filename in self.reads:
             print >> sys.stderr, 'Load', filename
-            for name, seq, qual in io.read_sequences(filename):
+            for name, seq, qual in io.read_sequences(filename, qualities='required'):
                 reads[name] = (seq, qual)
         
         print >> sys.stderr, 'Begin'

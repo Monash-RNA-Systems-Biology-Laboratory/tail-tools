@@ -98,15 +98,14 @@ sink()
     )
 @config.String_flag('norm_file', 'Use normalization produced by "norm-from-counts:".')
 @config.String_flag('parent_type', 'Type of parent genes in parents annotation file.')
+@config.String_flag('utrs', '3\' UTR annotations.')
 @config.Bool_flag('utr_only', 
     'Only use peaks in the 3\' UTR. '
-    'Feature must have a property three_prime_UTR_start giving the 1-based position of the start of the UTR.'
     )
 @config.Int_flag('top',
     'Only use top n most expressed peaks. 0 = use all.'
     )
-@config.Positional('reference', 
-    'Reference sequences.')
+@config.Positional('reference', 'Reference sequences.')
 @config.Positional('parents', 'Annotation file containing parent genes.')
 @config.Positional('children', 'Annotation file containing child peaks. "Parent" property should be set.')
 @config.Positional('counts', 'Counts file as produced by tail-stats.')
@@ -114,6 +113,7 @@ class Compare_peaks(config.Action_with_prefix):
     fdr = 0.05
     norm_file = None
     parent_type = 'gene'
+    utrs = None
     utr_only = True
     top = 0
     reference = None
@@ -163,6 +163,10 @@ class Compare_peaks(config.Action_with_prefix):
         # Read data
         
         annotations = list(annotation.read_annotations(self.parents))
+        if self.utrs:
+            utrs = list(annotation.read_annotations(self.utrs))
+        else:
+            utrs = [ ]
         children = list(annotation.read_annotations(self.children))
         
         count_table = io.read_grouped_table(self.counts, [
@@ -193,28 +197,17 @@ class Compare_peaks(config.Action_with_prefix):
             id_to_parent[item.get_id()] = item
             item.children = [ ]
             #item.cds = [ ]
-
-
-        #for item in parents:
-        #    if item.type != 'CDS': continue
-        #    if 'Parent' not in item.attr or item.attr['Parent'] not in id_to_parent: continue
-        #    parent = id_to_parent[item.attr['Parent']]
-        #    assert item.seqid == parent.seqid and item.strand == parent.strand
-        #    if item.strand < 0:
-        #        cds = (parent.end-item.end, parent.end-item.start)
-        #    else:
-        #        cds = (item.start-parent.start, item.end-parent.start)            
-        #    id_to_parent[item.attr['Parent']].cds.append(cds)            
-        #
-        #for item in parents:
-        #    item.cds.sort()
-        #    if item.cds:
-        #        item.cds_start = min(a for a,b in item.cds)
-        #        item.cds_end = max(a for a,b in item.cds)
-        #    else:
-        #        item.cds_start = 0
-        #        item.cds_end = item.end-item.start
             
+            # Default utr
+            if item.strand >= 0:
+               item.utr_pos = item.end
+            else:
+               item.utr_pos = item.start
+        
+        for item in utrs:        
+            id_to_parent[item.attr['Parent']].utr_pos = (item.start if item.strand >= 0 else item.end)
+
+
         for item in children:
             item.transcription_stop = item.end if item.strand >= 0 else item.start #End of transcription, 0-based, ie between-positions based
             
@@ -229,14 +222,19 @@ class Compare_peaks(config.Action_with_prefix):
             
             relevant = list(item.children)
             if self.utr_only:
-                if item.strand <= 0:
-                    relative_utr_start = item.end - int(item.attr['three_prime_UTR_start'])
-                else:
-                    relative_utr_start = int(item.attr['three_prime_UTR_start'])-1 - item.start
-            
-                def relative_start(peak):
-                    return item.end-peak.end if item.strand < 0 else peak.start-item.start
-                relevant = [ peak for peak in relevant if relative_start(peak) >= relative_utr_start ]
+                #if item.strand <= 0:
+                #    relative_utr_start = item.end - int(item.attr['three_prime_UTR_start'])
+                #else:
+                #    relative_utr_start = int(item.attr['three_prime_UTR_start'])-1 - item.start
+                #
+                #def relative_start(peak):
+                #    return item.end-peak.end if item.strand < 0 else peak.start-item.start
+                #relevant = [ peak for peak in relevant if relative_start(peak) >= relative_utr_start ]
+                relevant = [ 
+                    peak for peak in relevant 
+                    if (peak.end >= item.utr_pos if item.strand >= 0 else peak.start <= item.utr_pos)
+                    ]
+                    
             if self.top:
                 relevant.sort(key=lambda peak:peak.weight, reverse=True)
                 relevant = relevant[:self.top]

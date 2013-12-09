@@ -1054,16 +1054,17 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         
         similarity.report(r)
         
-        r.heading('Poly(A) tail length in reads')
-        
+        r.heading('Poly(A) tail length distribution')
+                
         r.p(
-            'Some reads contain a poly(A) sequence not found in the reference. '
-            'It is hoped that the lengths of these poly(A) sequences gives an indication of the true length of polyadenylation.'
-        )
+            'This plot shows the distribution of lengths of poly(A) tail sequence in top expressed features. '
+            'Its main purpose is to assess data quality. '
+            'If the plot has many bright spots, there may be many PCR duplicates in the reads.'
+            )
         
         r.p(
             'Only reads with a poly(A) sequence of four or more bases are used.'
-        )
+            )
         
         for heatmap in plot_pooleds:
             r.report_heatmap(heatmap)
@@ -1072,12 +1073,12 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         
         r.p(
             'Only reads with a poly(A) sequence of four or more bases was included in the averages.'
-        )
+            )
         
         r.p(
-            'Genes were selected based on there being at least some number of reads with poly(A) sequence in <i>each</i> sample (min-tails), '
+            'Genes were selected based on there being at least 10 reads with poly(A) sequence in <i>each</i> sample, '
             'and on there being at least some amount of difference in average tail length between samples (min-span).'
-        )
+            )
         
         for heatmap in plot_comparisons:
             r.report_heatmap(heatmap)

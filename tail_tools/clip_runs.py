@@ -19,7 +19,7 @@ Reads should be in CSFASTQ format.
 """)
 @config.String_flag('sample', 'Sample name (for logging of statistics).')
 @config.Int_flag('quality', 'Minimum quality.')
-@config.String_flag('adaptor', 'Adaptor sequence expected after poly-A tail (basespace only).')
+#@config.String_flag('adaptor', 'Adaptor sequence expected after poly-A tail (basespace only).')
 @config.Int_flag('length', 'Minimum length.')
 @config.Bool_flag('debug', 'Show detected poly-A region and adaptor location in each read.')
 @config.Main_section('filenames', 'Input FASTQ files.')

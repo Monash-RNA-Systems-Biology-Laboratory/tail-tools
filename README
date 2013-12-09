@@ -70,37 +70,11 @@ The package can be used directly from the source directory with:
 
 These tools may also be used as part of a nesoni-style workflow python script.
 
+Typical usage of the pipeline is described below.
 
 
-
-
-Peak calling and statistics:
-============================
-
-tail-tools call-peaks: peaks $SAMPLES_POLYA \
-    --types gene --shift-start 0 --shift-end 1000
-#
-#  --shift-end should be chosen appropriate to the genome
-#
-
-tail-tools analyse-tail-lengths: myanalysis $SAMPLES_ALL \
-    --annotations peaks/relation-child.gff --types peak \
-    --saturation 0 --make-do all
-#
-#  --saturation 1 to de-duplicate alignments
-#
-
-
-tail-tools compare-peaks: mycomparison $REFERENCE \
-    peaks/relation-parent.gff peaks/relation-child.gff myanalysis-counts.csv
-
-tail-tools geneview-webapp: geneviewer
-
-
-
-
-Reference format
-================
+Reference format:
+=================
 
 Before processing any reads, you need to create a "tail-tools reference directory".
 
@@ -108,8 +82,7 @@ References are most easily downloaed from the UCSC browser using:
 
    tail-tools make-ucsc-reference: \
        <output_dir> \
-       <ucsc_reference_name> \
-       --extension <extension_length>
+       <ucsc_reference_name>
 
 If creating your own reference, it needs to consist of:
 
@@ -121,8 +94,7 @@ The reference directory is then created with the command:
   tail-tools make-tt-reference: \
       <output_dir> \
       <sequence_file> \
-      <annotations_file> \
-      --extension <extension_length>
+      <annotations_file>
 
 --extension determines how far downstrand of a gene a read (or peak) can be and 
 still be counted as belonging to that gene.
@@ -151,35 +123,98 @@ exon
 
 
 
+Pipeline:
+=========
 
-GTF appears to be the standard used by
-htseq
-cufflinks etc
-
-
-iGenomes as a data source?
-
-
-produces 
-reference.gff           - GFF3 file, mRNA attributes have group attribute refers to reference-collapsed.gff
-reference-collapsed.gff - 
-reference-3utr.gff      - 3' UTR regions of collapsed genes 
+Having created a reference directory, the next step is to run the pipeline,
+"analyse-polya-batch". This can be done from the command line, but is more
+usefully done from a python script. We suggest adapting the following example
+to your data:
 
 
+import tail_tools, nesoni, glob
+
+tags = [
+    ('logRep1',         ['BY',   'rep1']),
+    ('logRep2',         ['BY',   'rep2']),
+    ('deltaccr4logRep1',['ccr4', 'rep1']),
+    ('deltaccr4logRep2',['ccr4', 'rep2']),
+    ('deltaccr4logRep3',['ccr4', 'rep3']),
+    ('YPEGRep1',        ['ypeg', 'rep1']),
+    ('YPEGRep2',        ['ypeg', 'rep2']),
+    ('GALRep1',         ['gal',  'rep1']),
+    ('GALRep2',         ['gal',  'rep2']),
+    ('GLU10Rep1',       ['glu10','rep1']),
+    ('GLU10Rep2',       ['glu10','rep2']),
+    ('GLU20Rep1',       ['glu20','rep1']),
+    ('GLU20Rep2',       ['glu20','rep2']),
+]
+
+# For each sample we create a tail_tools.Analyse_polya instance
+# Each sample is given a set of tags
+samples = [ ]
+for name, tags in tags:
+    reads = sorted(glob.glob('mydata/Sample_scBY4741%s/*.fastq.gz' % name))
+    samples.append(tail_tools.Analyse_polya(
+        name,
+        reads = reads,
+        tags = tags,            
+        ))
+
+action = tail_tools.Analyse_polya_batch(
+        # Output directory
+        'yeast-june-2013',
+        
+        # Title for report
+        title = 'Yeast June 2013',
+        
+        # Files in report will have this prefix
+        file_prefix = 'yeast-june-2013',
+        
+        # Reference directory you created earlier
+        reference = 'sacCer3',
+        
+        # Allow reads/peaks this far downstrand of the annotated transcript end point
+        # For sparser genomes then yeast, perhaps use 1000
+        extension = 200,
+        
+        # Whether to include .genome file for IGV in plots tarball
+        # Not necessary if for model organisms where IGV already provides the genome
+        include_genome = False,
+        
+        # List of instances of tail_tools.Analyse_polya
+        samples = yeast_samples,
+        
+        # List of sample groups
+        # A sample group is specified as <nesoni-selection-expression>=<name>
+        # See nesoni help for description of selection expressions,
+        # this uses the tags given to each sample to concisely specify sets of samples.
+        groups = [ 'BY=BY', 'ccr4=ccr4', 'ypeg=ypeg', 'gal=gal', 'glu10=glu10' ],
+        )
 
 
 
+# A little boilerplate so that
+# - multiprocessing works
+# - you can control making
+#   (see nesoni help on --make-* flags)
 
+def main():
+    action.make()
 
+if __name__ == '__main__': 
+    nesoni.run_script(main)
 
-
-
-
-
-
-
-
-
+# If run again with adjusted parameters,
+# only the parts that need to be run again will run.
+#
+# To force a complete re-run:
+#     python myscript.py --make-do all
+#
+# To re-run everything but the alignment to reference
+# (eg if there is a new version of tail-tools)
+#     python myscript.py --make-do all --make-done analyse-polya
+#
 
 
 
