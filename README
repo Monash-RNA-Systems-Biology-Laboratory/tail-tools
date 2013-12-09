@@ -96,9 +96,6 @@ The reference directory is then created with the command:
       <sequence_file> \
       <annotations_file>
 
---extension determines how far downstrand of a gene a read (or peak) can be and 
-still be counted as belonging to that gene.
-
 Annotations shall include the following feature types and attributes:
 
 gene
