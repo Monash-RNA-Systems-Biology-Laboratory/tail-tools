@@ -1,4 +1,9 @@
 
+==============
+= Tail Tools =
+==============
+
+http://www.vicbioinformatics.com/software.tail-tools.shtml
 
 This is a Python 2 based suite of tools for analysing SOLiD or Illumina
 sequencing reads with poly(A) tails.
@@ -182,7 +187,7 @@ action = tail_tools.Analyse_polya_batch(
         include_genome = False,
         
         # List of instances of tail_tools.Analyse_polya
-        samples = yeast_samples,
+        samples = samples,
         
         # List of sample groups
         # A sample group is specified as <nesoni-selection-expression>=<name>

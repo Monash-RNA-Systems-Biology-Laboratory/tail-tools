@@ -19,6 +19,7 @@ pre { line-height: 100%%; font-size: 130%%; }
 
 <ul>
 <li> <a href="%(release_tarball_name)s">%(release_tarball_name)s</a> </li>
+<li> <a href="https://pypi.python.org/pypi/tail-tools/">Python Package Index (PyPI) page, with older versions</a>
 <li><a href="https://github.com/Victorian-Bioinformatics-Consortium/tail-tools">github repository</a></li>
 </ul>
 

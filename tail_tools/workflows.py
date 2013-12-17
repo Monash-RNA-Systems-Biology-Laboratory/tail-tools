@@ -527,7 +527,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
 
         with nesoni.Stage() as stage:
             peak_template(
-                expressionspace/'peak',
+                expressionspace/'peakwise',
                 saturation=0,
                 title='Peakwise expression - ' + self.title,
                 file_prefix=file_prefix+'peakwise-',

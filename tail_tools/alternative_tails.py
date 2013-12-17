@@ -40,6 +40,7 @@ result <- data.frame(
     chromosome = CHROMOSOME_NAMES,
     strand = STRANDS,
     transcription_stops = TRANSCRIPTION_STOPS,
+    prepeak_seq = PREPEAK_SEQS,
     interpeak_seq = INTERPEAK_SEQS,
     row.names = names(data)
     )
@@ -75,7 +76,7 @@ output <- result[
     reordering, 
     c('name','interestingness','peaks','df','chisq','FDR',
       'gene','product','mean.tail','proportion.with.tail',
-      'chromosome','strand','transcription_stops','interpeak_seq'
+      'chromosome','strand','transcription_stops','prepeak_seq','interpeak_seq'
       )
     ]
 
@@ -110,7 +111,6 @@ sink()
 @config.Positional('children', 'Annotation file containing child peaks. "Parent" property should be set.')
 @config.Positional('counts', 'Counts file as produced by tail-stats.')
 class Compare_peaks(config.Action_with_prefix):
-    fdr = 0.05
     norm_file = None
     parent_type = 'gene'
     utrs = None
@@ -122,6 +122,8 @@ class Compare_peaks(config.Action_with_prefix):
     counts = None
     
     def run(self):
+        assert not self.utr_only or self.utrs, '--utrs-only yes but no --utrs given'
+        
         # Reference genome
         
         #chromosome_lengths = reference_directory.Reference(self.reference, must_exist=True).get_lengths()
@@ -135,6 +137,18 @@ class Compare_peaks(config.Action_with_prefix):
                 return chromosomes[peaks[0].seqid][start:end]
             else:
                 return bio.reverse_complement(chromosomes[peaks[0].seqid][start:end])
+
+        def get_prepeak_seq(gene,peaks):
+            if gene.strand >= 0:
+                start = gene.utr_pos
+                end = min(item.transcription_stop for item in peaks)
+                if end-start > 10000: return ''
+                return chromosomes[gene.seqid][start:end]
+            else:
+                start = max(item.transcription_stop for item in peaks)
+                end = gene.utr_pos
+                if end-start > 10000: return ''
+                return bio.reverse_complement(chromosomes[gene.seqid][start:end])
         
         # Normalization files
         
@@ -203,6 +217,14 @@ class Compare_peaks(config.Action_with_prefix):
                item.utr_pos = item.end
             else:
                item.utr_pos = item.start
+            
+            if 'three_prime_UTR_start' in item.attr:
+               if item.strand >= 0:
+                  item.utr_pos = int(item.attr['three_prime_UTR_start'])-1
+               else:
+                  item.utr_pos = int(item.attr['three_prime_UTR_start'])
+            
+            
         
         for item in utrs:        
             id_to_parent[item.attr['Parent']].utr_pos = (item.start if item.strand >= 0 else item.end)
@@ -330,7 +352,8 @@ class Compare_peaks(config.Action_with_prefix):
         
         output_names = [ ]
         output_counts = [ ]
-        output_annotation_fields = [ 'gene', 'product', 'mean_tail_1', 'mean_tail_2', 'chromosome', 'strand', 'transcription_stops', 'interpeak_seq' ]
+        output_annotation_fields = [ 'gene', 'product', 'mean_tail_1', 'mean_tail_2', 'chromosome', 'strand', 
+                                     'transcription_stops', 'interpeak_seq', ]
         output_annotations = [ ]
             
         for item in parents:
@@ -383,6 +406,7 @@ class Compare_peaks(config.Action_with_prefix):
         strands = [ ]
         transcription_stops = [ ]
         interpeak_seqs = [ ]
+        prepeak_seqs = [ ]
 
         for parent in parents:
             id = parent.get_id()
@@ -415,6 +439,7 @@ class Compare_peaks(config.Action_with_prefix):
             strands.append(parent.strand)
             transcription_stops.append(', '.join(str(item.transcription_stop) for item in peaks))
             interpeak_seqs.append(get_interpeak_seq(peaks))
+            prepeak_seqs.append(get_prepeak_seq(parent,peaks))
             
             #if len(mats) >= 10: break
         
@@ -432,6 +457,7 @@ class Compare_peaks(config.Action_with_prefix):
             STRANDS = strands,
             TRANSCRIPTION_STOPS = transcription_stops,
             INTERPEAK_SEQS = interpeak_seqs,
+            PREPEAK_SEQS = prepeak_seqs,
             )
         
             
