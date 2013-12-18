@@ -1,6 +1,6 @@
 
 0.22 - "compare-peaks:" outputs utr before first peak as well as inter-peak sequence.
-       Fix bug in workflow.
+       Fix bugs in workflow.
 
 0.21 - Major refactoring
        - define reference annotation to be GFF3

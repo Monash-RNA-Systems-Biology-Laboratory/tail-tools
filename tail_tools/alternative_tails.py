@@ -226,7 +226,8 @@ class Compare_peaks(config.Action_with_prefix):
             
             
         
-        for item in utrs:        
+        for item in utrs:
+            assert item.attr['Parent'] in id_to_parent, 'Unknown gene '+item.attr['Parent']    
             id_to_parent[item.attr['Parent']].utr_pos = (item.start if item.strand >= 0 else item.end)
 
 
@@ -289,8 +290,8 @@ class Compare_peaks(config.Action_with_prefix):
             j_genes['strand'].append( item.strand )
             j_genes['start'].append( item.start )
             j_genes['end'].append( item.end )
-            j_genes['gene'].append( item.attr.get('gene','') )
-            j_genes['product'].append( item.attr.get('product','') )
+            j_genes['gene'].append( item.attr.get('Name','') )
+            j_genes['product'].append( item.attr.get('Product','') )
             j_genes['peaks'].append( [ item2.get_id() for item2 in item.children ] )
             j_genes['relevant_peaks'].append( [ item2.get_id() for item2 in item.relevant_children ] )
             #j_genes['cds'].append( item.cds )
@@ -369,8 +370,8 @@ class Compare_peaks(config.Action_with_prefix):
                     row.extend(counts[id_j].values())
                     output_counts.append(row)
                     output_annotations.append([
-                        item.attr.get('gene',''),
-                        item.attr.get('product',''),
+                        item.attr.get('Name',''),
+                        item.attr.get('Product',''),
                         count_table['Annotation'][id_i]['mean-tail'],
                         count_table['Annotation'][id_j]['mean-tail'],
                         
@@ -422,8 +423,8 @@ class Compare_peaks(config.Action_with_prefix):
                 runr.R_literal(matrix)
                 )
             
-            genes.append(parent.attr.get('gene',''))
-            products.append(parent.attr.get('product',''))
+            genes.append(parent.attr.get('Name',''))
+            products.append(parent.attr.get('Product',''))
             
             def format_mean(s):
                 if s == 'NA': return 'NA'

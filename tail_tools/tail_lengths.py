@@ -324,8 +324,8 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
                     row[('Count',names[j])] = '%d' % totals[i][j] #sum(counts[i][j]) 
 
                 row[('Annotation','Length')] = annotations[i].end - annotations[i].start
-                row[('Annotation','gene')] = annotations[i].attr.get('gene','')
-                row[('Annotation','product')] = annotations[i].attr.get('product','')
+                row[('Annotation','gene')] = annotations[i].attr.get('Name','')
+                row[('Annotation','product')] = annotations[i].attr.get('Product','')
                 #row[('Annotation','Strand')] = str(annotations[i].strand)
                 row[('Annotation','n-with-tail')] = str(overall_n_tail[i])
                 row[('Annotation','mean-tail')] = str(overall_tail[i]) if overall_tail[i] is not None else 'NA'

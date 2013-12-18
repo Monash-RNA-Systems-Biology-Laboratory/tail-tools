@@ -414,7 +414,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.report_logs('alignment-statistics',
             #[ workspace/'stats.txt' ] +
             filter_logs + #filter_polya_logs +
-            [ expressionspace/('gene-dedup','aggregate-tail-counts_log.txt') ],
+            [ expressionspace/('genewise-dedup','aggregate-tail-counts_log.txt') ],
             filter=lambda sample, field: (
                 field not in [
                     'fragments','fragments aligned to the reference','reads kept',
@@ -479,13 +479,13 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         if self.groups:
             r.subheading('Peak shift between groups')
             r.p(r.get(workspace/('peak-shift','grouped.csv')) + ' - genes with a potential peak shift')        
-            r.get(workspace/('peak-shift','individual.json'))
-            r.p('<a href="view.html?json=shift.json">Gene viewer</a>')
+            r.get(workspace/('peak-shift','grouped.json'))
+            r.p('<a href="view.html?json=%sgrouped.json">Gene viewer</a>' % r.file_prefix)
 
         r.subheading('Peak shift between samples')
         r.p(r.get(workspace/('peak-shift','individual.csv')) + ' - genes with a potential peak shift')        
         r.get(workspace/('peak-shift','individual.json'))
-        r.p('<a href="view.html?json=shift.json">Gene viewer</a>')
+        r.p('<a href="view.html?json=%sindividual.json">Gene viewer</a>' % r.file_prefix)
        
         
         io.symbolic_link(source=expressionspace/('peakwise','report'),link_name=r.workspace/'peakwise')
