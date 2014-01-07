@@ -13,7 +13,7 @@ with open(join(directory,'tail_tools','__init__.py'),'rU') as f:
 setup(
     name='tail-tools',
     version=VERSION,
-    description='Analyse PAT-Seq RNA expression data.'
+    description='Analyse PAT-Seq RNA expression data.',
     url = 'http://bioinformatics.net.au/software.tail-tools.shtml',
     author = 'Paul Harrison',
     author_email = 'paul.harrison@monash.edu',
