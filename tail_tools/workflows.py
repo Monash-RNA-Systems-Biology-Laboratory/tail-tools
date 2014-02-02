@@ -36,7 +36,7 @@ from . import clip_runs, extend_sam, proportions, tail_lengths, web, alternative
 class Call_peaks(config.Action_with_output_dir):
     lap = 10
     radius = 50
-    min_depth = 10
+    min_depth = 50
     peak_length = 100
     
     annotations = None
@@ -257,6 +257,9 @@ class Analyse_polya(config.Action_with_output_dir):
 """)
 @config.String_flag('title', 'Analysis report title.')
 @config.String_flag('file_prefix', 'Prefix for report filenames.')
+@config.Int_flag('peak_min_depth', 
+    'Number of poly(A) reads ending at nearly the same position required in order to call a peak.'
+    )
 @config.Int_flag('extension', 'How far downstrand of the given annotations a read or peak belonging to a gene might be.')
 #@config.String_flag('blurb', 'Introductory HTML text for report')
 #@config.String_flag('genome', 'IGV .genome file, to produce IGV plots')
@@ -285,6 +288,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     #extra_files = [ ]
     
     extension = 1000
+    
+    peak_min_depth = 50
     
     #genome = None
     #genome_dir = None
@@ -516,6 +521,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             annotations = reference/'reference.gff',
             shift_start = 0,
             shift_end = self.extension,
+            min_depth = self.peak_min_depth,
             types = 'gene',
             polyas = polya_dirs,
             ).make()

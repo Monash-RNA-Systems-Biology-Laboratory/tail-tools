@@ -1,4 +1,7 @@
 
+0.23 - Add --peak-min-depth option to workflow.
+       Default raised from 10 to 50.
+
 0.22 - "compare-peaks:" outputs utr before first peak as well as inter-peak sequence.
        Fix bugs in workflow.
 
