@@ -1,6 +1,10 @@
 
 0.23 - Add --peak-min-depth option to workflow.
        Default raised from 10 to 50.
+       compare-peaks output table lists relevant peaks.
+       Gene viewer shows relevant peaks.
+       Gene viewer shows 3' UTR position.
+       Don't nuke pooled.csv.
 
 0.22 - "compare-peaks:" outputs utr before first peak as well as inter-peak sequence.
        Fix bugs in workflow.

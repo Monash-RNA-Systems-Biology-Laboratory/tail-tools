@@ -135,9 +135,11 @@ describe_peak = function(index, into) {
         product : "",
         chromosome : Data.peaks.chromosome[index],
         start : Data.peaks.start[index],
+        utr : (Data.peaks.strand[index] > 0 ? Data.peaks.end[index] : Data.peaks.start[index]),
         end : Data.peaks.end[index],
         strand : Data.peaks.strand[index],
         peaks : [ index ],
+        relevant_peaks : [ index ],
     }, into);
 }
 
@@ -149,10 +151,12 @@ describe_gene = function(index, into) {
         product : Data.genes.product[index],
         chromosome : Data.genes.chromosome[index],
         start : Data.genes.start[index],
+        utr : Data.genes.utr[index],
         end : Data.genes.end[index],
         cds : [ ],
         strand : Data.genes.strand[index],
         peaks : $.map(Data.genes.peaks[index], function(peak_name) { return Peak_id[peak_name]; }),
+        relevant_peaks : $.map(Data.genes.relevant_peaks[index], function(peak_name) { return Peak_id[peak_name]; }),
     }, into);
 }
 
@@ -230,15 +234,26 @@ describe_inner = function(gene, into) {
     
     
     var genome_scale = d3.scale.linear()
-        .domain([0,20000])
+        .domain([0,5000])
         .range([x_left+0,x_left+100]);
+    
+    
+    var gene_length = gene.end-gene.start;
+    var gene_utr = gene.strand > 0 ? gene.utr-gene.start : gene.end-gene.utr;
         
     svg.append("svg:rect")
         .attr("x", genome_scale(0))
         .attr("y", 0)
-        .attr("width", genome_scale(gene.end-gene.start) - genome_scale(0) )
+        .attr("width", genome_scale(gene_utr) - genome_scale(0) )
+        .attr("height", 20)
+        .attr("fill", "#8888ff");
+    svg.append("svg:rect")
+        .attr("x", genome_scale(gene_utr))
+        .attr("y", 0)
+        .attr("width", genome_scale(gene_length) - genome_scale(gene_utr) )
         .attr("height", 10)
         .attr("fill", "#8888ff");
+        
     $.each(peaks, function(i,peak) {
         var start, end;
         if (gene.strand < 0) {
@@ -282,6 +297,7 @@ describe_inner = function(gene, into) {
             .attr("transform", "rotate(45,"+x+","+y+")")
             .attr("text-anchor", "start")
             .attr("dy", "1.0em")
+            .style("fill", gene.relevant_peaks.indexOf(peak) != -1 ? "#000000" : "#888888")
             .text(Data.peaks.name[peak]);
         
         for(var j=0;j<n_samples;j++) {

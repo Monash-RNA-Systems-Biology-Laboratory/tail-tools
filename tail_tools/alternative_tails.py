@@ -37,11 +37,12 @@ result <- data.frame(
     product = PRODUCTS,
     mean.tail = MEAN_TAILS,
     proportion.with.tail = PROP_TAILS,
+    peak.names = PEAK_NAMES,
     chromosome = CHROMOSOME_NAMES,
     strand = STRANDS,
-    transcription_stops = TRANSCRIPTION_STOPS,
-    prepeak_seq = PREPEAK_SEQS,
-    interpeak_seq = INTERPEAK_SEQS,
+    transcription.stops = TRANSCRIPTION_STOPS,
+    prepeak.seq = PREPEAK_SEQS,
+    interpeak.seq = INTERPEAK_SEQS,
     row.names = names(data)
     )
 
@@ -76,7 +77,8 @@ output <- result[
     reordering, 
     c('name','interestingness','peaks','df','chisq','FDR',
       'gene','product','mean.tail','proportion.with.tail',
-      'chromosome','strand','transcription_stops','prepeak_seq','interpeak_seq'
+      'peak.names', 'chromosome','strand','transcription.stops',
+      'prepeak.seq','interpeak.seq'
       )
     ]
 
@@ -276,6 +278,7 @@ class Compare_peaks(config.Action_with_prefix):
         j_genes['chromosome'] = [ ]
         j_genes['strand'] = [ ]
         j_genes['start'] = [ ]
+        j_genes['utr'] = [ ]
         j_genes['end'] = [ ]
         j_genes['gene'] = [ ]
         j_genes['product'] = [ ]
@@ -289,6 +292,7 @@ class Compare_peaks(config.Action_with_prefix):
             j_genes['chromosome'].append( item.seqid )
             j_genes['strand'].append( item.strand )
             j_genes['start'].append( item.start )
+            j_genes['utr'].append( item.utr_pos )
             j_genes['end'].append( item.end )
             j_genes['gene'].append( item.attr.get('Name','') )
             j_genes['product'].append( item.attr.get('Product','') )
@@ -403,6 +407,7 @@ class Compare_peaks(config.Action_with_prefix):
         mean_tails = [ ]
         prop_tails = [ ]
 
+        peak_names = [ ]
         chromosome_names = [ ]
         strands = [ ]
         transcription_stops = [ ]
@@ -436,6 +441,7 @@ class Compare_peaks(config.Action_with_prefix):
                 return '%.2f' % float(s)
             prop_tails.append(', '.join( format_prop(count_table['Annotation'][item.get_id()]['proportion-with-tail']) for item in peaks ))
             
+            peak_names.append(', '.join(item.get_id() for item in peaks))
             chromosome_names.append(parent.seqid)
             strands.append(parent.strand)
             transcription_stops.append(', '.join(str(item.transcription_stop) for item in peaks))
@@ -454,6 +460,7 @@ class Compare_peaks(config.Action_with_prefix):
             PRODUCTS = products,
             MEAN_TAILS = mean_tails,
             PROP_TAILS = prop_tails,
+            PEAK_NAMES = peak_names,
             CHROMOSOME_NAMES = chromosome_names,
             STRANDS = strands,
             TRANSCRIPTION_STOPS = transcription_stops,
@@ -462,12 +469,6 @@ class Compare_peaks(config.Action_with_prefix):
             )
         
             
-        ## Inter-peak sequences
-        #
-        #stats = io.read_grouped_table(self.prefix+'.csv', [('All',str)])['All']
-        #for ident in stats.keys():
-        #    parent = id_to_parent[ident]
-        #    ...etc...
         
         
         

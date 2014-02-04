@@ -590,8 +590,8 @@ class Plot_pooled(config.Action_with_prefix, runr.R_action):
     
     if (row.labels) {
        labels <- list(
-           rownames(kept.annotation), 
            kept.annotation[,'gene'],
+           rownames(kept.annotation), 
            kept.annotation[,'product']
        )
     } else {
@@ -711,8 +711,8 @@ class Plot_comparison(config.Action_with_prefix, runr.R_action):
 
     if (row.labels) {
        labels <- list(
-           rownames(kept.annotation)[dend.row$order], 
            kept.annotation[dend.row$order,'gene'],
+           rownames(kept.annotation)[dend.row$order], 
            kept.annotation[dend.row$order,'product']
        )
     } else {
@@ -970,7 +970,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         
         plot_pooleds = [        
             Plot_pooled(
-                prefix = work/'pooled',
+                prefix = work/'pooled-heatmap',
                 aggregate = self.output_dir,
                 #min_tails = min_tails,
                 min_tails = 1,
