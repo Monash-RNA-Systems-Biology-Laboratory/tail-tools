@@ -90,6 +90,10 @@ index_data = function() {
             add(part, i); 
         });
         
+        $.each( Data['genes']['gene'][i].split("/"), function(j,part) { 
+            add(part, i);
+        });
+        
         $.each( Data['genes']['peaks'][i], function(j,peak) { 
             add(peak, i); 
         });
@@ -243,9 +247,9 @@ describe_inner = function(gene, into) {
         
     svg.append("svg:rect")
         .attr("x", genome_scale(0))
-        .attr("y", 0)
+        .attr("y", -5)
         .attr("width", genome_scale(gene_utr) - genome_scale(0) )
-        .attr("height", 20)
+        .attr("height", 15)
         .attr("fill", "#8888ff");
     svg.append("svg:rect")
         .attr("x", genome_scale(gene_utr))
