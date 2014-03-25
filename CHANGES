@@ -1,4 +1,6 @@
 
+0.24 - Add "test:" tool.
+
 0.23 - Add --peak-min-depth option to workflow.
        Default raised from 10 to 50.
        compare-peaks output table lists relevant peaks.

@@ -84,7 +84,7 @@ class Call_peaks(config.Action_with_output_dir):
             upstrand = -self.shift_start,
             downstrand = self.shift_end,
             use = 'in/upstrand/downstrand',
-            to_child = 'gene/product',
+            to_child = 'Name/Product',
             ).make()
         
 

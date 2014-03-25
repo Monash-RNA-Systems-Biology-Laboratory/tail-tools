@@ -1,4 +1,4 @@
-VERSION = '0.23'
+VERSION = '0.24'
 #^ Note: this first line is read by the setup.py script to get the version
 
 import nesoni
@@ -9,6 +9,7 @@ from .extend_sam import Extend_sam_colorspace, Extend_sam_basespace
 from .proportions import Proportions, Proportions_heatmap 
 from .tail_lengths import Tail_count, Aggregate_tail_counts, Plot_pooled, Plot_comparison, Collapse_counts, Analyse_tail_counts
 from .alternative_tails import Compare_peaks
+from .test import Test
 from .web import Geneview_webapp
 from .workflows import Call_peaks, Analyse_polya, Analyse_polya_batch
 from .reference_directory import Make_tt_reference, Make_ucsc_reference
@@ -34,6 +35,7 @@ def main():
             Plot_comparison,
             Collapse_counts,
             Compare_peaks,
+            Test,
             Geneview_webapp,
             
             'Workflows:',

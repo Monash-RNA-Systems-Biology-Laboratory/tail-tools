@@ -14,6 +14,11 @@ def _float_or_none(text):
         return None
     return float(text)
 
+def _text(value):
+    if value is None:
+        return 'None'
+    return str(value)
+
 def _annotation_sorter(item):
     if item.strand < 0:
         return -item.end
@@ -192,6 +197,8 @@ class Compare_peaks(config.Action_with_prefix):
             ('Annotation',str)
             ])
         counts = count_table['Count']
+        proportions = count_table['Proportion']
+        tails = count_table['Tail']
         
         samples = counts.value_type().keys()
         sample_tags = { }
@@ -357,6 +364,8 @@ class Compare_peaks(config.Action_with_prefix):
         
         output_names = [ ]
         output_counts = [ ]
+        output_proportions = [ ]
+        output_tails = [ ]
         output_annotation_fields = [ 'gene', 'product', 'mean_tail_1', 'mean_tail_2', 'chromosome', 'strand', 
                                      'transcription_stops', 'interpeak_seq', ]
         output_annotations = [ ]
@@ -369,10 +378,22 @@ class Compare_peaks(config.Action_with_prefix):
                     id_j = peaks[j].get_id()
                     id_pair = item.get_id() + '-'+id_i+'-'+id_j
                     output_names.append(id_pair)
+                    
                     row = [ ]
                     row.extend(counts[id_i].values())
                     row.extend(counts[id_j].values())
-                    output_counts.append(row)
+                    output_counts.append(filter(_text,row))
+
+                    row = [ ]
+                    row.extend(proportions[id_i].values())
+                    row.extend(proportions[id_j].values())
+                    output_proportions.append(filter(_text,row))
+
+                    row = [ ]
+                    row.extend(tails[id_i].values())
+                    row.extend(tails[id_j].values())
+                    output_tails.append(filter(_text,row))
+                    
                     output_annotations.append([
                         item.attr.get('Name',''),
                         item.attr.get('Product',''),
@@ -390,6 +411,8 @@ class Compare_peaks(config.Action_with_prefix):
             self.prefix + '-pairs.csv',
             [ 
                 ('Count',io.named_matrix_type(output_names,output_samples)(output_counts)),
+                ('Proportion',io.named_matrix_type(output_names,output_samples)(output_proportions)),
+                ('Tail',io.named_matrix_type(output_names,output_samples)(output_tails)),
                 ('Annotation',io.named_matrix_type(output_names,output_annotation_fields)(output_annotations)),
                 ],
             comments=output_comments,
