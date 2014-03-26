@@ -1,4 +1,6 @@
 
+0.25 - Bugfix in "test:" tool.
+
 0.24 - Add "test:" tool.
 
 0.23 - Add --peak-min-depth option to workflow.
