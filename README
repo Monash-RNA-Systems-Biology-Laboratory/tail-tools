@@ -195,6 +195,18 @@ action = tail_tools.Analyse_polya_batch(
         # this uses the tags given to each sample to concisely 
         # specify sets of samples.
         groups = [ 'BY=BY', 'ccr4=ccr4', 'ypeg=ypeg', 'gal=gal', 'glu10=glu10' ],
+        
+        # (Advanced)
+        # Perform differential tests
+        tests = [
+            tail_tools.Test(
+                'BY-ccr4',
+                title='BY vs ccr4',
+                null=['BY/ccr4'],
+                alt=['ccr4'],
+                ),
+            #etc
+            ],
         )
 
 

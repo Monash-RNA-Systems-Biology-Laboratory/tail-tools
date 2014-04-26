@@ -18,7 +18,7 @@ library(nesoni)
 #toptable sanitizes names
 #colnames(MODEL) <- MODEL_COLUMNS
 #colnames(PAIRS_MODEL) <- PAIRS_MODEL_COLUMNS
-for(i in basic.seq(ncol(MODEL)))
+
 colnames(MODEL) <- sapply(basic.seq(ncol(MODEL)), function(i) sprintf("coef%d", i))
 colnames(PAIRS_MODEL) <- sapply(basic.seq(ncol(PAIRS_MODEL)), function(i) sprintf("coef%d", i))
 
@@ -118,11 +118,14 @@ class Test(config.Action_with_output_dir):
    null = [ ]
    alt = [ ]
    
-   def run(self):
+   def get_title(self):
        title = self.title
        if not title:
            title = ', '.join(filter(term_name,self.alt)) + ' in ' + ', '.join(filter(term_name,self.null))
+       return title
    
+   def run(self):
+       title = self.get_title()
    
        n_alt = len(self.alt)
        n_null = len(self.null)

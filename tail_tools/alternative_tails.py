@@ -113,6 +113,9 @@ sink()
 @config.Int_flag('top',
     'Only use top n most expressed peaks. 0 = use all.'
     )
+@config.Int_flag('max_seq',
+    'Maximum length of pre-peak and inter-peak sequence to include in output.'
+    )
 @config.Positional('reference', 'Reference sequences.')
 @config.Positional('parents', 'Annotation file containing parent genes.')
 @config.Positional('children', 'Annotation file containing child peaks. "Parent" property should be set.')
@@ -123,13 +126,14 @@ class Compare_peaks(config.Action_with_prefix):
     utrs = None
     utr_only = True
     top = 0
+    max_seq = 50000
     reference = None
     parents = None
     children = None
     counts = None
     
     def run(self):
-        assert not self.utr_only or self.utrs, '--utrs-only yes but no --utrs given'
+        #assert not self.utr_only or self.utrs, '--utrs-only yes but no --utrs given'
         
         # Reference genome
         
@@ -139,7 +143,7 @@ class Compare_peaks(config.Action_with_prefix):
         def get_interpeak_seq(peaks):
             start = min(item.transcription_stop for item in peaks)
             end = max(item.transcription_stop for item in peaks)
-            if end-start > 10000: return ''
+            if end-start > self.max_seq: return ''
             if peaks[0].strand >= 0:
                 return chromosomes[peaks[0].seqid][start:end]
             else:
@@ -149,12 +153,12 @@ class Compare_peaks(config.Action_with_prefix):
             if gene.strand >= 0:
                 start = gene.utr_pos
                 end = min(item.transcription_stop for item in peaks)
-                if end-start > 10000: return ''
+                if end-start > self.max_seq: return ''
                 return chromosomes[gene.seqid][start:end]
             else:
                 start = max(item.transcription_stop for item in peaks)
                 end = gene.utr_pos
-                if end-start > 10000: return ''
+                if end-start > self.max_seq: return ''
                 return bio.reverse_complement(chromosomes[gene.seqid][start:end])
         
         # Normalization files
@@ -301,8 +305,8 @@ class Compare_peaks(config.Action_with_prefix):
             j_genes['start'].append( item.start )
             j_genes['utr'].append( item.utr_pos )
             j_genes['end'].append( item.end )
-            j_genes['gene'].append( item.attr.get('Name','') )
-            j_genes['product'].append( item.attr.get('Product','') )
+            j_genes['gene'].append( item.attr.get('Name',item.attr.get('gene','')) )
+            j_genes['product'].append( item.attr.get('Product',item.attr.get('product','')) )
             j_genes['peaks'].append( [ item2.get_id() for item2 in item.children ] )
             j_genes['relevant_peaks'].append( [ item2.get_id() for item2 in item.relevant_children ] )
             #j_genes['cds'].append( item.cds )
@@ -367,7 +371,7 @@ class Compare_peaks(config.Action_with_prefix):
         output_proportions = [ ]
         output_tails = [ ]
         output_annotation_fields = [ 'gene', 'product', 'mean_tail_1', 'mean_tail_2', 'chromosome', 'strand', 
-                                     'transcription_stops', 'interpeak_seq', ]
+                                     'transcription_stops' ] #, 'interpeak_seq', ]
         output_annotations = [ ]
             
         for item in parents:
@@ -395,15 +399,15 @@ class Compare_peaks(config.Action_with_prefix):
                     output_tails.append(filter(_text,row))
                     
                     output_annotations.append([
-                        item.attr.get('Name',''),
-                        item.attr.get('Product',''),
+                        item.attr.get('Name',item.attr.get('gene','')),
+                        item.attr.get('Product',item.attr.get('product','')),
                         count_table['Annotation'][id_i]['mean-tail'],
                         count_table['Annotation'][id_j]['mean-tail'],
                         
                         item.seqid,
                         str(item.strand),
                         '%d, %d' % (peaks[i].transcription_stop,peaks[j].transcription_stop),
-                        get_interpeak_seq([peaks[i],peaks[j]]),
+                        #get_interpeak_seq([peaks[i],peaks[j]]),
                         ])
         
         output_count_table = io.named_matrix_type(output_names,output_samples)(output_counts)
@@ -451,8 +455,8 @@ class Compare_peaks(config.Action_with_prefix):
                 runr.R_literal(matrix)
                 )
             
-            genes.append(parent.attr.get('Name',''))
-            products.append(parent.attr.get('Product',''))
+            genes.append(parent.attr.get('Name',parent.attr.get('gene','')))
+            products.append(parent.attr.get('Product',parent.attr.get('product','')))
             
             def format_mean(s):
                 if s == 'NA': return 'NA'

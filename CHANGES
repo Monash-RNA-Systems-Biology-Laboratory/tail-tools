@@ -1,6 +1,10 @@
 
-0.25 - Bugfix in "test:" tool.
+0.27 - Peaks were being incorrectly extended in pipeline, fixed.
+       Added facility to perform a set of tests to analyse-polya-batch.
+       "compare-peaks:" option to output longer pre-peak and inter-peak sequences.
 
+0.26 - Show p.value in "test:".
+0.25 - Bugfix in "test:" tool.
 0.24 - Add "test:" tool.
 
 0.23 - Add --peak-min-depth option to workflow.

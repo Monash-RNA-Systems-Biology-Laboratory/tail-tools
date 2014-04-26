@@ -3,7 +3,7 @@ import os, math, glob
 from os.path import join
 
 import nesoni
-from nesoni import config, workspace, working_directory, reference_directory, io, reporting, grace
+from nesoni import config, workspace, working_directory, reference_directory, io, reporting, grace, annotation
 
 import tail_tools
 from . import clip_runs, extend_sam, proportions, tail_lengths, web, alternative_tails
@@ -281,6 +281,11 @@ class Analyse_polya(config.Action_with_output_dir):
 #@config.Configurable_section('analyse_tail_lengths', 'Parameters for "analyse-tail-lengths:"')
 #@config.Section('extra_files', 'Extra files to include in report')
 @config.Section('groups', 'Sample groups, given as a list of <selection>=<name>.')
+@config.Configurable_section_list('tests',
+    'Differential tests to perform.',
+    templates = [ ],
+    sections = [ ('test', lambda obj: tail_tools.Test(), 'A differential test, parameters as per "test:".') ],
+    )
 class Analyse_polya_batch(config.Action_with_output_dir):
     file_prefix = ''
     title = 'PAT-Seq analysis'
@@ -301,6 +306,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     
     groups = [ ]
     
+    tests = [ ]
+    
     #analyse_tail_lengths = tail_lengths.Analyse_tail_lengths()
     
     def run(self):
@@ -315,7 +322,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         samplespace = io.Workspace(workspace/'samples', must_exist=False)
         plotspace = io.Workspace(workspace/'plots', must_exist=False)
         expressionspace = io.Workspace(workspace/'expression', must_exist=False)
-        
+        testspace = io.Workspace(workspace/'test', must_exist=False)
+                
         file_prefix = self.file_prefix
         if file_prefix and not file_prefix.endswith('-'):
             file_prefix += '-'
@@ -337,8 +345,11 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         polya_dirs = [ item + '-polyA' for item in dirs ]        
         interleaved = [ item2 for item in zip(dirs,polya_dirs) for item2 in item ]
         
-        filter_logs = [ item.get_filter_action().log_filename() for item in samples ]
-        filter_polya_logs = [ item.get_polya_filter_action().log_filename() for item in samples ]
+        clipper_logs = [ join(item.output_dir, 'clipped_reads_log.txt') for item in samples ]
+        filter_logs = [ join(item.output_dir, 'filter_log.txt') for item in samples ]
+        filter_polya_logs = [ join(item.output_dir + '-polyA', 'filter_log.txt') for item in samples ]                
+        #filter_logs = [ item.get_filter_action().log_filename() for item in samples ]
+        #filter_polya_logs = [ item.get_polya_filter_action().log_filename() for item in samples ]
 
         analyse_template = tail_lengths.Analyse_tail_counts(
             working_dirs = dirs,
@@ -406,7 +417,12 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 polya_dirs=polya_dirs, analyse_template=analyse_template, file_prefix=file_prefix,
                 )
             
-        
+        with nesoni.Stage() as stage:
+            for test in self.tests:
+                test(
+                    output_dir = testspace/test.output_dir,
+                    analysis = self.output_dir
+                    ).process_make(stage)
         
         #===============================================
         #                   Report        
@@ -418,10 +434,11 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         r.report_logs('alignment-statistics',
             #[ workspace/'stats.txt' ] +
-            filter_logs + #filter_polya_logs +
+            clipper_logs + filter_logs + #filter_polya_logs +
             [ expressionspace/('genewise-dedup','aggregate-tail-counts_log.txt') ],
             filter=lambda sample, field: (
                 field not in [
+                    
                     'fragments','fragments aligned to the reference','reads kept',
                     'average depth of coverage, ambiguous',
                     'average depth of coverage, unambiguous',
@@ -479,7 +496,11 @@ class Analyse_polya_batch(config.Action_with_output_dir):
 
         web.Geneview_webapp(r.workspace/'view').run()        
         
-        r.p(r.get(expressionspace/('peakwise','features-with-data.gff'), name='peaks.gff') + ' - peaks called')        
+        peak_filename = expressionspace/('peakwise','features-with-data.gff')
+        n_peaks = len(list(annotation.read_annotations(peak_filename)))
+        r.p('%d peaks called (%d poly(A) reads were required to call a peak).' % (n_peaks, self.peak_min_depth))
+        
+        r.p(r.get(peak_filename, name='peaks.gff') + ' - peaks called')        
 
         if self.groups:
             r.subheading('Peak shift between groups')
@@ -498,6 +519,14 @@ class Analyse_polya_batch(config.Action_with_output_dir):
 
         io.symbolic_link(source=expressionspace/('peakwise-dedup','report'),link_name=r.workspace/'genewise-dedup')
         r.subheading('<a href="peakwise-dedup/index.html">&gt; Peakwise expression with read deduplication</a>')
+        
+        
+        if self.tests:
+            r.heading('Differential tests')
+            for test in self.tests:
+                io.symbolic_link(source=testspace/test.output_dir,link_name=r.workspace/('test-'+test.output_dir))
+                r.p('<a href="test-%s">%s</a>' % (test.output_dir, test.get_title()))
+
 
         r.write('<p/><hr>\n')
         
@@ -528,6 +557,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
 
         peak_template = analyse_template(
             annotations=workspace/('peaks','relation-child.gff'), 
+            extension=0,
             types='peak',
             )
 
