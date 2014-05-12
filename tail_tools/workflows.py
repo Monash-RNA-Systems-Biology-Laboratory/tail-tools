@@ -185,8 +185,8 @@ class Analyse_polya(config.Action_with_output_dir):
         
         if colorspace:
             nesoni.Execute(
-                command = reference.shrimp_command(cs=colorspace, parameters=[ clipped_filename ]),
-                execution_options = [ '-N', str(cores) ] + [ '--qv-offset', '33' ] if not colorspace else [ ],
+                command = reference.shrimp_command(cs=colorspace, parameters=[ clipped_filename ]) + [ '--qv-offset', '33' ],
+                execution_options = [ '-N', str(cores) ],
                 output=raw_filename,
                 cores=cores,
                 ).make()
@@ -474,7 +474,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             
             r.p('These BAM files contain the alignments of reads to the reference sequences.')
             
-            r.p('Reads with a poly(A) tail have an \'AA\' attribute.')
+            r.p('Reads with a poly(A) tail have an \'AN\' attribute giving the length of non-templated poly(A) sequence. '
+                'Tail-tools only treats a read as having a tail if this length is at least 4.')
             
             bam_files = [ ]
             for name in names:

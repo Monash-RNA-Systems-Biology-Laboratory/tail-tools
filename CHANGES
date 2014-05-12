@@ -1,4 +1,6 @@
 
+0.28 - Bugfix to "make-tt-reference:".
+
 0.27 - Peaks were being incorrectly extended in pipeline, fixed.
        Added facility to perform a set of tests to analyse-polya-batch.
        "compare-peaks:" option to output longer pre-peak and inter-peak sequences.

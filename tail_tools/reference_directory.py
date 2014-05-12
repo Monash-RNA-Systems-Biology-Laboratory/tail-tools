@@ -28,7 +28,7 @@ class Tailtools_reference(reference_directory.Reference):
         
 
 @config.Bool_flag('index', 'Generate bowtie2 and shrimp indexes. Only disable if re-building reference directory.')
-@config.Positional('filenames', 'Sequence and annotation files.')
+@config.Main_section('filenames', 'Sequence and annotation files.')
 class Make_tt_reference(config.Action_with_output_dir):
     _workspace_class = Tailtools_reference
 
