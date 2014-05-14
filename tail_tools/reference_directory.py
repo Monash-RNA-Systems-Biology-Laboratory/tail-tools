@@ -63,7 +63,7 @@ class Make_tt_reference(config.Action_with_output_dir):
                     cdss = [ item for item in mrna.children if item.type == 'CDS' ]
                     exons = [ item for item in mrna.children if item.type == 'exon' ]
                     if not cdss or not exons: continue
-                    if item.strand >= 0:
+                    if gene.strand >= 0:
                        cds_3prime = max(item.end for item in cdss)
                        for item in exons:
                            if item.end > cds_3prime:
@@ -74,7 +74,7 @@ class Make_tt_reference(config.Action_with_output_dir):
                            if item.start < cds_3prime:
                                utr_5primes.append(min(item.end,cds_3prime))
                 
-                if item.strand >= 0:
+                if gene.strand >= 0:
                     utr_start = max(utr_5primes) if utr_5primes else gene.end
                     utr_end = max(utr_start+1,gene.end)
                 else:
