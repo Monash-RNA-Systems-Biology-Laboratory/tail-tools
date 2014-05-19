@@ -518,7 +518,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         io.symbolic_link(source=expressionspace/('peakwise','report'),link_name=r.workspace/'peakwise')
         r.subheading('<a href="peakwise/index.html">&gt; Peakwise expression</a>')
 
-        io.symbolic_link(source=expressionspace/('peakwise-dedup','report'),link_name=r.workspace/'genewise-dedup')
+        io.symbolic_link(source=expressionspace/('peakwise-dedup','report'),link_name=r.workspace/'peakwise-dedup')
         r.subheading('<a href="peakwise-dedup/index.html">&gt; Peakwise expression with read deduplication</a>')
         
         

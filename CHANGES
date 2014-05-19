@@ -1,4 +1,7 @@
 
+0.30 - Bugfix in report generation for "analyse-polya-batch:",
+       correctly link to genewise-dedup/peakwise-dedup
+
 0.29 - Bugfix to "make-tt-reference:".
 
 0.28 - Bugfix to "make-tt-reference:".
