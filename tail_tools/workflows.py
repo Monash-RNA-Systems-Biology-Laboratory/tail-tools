@@ -11,15 +11,13 @@ from . import clip_runs, extend_sam, proportions, tail_lengths, web, alternative
 
 @config.help(
     'Call peaks in depth of coverage indicating transcription end sites.',
-    'Note that you must specify --select (the annotation type to use from the annotation file), '
-    '--shift-start, and --shift-end.'
+    'Note that you must specify --shift-start, and --shift-end.'
     '\n\n'
     'Operates as follows:'
     '\n\n'
     '- Call end points using "nesoni modes: --what 3prime".\n'
     '- Extend called modes back by --peak-length.\n'
-    '- Collapse any overlapping annotations down to a single annotation.\n'
-    '- Relate resultant peaks to the given (collapsed) annotations.\n'
+    '- Relate resultant peaks to the given annotations.\n'
     '\n'
     'Note: As this is a workflow, you may need to specify "--make-do all" to force everything to recompute if an input file is changed. '
     'Use "--make-do -modes" to recompute everything but the peak calling.'
@@ -40,7 +38,7 @@ class Call_peaks(config.Action_with_output_dir):
     peak_length = 100
     
     annotations = None
-    types = None # Must specify
+    types = 'gene'
     shift_start = None # Must specify
     shift_end = None
     
@@ -50,7 +48,7 @@ class Call_peaks(config.Action_with_output_dir):
     def run(self):
         assert self.shift_start is not None, '--shift-start must be specified'
         assert self.shift_end is not None, '--shift-end must be specified'
-        assert self.types is not None, '--select must be specified'
+        assert self.types is not None, '--types must be specified'
         assert self.annotations is not None, '--annotations must be specified'
     
         outspace = self.get_workspace()
@@ -71,15 +69,10 @@ class Call_peaks(config.Action_with_output_dir):
             shift_start = str(-self.peak_length),
             ).make()
         
-        nesoni.Collapse_features(
-            working/'collapsed',
-            self.annotations,
-            select = '/'.join(self.types.split(',')),
-            ).make()
-        
         nesoni.Relate_features(
             outspace/'relation',
-            parent = working/'collapsed.gff',
+            parent = self.annotations,
+            select_parent = '/'.join(self.types.split(',')),
             child = working/'peaks.gff',
             upstrand = -self.shift_start,
             downstrand = self.shift_end,

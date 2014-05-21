@@ -1,4 +1,6 @@
 
+0.31 - Remove collapse-features from call-peaks, not needed and causes later stage to fail.
+
 0.30 - Bugfix in report generation for "analyse-polya-batch:",
        correctly link to genewise-dedup/peakwise-dedup
 
