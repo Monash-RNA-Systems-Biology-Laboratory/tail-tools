@@ -112,7 +112,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
         
         with io.open_possibly_compressed_writer(self.prefix+'.fastq.gz') as out_file, \
              io.open_possibly_compressed_writer(self.prefix+'.clips.gz') as out_clips_file:
-            print >> out_clips_file, '#Read\tread length\tpoly-A start\tpoly-A end\tpoly-A start, ignoring adaptor\rpoly-A end, ignoring adaptor'
+            print >> out_clips_file, '#Read\tread length\tpoly-A start\tpoly-A end\tpoly-A start, ignoring adaptor\tpoly-A end, ignoring adaptor\tadaptor bases matched'
              
             n = 0
             n_discarded = 0
@@ -125,6 +125,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
                     best_score = 0
                     best_a_start = len(seq)
                     best_a_end = len(seq)
+                    best_adaptor_bases = 0
                     best_aonly_score = 0
                     best_aonly_start = len(seq)
                     best_aonly_end = len(seq)
@@ -140,16 +141,19 @@ class Clip_runs_basespace(config.Action_with_prefix):
                                 best_aonly_end = a_end
                                             
                             score = aonly_score
+                            adaptor_bases = 0
                             for i in xrange(a_end,min(a_end+len(self.adaptor),len(seq))):
                                 if qual[i] >= min_quality:
                                     if seq[i] == self.adaptor[i-a_end]:
                                         score += 1
+                                        adaptor_bases += 1
                                     else:
                                         score -= 4
                             if score > best_score:
                                 best_score = score
                                 best_a_start = a_start
                                 best_a_end = a_end
+                                best_adaptor_bases = adaptor_bases
                         
                             if a_end >= len(seq): break
                             if qual[a_end] >= min_quality:
@@ -162,6 +166,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
                         
                     a_start = best_a_start
                     a_end = best_a_end
+                    adaptor_bases = best_adaptor_bases
                     aonly_start = best_aonly_start
                     aonly_end = best_aonly_end                    
                         
@@ -177,7 +182,14 @@ class Clip_runs_basespace(config.Action_with_prefix):
                     n += 1
                     total_before += len(seq)
 
-                    print >> out_clips_file, '%s\t%d\t%d\t%d\t%d\t%d' % (name, len(seq) , a_start, a_end, aonly_start, aonly_end)
+                    # 0 - sequence name
+                    # 1 - sequence length
+                    # 2 - poly(A) start
+                    # 3 - poly(A) end
+                    # (4 - best run of As start, for debugging the need to detect adaptor seq)
+                    # (5 - best run of As end)
+                    # 6 - number of adaptor bases matched
+                    print >> out_clips_file, '%s\t%d\t%d\t%d\t%d\t%d\t%d' % (name, len(seq) , a_start, a_end, aonly_start, aonly_end,  adaptor_bases)
                     
                     if a_start > self.length:
                         if a_start < len(seq):

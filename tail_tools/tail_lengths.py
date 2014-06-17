@@ -78,9 +78,12 @@ class Tail_count(config.Action_with_prefix):
                      tail_pos = start
                  
                  tail_length = 0
+                 adaptor_bases = 0
                  for item in fragment[0].extra:
                      if item.startswith('AN:i:'):
                          tail_length = int(item[5:])
+                     elif item.startswith('AD:i:'):
+                         adaptor_bases = int(item[5:])
                  
                  if fragment[0].rname in index:
                      hits = [ 
@@ -100,7 +103,7 @@ class Tail_count(config.Action_with_prefix):
                              rel_start = gene.end - end
                              rel_end = gene.end - start
                          
-                         gene.hits.append( (rel_start,rel_end,tail_length) )
+                         gene.hits.append( (rel_start,rel_end,tail_length,adaptor_bases) )
 
          f = io.open_possibly_compressed_writer(self.prefix + '.pickle.gz')
          pickle.dump((workspace.name, workspace.get_tags(), annotations), f, pickle.HIGHEST_PROTOCOL)
@@ -121,41 +124,14 @@ class Tail_count(config.Action_with_prefix):
 @config.Int_flag('tail',
      'Minimum tail length to count as having a tail.'
      )
-@config.Int_flag('ntail',
-     'Minimum number of observed tails lengths needed to call a mean tail length.'
-     )
-@config.Int_flag('nprop',
-     'Minimum number of observed reads to call a proportion of reads with tails.'
-     )
 @config.Main_section('pickles')
 class Aggregate_tail_counts(config.Action_with_output_dir):             
     saturation = 0
     tail = 4
-    ntail = 10
-    nprop = 10
     pickles = [ ]
-
-    #def log_filename(self):
-    #    if self.prefix is None: return None
-    #    return self.prefix + '_aggregate_log.txt'
-
-    #def state_filename(self):
-    #    return self.prefix + '_aggregate.state'
          
     def run(self):
         work = self.get_workspace()
-    
-        #workspaces = [ 
-        #    working_directory.Working(item) 
-        #    for item in self.working_dirs 
-        #]
-        #
-        #data = [ 
-        #    item.get_object('tail-lengths.pickle.gz') 
-        #    for item in workspaces
-        #]        
-        #
-        #names = [ item.name for item in workspaces ]
         
         data = [ ]
         names = [ ]
@@ -172,10 +148,12 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
         annotations = data[0]
         
         all_lengths = [ 
-            tail_length
+            #tail_length
+            item[2]
             for sample in data
             for feature in sample
-            for rel_start,rel_end,tail_length in feature.hits
+            #for rel_start,rel_end,tail_length in feature.hits
+            for item in feature.hits
             ]
         if all_lengths: 
             max_length = max(all_lengths)+1
@@ -191,7 +169,8 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
                 feature.tail_counts = [ 0.0 ] * max_length
                 
                 buckets = collections.defaultdict(list)
-                for rel_start,rel_end,tail_length in feature.hits:
+                for item in feature.hits:
+                    rel_start,rel_end,tail_length = item[:3]
                     buckets[ (rel_start,rel_end) ].append(tail_length)
                 for item in buckets.values():
                     n_alignments += len(item)
@@ -218,68 +197,69 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
             this_counts = [ item.tail_counts for item in row ]
             counts.append(this_counts)
         
-        totals = [ ]          # [feature][sample]  Total count
+        sample_n = [ ]        # [feature][sample]  Total count
+        sample_n_tail = [ ]   # [feature][sample]  Polya count
         sample_prop = [ ]     # [feature][sample]  Proportion of reads with tail
         sample_tail = [ ]     # [feature][sample]  Mean tail length in each sample
+        sample_total_tail = [ ]
+        overall_n = [ ]
         overall_prop = [ ]    # [feature]          Overall proportion with tail
         overall_tail = [ ]    # [feature]          Overall mean tail length
-        overall_n_tail = [ ]
+        overall_n_tail = [ ]  # [feature]          Overall polya count
+        overall_total_tail = [ ]
         for row in counts:
-            this_totals = [ ]
+            this_n = [ ]
+            this_n_tail = [ ]
             this_prop = [ ]
             this_tail = [ ]
-            this_n = 0.0
-            this_n_tail = 0.0
-            this_total_tail = 0.0
+            this_total_tail = [ ]
             for item in row:
                 this_this_n = sum(item)
-                this_totals.append( this_this_n )
+                this_n.append( this_this_n )
+
                 this_this_n_tail = sum(item[self.tail:])
+                this_n_tail.append( this_this_n_tail )
+
                 this_this_total_tail = sum( item[i]*i for i in xrange(self.tail,max_length) )
-                if this_this_n < self.nprop:
+                this_total_tail.append( this_this_total_tail )
+
+                if this_this_n < 1:
                     this_prop.append(None)
                 else:
                     this_prop.append(float(this_this_n_tail)/this_this_n)
-                if this_this_n_tail < self.ntail:
+                if this_this_n_tail < 1:
                     this_tail.append(None)
                 else:
                     this_tail.append(this_this_total_tail/this_this_n_tail)
-                this_n += this_this_n
-                this_n_tail += this_this_n_tail
-                this_total_tail += this_this_total_tail
 
-            totals.append(this_totals)
+            sample_n.append(this_n)
+            sample_n_tail.append(this_n_tail)
             sample_prop.append(this_prop)
             sample_tail.append(this_tail)
-            overall_n_tail.append(this_n_tail)
-            if this_n < self.nprop:
+            sample_total_tail.append(this_total_tail)
+            overall_n.append(sum(this_n))
+            overall_n_tail.append(sum(this_n_tail))
+            overall_total_tail.append(sum(this_total_tail))
+            if sum(this_n) < 1:
                 overall_prop.append(None)
             else:
-                overall_prop.append(float(this_n_tail)/this_n)
-            if this_n_tail < self.ntail:
+                overall_prop.append(float(sum(this_n_tail))/sum(this_n))
+            if sum(this_n_tail) < 1:
                 overall_tail.append(None)
             else:
-                overall_tail.append(this_total_tail/this_n_tail)
+                overall_tail.append(float(sum(this_total_tail))/sum(this_n_tail))
              
         for i, name in enumerate(names):
-            this_total = 0.0            
-            this_n = 0
-            for row in sample_tail:
-                if row[i] is not None:
-                    this_total += row[i]
-                    this_n += 1
+            this_total = sum( item[i] for item in sample_total_tail )
+            this_n = sum( item[i] for item in sample_n_tail )
             if this_n:
-                self.log.datum(name, 'Average poly-A tail', this_total/this_n)
+                self.log.datum(name, 'Average poly-A tail', float(this_total)/this_n)
                 
         for i, name in enumerate(names):
-            this_total = 0.0
-            this_n = 0
-            for row in sample_prop:
-                if row[i] is not None:
-                    this_total += row[i]
-                    this_n += 1
+            this_total = sum( item[i] for item in sample_n_tail )
+            this_n = sum( item[i] for item in sample_n )
             if this_n:
-                self.log.datum(name, 'Average proportion of reads with tail', this_total/this_n)
+                self.log.datum(name, 'Average proportion of reads with tail', float(this_total)/this_n)
             
         
         #max_length = max(max(len(item) for item in row) for row in counts)
@@ -293,6 +273,8 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
         with open(work/'features-with-data.gff','wb') as f:
             annotation.write_gff3_header(f)
             for i, item in enumerate(annotations):
+                item.attr['reads'] = str(overall_n[i])
+                item.attr['reads_with_tail'] = str(overall_n_tail[i])
                 item.attr['mean_tail'] = '%.1f'%overall_tail[i] if overall_tail[i] else 'NA'
                 item.attr['proportion_with_tail'] = '%.2f'%overall_prop[i] if overall_prop[i] else 'NA'
                 
@@ -309,11 +291,9 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
             '#sampleTags='+','.join(tags)
             for tags in sample_tags
             ] + [
-            'n-with-tail = Number of reads with a poly-A tail of length at least %d' % self.tail,
-            'mean-tail = Mean poly-A tail length, for reads with a tail of length at least %d, if there were at least %d such reads' % (self.tail, self.ntail),
-            'proportion-with-tail = Proportion of reads with a tail of length at least %d, if there were at least %d total reads' % (self.tail, self.nprop),
-            '"Tail" group is mean tail per sample, as above',
-            '"Proportion" group is proportion of reads with tail per sample, as above',
+            '"Tail_count" group is number of reads with tail',
+            '"Tail" group is mean tail per sample',
+            '"Proportion" group is proportion of reads with tail',
             ]
 
         def counts_iter():
@@ -321,15 +301,18 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
                 row = collections.OrderedDict()
                 row['Feature'] = annotations[i].get_id()
                 for j in xrange(len(names)):
-                    row[('Count',names[j])] = '%d' % totals[i][j] #sum(counts[i][j]) 
+                    row[('Count',names[j])] = '%d' % sample_n[i][j]
 
                 row[('Annotation','Length')] = annotations[i].end - annotations[i].start
                 row[('Annotation','gene')] = annotations[i].attr.get('Name','')
                 row[('Annotation','product')] = annotations[i].attr.get('Product','')
                 #row[('Annotation','Strand')] = str(annotations[i].strand)
-                row[('Annotation','n-with-tail')] = str(overall_n_tail[i])
+                row[('Annotation','reads')] = str(overall_n[i])
+                row[('Annotation','reads-with-tail')] = str(overall_n_tail[i])
                 row[('Annotation','mean-tail')] = str(overall_tail[i]) if overall_tail[i] is not None else 'NA'
                 row[('Annotation','proportion-with-tail')] = str(overall_prop[i]) if overall_prop[i] is not None else 'NA'
+                for j in xrange(len(names)):
+                    row[('Tail_count',names[j])] = '%d' % sample_n_tail[i][j]
                 for j in xrange(len(names)):
                     row[('Tail',names[j])] = str(sample_tail[i][j]) if sample_tail[i][j] is not None else 'NA'
                 for j in xrange(len(names)):
@@ -365,36 +348,8 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
                     row[str(j)] = str( sum( counts[i][k][j] for k in xrange(len(names)) ) )
                 yield row
         io.write_csv(work/'pooled.csv', pooled())
-        
-        ##Note: zero if zero count
-        #def mean_length():
-        #    for i in xrange(len(counts)):
-        #        row = collections.OrderedDict()
-        #        row['Feature'] = annotations[i].get_id()
-        #        for j in xrange(len(names)):
-        #            a = 0
-        #            b = 0
-        #            for pos,count in enumerate(counts[i][j]):
-        #                a += pos*count
-        #                b += count
-        #            row[names[j]] = str( float(a)/max(1,b) )
-        #        yield row
-        #io.write_csv(self.prefix + '-mean-length.csv', mean_length())
-        #
-        #def mean4_length():
-        #    for i in xrange(len(counts)):
-        #        row = collections.OrderedDict()
-        #        row['Feature'] = annotations[i].get_id()
-        #        for j in xrange(len(names)):
-        #            a = 0
-        #            b = 0
-        #            for pos,count in enumerate(counts[i][j]):
-        #                if pos < 4: continue
-        #                a += pos*count
-        #                b += count
-        #            row[names[j]] = str( float(a)/max(1,b) )
-        #        yield row
-        #io.write_csv(self.prefix + '-mean-length-beyond4.csv', mean4_length())
+
+
 
 
 #@config.help(
@@ -805,7 +760,7 @@ class Collapse_counts(config.Action_with_prefix):
     def run(self):
         data = io.read_grouped_table(
             self.counts,
-            [('Count',str), ('Annotation',str), ('Tail',str), ('Proportion',str)],
+            [('Count',str), ('Annotation',str), ('Tail_count',str), ('Tail',str), ('Proportion',str)],
             'Count',
             )
         
@@ -849,34 +804,41 @@ class Collapse_counts(config.Action_with_prefix):
         
         
         count = [ ]
+        tail_count = [ ]
         tail = [ ]
         proportion = [ ]
         for feature in features:
             this_count = [ ]
+            this_tail_count = [ ]
             this_tail = [ ]
             this_proportion = [ ]
             for group in groups:
                 this_this_count = [ ]
+                this_this_tail_count = [ ]
                 this_this_tail = [ ]
                 this_this_proportion = [ ]
                 for sample in group:
                     this_this_count.append(int(data['Count'][feature][sample]))
+                    this_this_tail_count.append(int(data['Tail_count'][feature][sample]))
                     item = data['Tail'][feature][sample]
                     if item != 'NA': this_this_tail.append(float(item))
                     item = data['Proportion'][feature][sample]
                     if item != 'NA': this_this_proportion.append(float(item))
                 
                 this_count.append(str(sum(this_this_count)))
+                this_tail_count.append(str(sum(this_this_tail_count)))
                 this_tail.append(str(sum(this_this_tail)/len(this_this_tail)) if this_this_tail else 'NA')
                 this_proportion.append(str(sum(this_this_proportion)/len(this_this_proportion)) if this_this_proportion else 'NA')
                     
             count.append(this_count)
+            tail_count.append(this_tail_count)
             tail.append(this_tail)
             proportion.append(this_proportion)
         
         matrix = io.named_matrix_type(features,group_names)
         result['Count'] = matrix(count)
         result['Annotation'] = data['Annotation']
+        result['Tail_count'] = matrix(tail_count)
         result['Tail'] = matrix(tail)
         result['Proportion'] = matrix(proportion)
         result.write_csv(self.prefix + '.csv')
@@ -987,7 +949,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
                 min_span = min_span,
                 glog_moderation = self.glog_moderation,
                 )
-            for min_tails in [10] #(20,50,100,200)
+            for min_tails in [50,100,200,500]
             for min_span in [2,4,8,10,15,20,25,30]
             ]
 
@@ -1029,19 +991,6 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         
         
         
-        r.p('Counts are converted to '
-            'log2 Reads Per Million using a variance stabilised transformation. '
-            'Let the generalised logarithm with moderation m be')
-        
-        r.p('glog(x,m) = log2((x+sqrt(x*x+4*m*m))/2)')
-        
-        r.p('then the transformed values will be')
-        
-        r.p('glog( count/library_size*1e6, log_moderation/mean_library_size*1e6 )')
-        
-        r.p('where log_moderation is a parameter, here 5. '
-            'The library sizes used are effective library sizes after TMM normalization.')
-        
         
         #r.heading('Spreadsheet with statistics for all genes and all samples')
         #
@@ -1059,7 +1008,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         r.p(
             'This plot shows the distribution of lengths of poly(A) tail sequence in top expressed features. '
             'Its main purpose is to assess data quality. '
-            'If the plot has many bright spots, there may be many PCR duplicates in the reads.'
+            'If the plot has many bright spots there may be many identical reads, possibly due to non-random digestion.'
             )
         
         r.p(
@@ -1076,7 +1025,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
             )
         
         r.p(
-            'Genes were selected based on there being at least 10 reads with poly(A) sequence in <i>each</i> sample, '
+            'Genes were selected based on there being at least a certain number of reads with poly(A) sequence in <i>each</i> sample (min-tails), '
             'and on there being at least some amount of difference in average tail length between samples (min-span).'
             )
         
@@ -1106,6 +1055,22 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         r.p(r.get(work/'counts.csv') + ' - raw counts and tail statistics')
         r.p(r.get(work/'glog.csv') + ' - glog2 RPM counts')
         r.p(r.get(work/'norm.csv') + ' - normalization factors used')
+        
+        r.write('<p/><hr>\n')
+        r.subheading('About normalization and log transformation')
+        
+        r.p('Counts are converted to '
+            'log2 Reads Per Million using a variance stabilised transformation. '
+            'Let the generalised logarithm with moderation m be')
+        
+        r.p('glog(x,m) = log2((x+sqrt(x*x+4*m*m))/2)')
+        
+        r.p('then the transformed values will be')
+        
+        r.p('glog( count/library_size*1e6, log_moderation/mean_library_size*1e6 )')
+        
+        r.p('where log_moderation is a parameter, here 5. '
+            'The library sizes used are effective library sizes after TMM normalization.')
         
         r.close()
 

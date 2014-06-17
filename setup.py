@@ -24,6 +24,7 @@ setup(
         
     package_data = {
         'tail_tools' : [
+            'tail_tools.R',
             'web/*.html',
             'web/*.css',
             'web/*.js',

@@ -1,4 +1,11 @@
 
+0.32 - Add "AD" property to BAM files, number of adaptor sequence bases observed.
+       Don't put a lower limit on number of reads required to call proportion, tail.
+       Improved tail length testing.
+       Dropped Chi-Sq testing from "compare-peaks:", "test:" hopefully makes this obsolete.
+       "compare-peaks:" outputs "NA"s rather than "None"s in peak-pair file.
+       Cleaned up reports.
+
 0.31 - Remove collapse-features from call-peaks, not needed and causes later stage to fail.
 
 0.30 - Bugfix in report generation for "analyse-polya-batch:",

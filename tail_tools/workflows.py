@@ -316,6 +316,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         plotspace = io.Workspace(workspace/'plots', must_exist=False)
         expressionspace = io.Workspace(workspace/'expression', must_exist=False)
         testspace = io.Workspace(workspace/'test', must_exist=False)
+        testspace_dedup = io.Workspace(workspace/'test-dedup', must_exist=False)
                 
         file_prefix = self.file_prefix
         if file_prefix and not file_prefix.endswith('-'):
@@ -416,6 +417,12 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                     output_dir = testspace/test.output_dir,
                     analysis = self.output_dir
                     ).process_make(stage)
+
+                test(
+                    output_dir = testspace_dedup/test.output_dir,
+                    analysis = self.output_dir,
+                    dedup = True,
+                    ).process_make(stage)
         
         #===============================================
         #                   Report        
@@ -428,7 +435,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.report_logs('alignment-statistics',
             #[ workspace/'stats.txt' ] +
             clipper_logs + filter_logs + #filter_polya_logs +
-            [ expressionspace/('genewise-dedup','aggregate-tail-counts_log.txt') ],
+            [ expressionspace/('genewise','aggregate-tail-counts_log.txt') ],
             filter=lambda sample, field: (
                 field not in [
                     
@@ -480,10 +487,10 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.heading('Genewise expression')
         
         io.symbolic_link(source=expressionspace/('genewise','report'),link_name=r.workspace/'genewise')
-        r.subheading('<a href="genewise/index.html">&gt; Genewise expression</a>')
+        r.p('<a href="genewise/index.html">&rarr; Genewise expression</a>')
 
         io.symbolic_link(source=expressionspace/('genewise-dedup','report'),link_name=r.workspace/'genewise-dedup')
-        r.subheading('<a href="genewise-dedup/index.html">&gt; Genewise expression with read deduplication</a>')
+        r.p('<a href="genewise-dedup/index.html">&rarr; Genewise expression with read deduplication</a>')
 
 
         r.heading('Peakwise expression')
@@ -496,33 +503,45 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         r.p(r.get(peak_filename, name='peaks.gff') + ' - peaks called')        
 
-        if self.groups:
-            r.subheading('Peak shift between groups')
-            r.p(r.get(workspace/('peak-shift','grouped.csv')) + ' - genes with a potential peak shift')        
-            r.get(workspace/('peak-shift','grouped.json'))
-            r.p('<a href="view.html?json=%sgrouped.json">Gene viewer</a>' % r.file_prefix)
+        #if self.groups:
+            #r.subheading('Peak shift between groups')
+            #r.p(r.get(workspace/('peak-shift','grouped.csv')) + ' - genes with a potential peak shift')        
+            #r.get(workspace/('peak-shift','grouped.json'))
 
-        r.subheading('Peak shift between samples')
-        r.p(r.get(workspace/('peak-shift','individual.csv')) + ' - genes with a potential peak shift')        
-        r.get(workspace/('peak-shift','individual.json'))
-        r.p('<a href="view.html?json=%sindividual.json">Gene viewer</a>' % r.file_prefix)
-       
+        #r.subheading('Peak shift between samples')
+        #r.p(r.get(workspace/('peak-shift','individual.csv')) + ' - genes with a potential peak shift')        
+        #r.get(workspace/('peak-shift','individual.json'))
+
         
         io.symbolic_link(source=expressionspace/('peakwise','report'),link_name=r.workspace/'peakwise')
-        r.subheading('<a href="peakwise/index.html">&gt; Peakwise expression</a>')
+        r.p('<a href="peakwise/index.html">&rarr; Peakwise expression</a>')
 
         io.symbolic_link(source=expressionspace/('peakwise-dedup','report'),link_name=r.workspace/'peakwise-dedup')
-        r.subheading('<a href="peakwise-dedup/index.html">&gt; Peakwise expression with read deduplication</a>')
-        
-        
+        r.p('<a href="peakwise-dedup/index.html">&rarr; Peakwise expression with read deduplication</a>')
+                
         if self.tests:
             r.heading('Differential tests')
             for test in self.tests:
                 io.symbolic_link(source=testspace/test.output_dir,link_name=r.workspace/('test-'+test.output_dir))
-                r.p('<a href="test-%s">%s</a>' % (test.output_dir, test.get_title()))
+                io.symbolic_link(source=testspace_dedup/test.output_dir,link_name=r.workspace/('test-dedup-'+test.output_dir))
+                r.p('<a href="test-%s">&rarr; %s</a> '
+                    ' &nbsp; <a href="test-dedup-%s" style="font-size: 66%%">[&rarr; Deduplicated version]</a>' % (test.output_dir, test.get_title(), test.output_dir))
 
+        r.heading('Gene viewers')
+        r.p('Having identified interesting genes from heatmaps and differential tests above, '
+            'these viewers allow specific genes to be examined in detail.')
+        
+        if self.groups:
+            r.p('<a href="view.html?json=%sgrouped.json">&rarr; Gene viewer, grouped samples</a>' % r.file_prefix)
+        r.p('<a href="view.html?json=%sindividual.json">&rarr; Gene viewer, individual samples</a>' % r.file_prefix)
+       
 
         r.write('<p/><hr>\n')
+        
+        r.p('Note: Use deduplicated versions with care. '
+            'They may possibly provide more significant results, however they are less quantitative. '
+            'Read deduplication involves throwing away a large amount of data, much of which will not be a technical artifact. '
+            'Deduplicated versions might best be viewed as a check on data quality.')
         
         r.p('This set of genes was used in the analysis:')
         
@@ -538,6 +557,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
 
     def _run_peaks(self, workspace, expressionspace, reference, polya_dirs, analyse_template, file_prefix):
         shiftspace = io.Workspace(workspace/'peak-shift')
+        shiftspace_dedup = io.Workspace(workspace/'peak-shift-dedup')
 
         Call_peaks(
             workspace/'peaks',
@@ -582,6 +602,18 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             counts=expressionspace/('peakwise','counts.csv'),
             ).make()
         
+        alternative_tails.Compare_peaks(
+            shiftspace_dedup/'individual',
+            norm_file=expressionspace/('peakwise-dedup','norm.csv'),
+            utrs=reference/'utr.gff',
+            utr_only=True,
+            top=2,
+            reference=reference/'reference.fa',
+            parents=workspace/('peaks','relation-parent.gff'),
+            children=workspace/('peaks','relation-child.gff'),
+            counts=expressionspace/('peakwise-dedup','counts.csv'),
+            ).make()
+        
         if self.groups:
             tail_lengths.Collapse_counts(
                 shiftspace/'grouped-counts',
@@ -600,6 +632,23 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 counts=shiftspace/'grouped-counts.csv',
                 ).make()
             
+
+            tail_lengths.Collapse_counts(
+                shiftspace_dedup/'grouped-counts',
+                counts=expressionspace/('peakwise-dedup','counts.csv'),
+                groups=self.groups
+                ).make()
+            
+            alternative_tails.Compare_peaks(
+                shiftspace_dedup/'grouped',
+                utrs=reference/'utr.gff',
+                utr_only=True,
+                top=2,
+                reference=reference/'reference.fa',
+                parents=workspace/('peaks','relation-parent.gff'),
+                children=workspace/('peaks','relation-child.gff'),
+                counts=shiftspace/'grouped-counts.csv',
+                ).make()
             
             
                 

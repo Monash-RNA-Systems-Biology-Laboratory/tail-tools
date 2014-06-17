@@ -340,12 +340,15 @@ class Extend_sam_basespace(config.Action_filter):
                 references[name] = seq
         
         tail_lengths = { }
+        adaptor_bases = { }
         for filename in self.clips:
             with io.open_possibly_compressed_file(filename) as f:
                 for line in f:
                     if line.startswith('#'): continue
                     parts = line.rstrip('\n').split('\t')
-                    tail_lengths[parts[0].split()[0]] = int(parts[3])-int(parts[2])
+                    name = parts[0].split()[0]
+                    tail_lengths[name] = int(parts[3])-int(parts[2])
+                    adaptor_bases[name] = int(parts[6])
         
         in_file = self.begin_input()
         out_file = self.begin_output()
@@ -388,12 +391,15 @@ class Extend_sam_basespace(config.Action_filter):
             
             if n_tail-extension > 0:
                 al.extra.append('AN:i:%d' % (n_tail-extension))
+            if adaptor_bases[al.qname]:
+                al.extra.append('AD:i:%d' % adaptor_bases[al.qname])
             if n_tail-extension >= self.tail:
-                if reverse:
-                    tail_refpos = al.pos-extension
-                else:
-                    tail_refpos = al.pos+al.length+extension-1 
-                al.extra.append('AA:i:%d'%tail_refpos)
+                #if reverse:
+                #    tail_refpos = al.pos-extension
+                #else:
+                #    tail_refpos = al.pos+al.length+extension-1 
+                #al.extra.append('AA:i:%d'%tail_refpos)
+                al.extra.append('AA:i:1')
             
             cigar += 'M' * extension
             read_bases += 'A' * extension

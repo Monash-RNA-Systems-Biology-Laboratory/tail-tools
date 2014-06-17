@@ -16,7 +16,7 @@ def _float_or_none(text):
 
 def _text(value):
     if value is None:
-        return 'None'
+        return 'NA'
     return str(value)
 
 def _annotation_sorter(item):
@@ -96,11 +96,12 @@ sink()
 
 @config.help(
     'Look for shifts of transcription end point within genes.',
-    'Output is:\n'
-    '\n'
-    '1. "Interestingness" and chi-square tests on all genes, from a table of counts with samples as rows and peaks as columns.\n'
-    '\n'
-    '2. A "counts" file and accompanying normalization file '
+    #'Output is:\n'
+    #'\n'
+    #'1. "Interestingness" and chi-square tests on all genes, from a table of counts with samples as rows and peaks as columns.\n'
+    #'\n'
+    #'2. A "counts" file and accompanying normalization file '
+    'Outputs a "counts" file and accompanying normalization file '
     'with one row for each pair of peaks which share a common gene. '
     'This can be used as input to "nesoni test-counts:".\n'
     )
@@ -196,11 +197,13 @@ class Compare_peaks(config.Action_with_prefix):
         
         count_table = io.read_grouped_table(self.counts, [
             ('Count',int),
+            ('Tail_count',int),
             ('Tail',_float_or_none),
             ('Proportion',_float_or_none),
             ('Annotation',str)
             ])
         counts = count_table['Count']
+        tail_counts = count_table['Tail_count']
         proportions = count_table['Proportion']
         tails = count_table['Tail']
         
@@ -368,6 +371,7 @@ class Compare_peaks(config.Action_with_prefix):
         
         output_names = [ ]
         output_counts = [ ]
+        output_tail_counts = [ ]
         output_proportions = [ ]
         output_tails = [ ]
         output_annotation_fields = [ 'gene', 'product', 'mean_tail_1', 'mean_tail_2', 'chromosome', 'strand', 
@@ -387,6 +391,11 @@ class Compare_peaks(config.Action_with_prefix):
                     row.extend(counts[id_i].values())
                     row.extend(counts[id_j].values())
                     output_counts.append(filter(_text,row))
+                    
+                    row = [ ]
+                    row.extend(tail_counts[id_i].values())
+                    row.extend(tail_counts[id_j].values())
+                    output_tail_counts.append(filter(_text,row))
 
                     row = [ ]
                     row.extend(proportions[id_i].values())
@@ -410,11 +419,12 @@ class Compare_peaks(config.Action_with_prefix):
                         #get_interpeak_seq([peaks[i],peaks[j]]),
                         ])
         
-        output_count_table = io.named_matrix_type(output_names,output_samples)(output_counts)
+        #output_count_table = io.named_matrix_type(output_names,output_samples)(output_counts)
         io.write_grouped_csv(
             self.prefix + '-pairs.csv',
             [ 
                 ('Count',io.named_matrix_type(output_names,output_samples)(output_counts)),
+                ('Tail_count',io.named_matrix_type(output_names,output_samples)(output_tail_counts)),
                 ('Proportion',io.named_matrix_type(output_names,output_samples)(output_proportions)),
                 ('Tail',io.named_matrix_type(output_names,output_samples)(output_tails)),
                 ('Annotation',io.named_matrix_type(output_names,output_annotation_fields)(output_annotations)),
@@ -422,79 +432,79 @@ class Compare_peaks(config.Action_with_prefix):
             comments=output_comments,
             )
                         
-        # Chi Sq tests
-        
-        #for id in relation:
-        #    peaks = relation[id]
-        #    if len(peaks) < 2: continue     
-        
-        mats = [ ]   
-        genes = [ ]
-        products = [ ]
-        mean_tails = [ ]
-        prop_tails = [ ]
-
-        peak_names = [ ]
-        chromosome_names = [ ]
-        strands = [ ]
-        transcription_stops = [ ]
-        interpeak_seqs = [ ]
-        prepeak_seqs = [ ]
-
-        for parent in parents:
-            id = parent.get_id()
-            peaks = parent.relevant_children
-            if len(peaks) < 2: continue
-            
-            matrix = [ ]
-            for item in peaks:
-                matrix.append(counts[item.get_id()].values())
-            
-            mats.append(
-                runr.R_literal(id) + ' = ' + 
-                runr.R_literal(matrix)
-                )
-            
-            genes.append(parent.attr.get('Name',parent.attr.get('gene','')))
-            products.append(parent.attr.get('Product',parent.attr.get('product','')))
-            
-            def format_mean(s):
-                if s == 'NA': return 'NA'
-                return '%.1f' % float(s)
-            mean_tails.append(', '.join( format_mean(count_table['Annotation'][item.get_id()]['mean-tail']) for item in peaks ))
-            
-            def format_prop(s):
-                if s == 'NA': return 'NA'
-                return '%.2f' % float(s)
-            prop_tails.append(', '.join( format_prop(count_table['Annotation'][item.get_id()]['proportion-with-tail']) for item in peaks ))
-            
-            peak_names.append(', '.join(item.get_id() for item in peaks))
-            chromosome_names.append(parent.seqid)
-            strands.append(parent.strand)
-            transcription_stops.append(', '.join(str(item.transcription_stop) for item in peaks))
-            interpeak_seqs.append(get_interpeak_seq(peaks))
-            prepeak_seqs.append(get_prepeak_seq(parent,peaks))
-            
-            #if len(mats) >= 10: break
-        
-        text = 'cat("Loading data into R+\n")\n'
-        text += 'data <- list(\n' + ',\n'.join(mats) + ')\n'        
-        text += CHISQ
-        
-        runr.run_script(text,
-            OUTPUT_FILENAME=self.prefix+'.csv',
-            GENES = genes,
-            PRODUCTS = products,
-            MEAN_TAILS = mean_tails,
-            PROP_TAILS = prop_tails,
-            PEAK_NAMES = peak_names,
-            CHROMOSOME_NAMES = chromosome_names,
-            STRANDS = strands,
-            TRANSCRIPTION_STOPS = transcription_stops,
-            INTERPEAK_SEQS = interpeak_seqs,
-            PREPEAK_SEQS = prepeak_seqs,
-            )
-        
+#        # Chi Sq tests
+#        
+#        #for id in relation:
+#        #    peaks = relation[id]
+#        #    if len(peaks) < 2: continue     
+#        
+#        mats = [ ]   
+#        genes = [ ]
+#        products = [ ]
+#        mean_tails = [ ]
+#        prop_tails = [ ]
+#        
+#        peak_names = [ ]
+#        chromosome_names = [ ]
+#        strands = [ ]
+#        transcription_stops = [ ]
+#        interpeak_seqs = [ ]
+#        prepeak_seqs = [ ]
+#        
+#        for parent in parents:
+#            id = parent.get_id()
+#            peaks = parent.relevant_children
+#            if len(peaks) < 2: continue
+#            
+#            matrix = [ ]
+#            for item in peaks:
+#                matrix.append(counts[item.get_id()].values())
+#            
+#            mats.append(
+#                runr.R_literal(id) + ' = ' + 
+#                runr.R_literal(matrix)
+#                )
+#            
+#            genes.append(parent.attr.get('Name',parent.attr.get('gene','')))
+#            products.append(parent.attr.get('Product',parent.attr.get('product','')))
+#            
+#            def format_mean(s):
+#                if s == 'NA': return 'NA'
+#                return '%.1f' % float(s)
+#            mean_tails.append(', '.join( format_mean(count_table['Annotation'][item.get_id()]['mean-tail']) for item in peaks ))
+#            
+#            def format_prop(s):
+#                if s == 'NA': return 'NA'
+#                return '%.2f' % float(s)
+#            prop_tails.append(', '.join( format_prop(count_table['Annotation'][item.get_id()]['proportion-with-tail']) for item in peaks ))
+#            
+#            peak_names.append(', '.join(item.get_id() for item in peaks))
+#            chromosome_names.append(parent.seqid)
+#            strands.append(parent.strand)
+#            transcription_stops.append(', '.join(str(item.transcription_stop) for item in peaks))
+#            interpeak_seqs.append(get_interpeak_seq(peaks))
+#            prepeak_seqs.append(get_prepeak_seq(parent,peaks))
+#            
+#            #if len(mats) >= 10: break
+#        
+#        text = 'cat("Loading data into R+\n")\n'
+#        text += 'data <- list(\n' + ',\n'.join(mats) + ')\n'        
+#        text += CHISQ
+#        
+#        runr.run_script(text,
+#            OUTPUT_FILENAME=self.prefix+'.csv',
+#            GENES = genes,
+#            PRODUCTS = products,
+#            MEAN_TAILS = mean_tails,
+#            PROP_TAILS = prop_tails,
+#            PEAK_NAMES = peak_names,
+#            CHROMOSOME_NAMES = chromosome_names,
+#            STRANDS = strands,
+#            TRANSCRIPTION_STOPS = transcription_stops,
+#            INTERPEAK_SEQS = interpeak_seqs,
+#            PREPEAK_SEQS = prepeak_seqs,
+#            )
+#        
             
         
         
