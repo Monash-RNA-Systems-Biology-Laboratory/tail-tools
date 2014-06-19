@@ -1,4 +1,6 @@
 
+0.33 - Add average expression / average tail length column to "test:" degusts.
+
 0.32 - Add "AD" property to BAM files, number of adaptor sequence bases observed.
        Don't put a lower limit on number of reads required to call proportion, tail.
        Improved tail length testing.

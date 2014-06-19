@@ -27,7 +27,7 @@ colnames(MODEL) <- sapply(basic.seq(ncol(MODEL)), function(i) sprintf("coef%d", 
 colnames(PAIRS_MODEL) <- sapply(basic.seq(ncol(PAIRS_MODEL)), function(i) sprintf("coef%d", i))
 
 
-perform_test <- function(name, elist, model, model_columns, n_alt) {
+perform_test <- function(name, elist, model, model_columns, n_alt, aveexpr.name) {
     fit <- lmFit(elist, model)
     fit <- eBayes(fit[,basic.seq(n_alt)])
     table <- topTableF(fit, number=nrow(fit))    
@@ -38,6 +38,13 @@ perform_test <- function(name, elist, model, model_columns, n_alt) {
                 colnames(table)[i] <- model_columns[j]
                 break
             }
+
+    for(i in basic.seq(ncol(table)))
+        if (colnames(table)[i] == 'AveExpr') {
+            colnames(table)[i] <- aveexpr.name
+            break
+        }
+        
 
     write.csv(table, sprintf('%s/%s-toptable.csv',DIR,name))
     
@@ -65,6 +72,7 @@ perform_tests <- function(name, counts_filename, norm_filename, select, model, m
     dgelist <- dgelist[,select]
 
     genes <- dgelist$genes
+    genes <- genes[,colnames(genes) %in% c('locus_tag','Length','gene','product')]
     genes[,'reads'] = mapply(
         function(genename) paste(counts[genename,],collapse='; '),
         rownames(genes))
@@ -86,11 +94,11 @@ perform_tests <- function(name, counts_filename, norm_filename, select, model, m
             '(required at least one sample with %d reads)\n',
             sep=''), 
         sum(good),length(good),MIN_READS)
-    perform_test(sprintf("%s-voom",name), voomed, model, model_columns, n_alt)
+    perform_test(sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')
     
 
     tail.elist <- elist.tails(tails, tail.counts, model, genes, MIN_READS)
-    perform_test(sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt)
+    perform_test(sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')
 }
 
 perform_tests('genewise', GENEWISE_FILENAME, GENEWISE_NORM_FILENAME, SELECT, MODEL, MODEL_COLUMNS, N_ALT)
@@ -220,13 +228,13 @@ class Test(config.Action_with_output_dir):
        if self.dedup:
            reporter.p('Read deduplication was used.')
        
-       for entities, result, subtitle, terms in [
-           ('genes', 'genewise-voom', 'Genewise expression level', model_columns[:n_alt]),
-           ('genes', 'genewise-tail', 'Genewise tail length', model_columns[:n_alt]),
-           ('peaks', 'peakwise-voom', 'Peakwise expression level', model_columns[:n_alt]),
-           ('peaks', 'peakwise-tail', 'Peakwise tail length', model_columns[:n_alt]),
-           ('peak pairs', 'pairwise-voom', 'Peak-pair expression shift', pairs_model_columns[:n_alt]),
-           ('peak pairs', 'pairwise-tail', 'Peak-pair tail length shift', pairs_model_columns[:n_alt]),
+       for entities, result, aveexpr, subtitle, terms in [
+           ('genes', 'genewise-voom', 'avg.expression', 'Genewise expression level', model_columns[:n_alt]),
+           ('genes', 'genewise-tail', 'avg.tail', 'Genewise tail length', model_columns[:n_alt]),
+           ('peaks', 'peakwise-voom', 'avg.expression', 'Peakwise expression level', model_columns[:n_alt]),
+           ('peaks', 'peakwise-tail', 'avg.tail', 'Peakwise tail length', model_columns[:n_alt]),
+           ('peak pairs', 'pairwise-voom', 'avg.expression', 'Peak-pair expression shift', pairs_model_columns[:n_alt]),
+           ('peak pairs', 'pairwise-tail', 'avg.tail', 'Peak-pair tail length shift', pairs_model_columns[:n_alt]),
            ]:
            #data = io.read_grouped_table(workspace/(result+'-toptable.csv'))['All']
            #n = 0
@@ -241,11 +249,11 @@ class Test(config.Action_with_output_dir):
            io.execute([
                'degust.py',
                '--name', title + ' : ' + subtitle,
-               '--avg', 'AveExpr',
+               '--avg', aveexpr,
                '--primary', 'baseline',
                '--logFC', ','.join(terms),
                '--fdr', 'adj.P.Val',
-               '--info', 'gene,locus_tag,product,reads,polya.reads,tail.lengths',
+               '--info', 'gene,locus_tag,product,reads,polya.reads,tail.lengths,'+aveexpr,
                '--notour', '1',
                '--out', workspace/(result+'.html'),
                workspace/(result+'-toptable.csv'),
