@@ -152,11 +152,13 @@ tags = [
     ('GLU20Rep2',       ['glu20','rep2']),
 ]
 
+filename_pattern = 'mydata/Sample_scBY4741%s/*.fastq.gz'
+
 # For each sample we create a tail_tools.Analyse_polya instance
 # Each sample is given a set of tags
 samples = [ ]
 for name, tags in tags:
-    reads = sorted(glob.glob('mydata/Sample_scBY4741%s/*.fastq.gz' % name))
+    reads = sorted(glob.glob(filename_pattern % name))
     samples.append(tail_tools.Analyse_polya(
         name,
         reads = reads,
@@ -185,6 +187,11 @@ action = tail_tools.Analyse_polya_batch(
         # Not necessary if for model organisms where IGV 
         # already provides the genome.
         include_genome = False,
+        
+        # Whether to generate IGV plots.
+        # This is currently memory intensive!
+        include_plots = True,
+        
         
         # List of instances of tail_tools.Analyse_polya
         samples = samples,

@@ -1,4 +1,4 @@
-VERSION = '0.33'
+VERSION = '0.34'
 #^ Note: this first line is read by the setup.py script to get the version
 
 import nesoni
@@ -19,8 +19,6 @@ def main():
             'tail-tools ' + VERSION,
             'Tools:',
             'These tools are used by the workflows below, you generally won\'t need to use these directly.',
-            Make_tt_reference,
-            Make_ucsc_reference,
             Fasta_qual_merge,
             Clip_runs_colorspace,
             Clip_runs_basespace,
@@ -38,11 +36,19 @@ def main():
             Test,
             Geneview_webapp,
             
-            'Workflows:',
+            'Component workflows:',
+            Call_peaks,
             Analyse_polya,
             Analyse_tail_counts,
+            
+            'Primary workflow:',
             Analyse_polya_batch,
-            Call_peaks,
+
+            'Reference directory creation:',
+            Make_tt_reference,
+            Make_ucsc_reference,
+
+            
         ], 
         'tail-tools',
         )

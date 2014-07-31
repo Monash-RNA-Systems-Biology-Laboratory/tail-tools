@@ -19,6 +19,11 @@ COLORS = {
     'C':(0.33,0.33,1),
     'G':(1,1,0),
     }
+
+def float_or_none(a_str):
+    if a_str == 'NA': return None
+    return float(a_str)
+
     
 def index(filename, type=None, modify = lambda item: item, name = lambda item: item.get_id()):
     result = { }
@@ -30,34 +35,74 @@ def index(filename, type=None, modify = lambda item: item, name = lambda item: i
     return result    
 
 
-class Reference(object): pass
+def memo_property(func):
+    attr = '_memo_'+func.__name__
+    def outer(self):
+        if not hasattr(self,attr):
+            setattr(self,attr,func(self))
+        return getattr(self,attr)
+    outer.__name__ = func.__name__
+    return property(outer)
+
+
+class Reference(object):
+    def __init__(self, dirname):
+        self.dirname = dirname
+        self.ref = reference_directory.Reference(dirname, must_exist=True)
+
+    @memo_property
+    def seqs(self):    
+        seqs = collections.OrderedDict()
+        for name, length in self.ref.get_lengths():
+            with open(join(self.dirname,self.ref.name,name+'.txt'),'rb') as f:
+                seqs[name] = mmap.mmap(f.fileno(), 0, access=mmap.PROT_READ)
+        return seqs
+
+    @memo_property
+    def genes(self):
+        return index(join(self.dirname,'reference.gff'), 'gene')
+    
+    @memo_property
+    def gene_index(self):
+        return span_index.index_annotations(self.genes.values())
+
+    @memo_property
+    def utrs(self):
+        return index(join(self.dirname,'utr.gff'))
+    
+    @memo_property
+    def utr_index(self):
+        return span_index.index_annotations(self.utrs.values())
+    
 
 def load_ref(dirname):
-    ref = reference_directory.Reference(dirname, must_exist=True)
-
-    result = Reference()
-    
-    #result.seqs = dict(io.read_sequences(join(dirname,'reference.fa')))
-    result.seqs = { }
-    for name, length in ref.get_lengths():
-        with open(join(dirname,ref.name,name+'.txt'),'rb') as f:
-            #result.seqs[name] = f.read()
-            result.seqs[name] = mmap.mmap(f.fileno(), 0, access=mmap.PROT_READ)
-    
-    result.genes = index(join(dirname,'reference.gff'), 'gene')
-    result.utrs = index(join(dirname,'utr.gff'))
-    
-    return result
+    return Reference(dirname)
 
 
-class Analysis(object): pass
+class Analysis(object):
+    def __init__(self, dirname):
+        self.dirname = dirname
+
+    @memo_property
+    def peaks(self):
+        return index(join(self.dirname,'peaks','relation-child.gff'),
+            modify=lambda item: item.three_prime())
+
+    @memo_property
+    def peak_index(self):
+        return span_index.index_annotations(self.peaks.itervalues())
+
+    @memo_property
+    def peak_counts(self):
+        return io.read_grouped_table(
+            join(self.dirname,'expression','peakwise','counts.csv'),
+            [ ('Count',int), ('Tail_count',int), 
+              ('Tail', float_or_none), ('Proportion', float_or_none) ],
+            )
+
 
 def load_analysis(dirname):
-    result = Analysis()
-    result.peaks = index(join(dirname,'peaks','relation-child.gff'),
-        modify=lambda item: item.three_prime())
-    result.peak_index = span_index.index_annotations(result.peaks.itervalues())
-    return result
+    return Analysis(dirname)
 
 
 

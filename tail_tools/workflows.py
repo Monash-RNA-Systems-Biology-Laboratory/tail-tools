@@ -532,7 +532,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             'these viewers allow specific genes to be examined in detail.')
         
         if self.groups:
+            r.get(workspace/('peak-shift','grouped.json'))
             r.p('<a href="view.html?json=%sgrouped.json">&rarr; Gene viewer, grouped samples</a>' % r.file_prefix)
+        r.get(workspace/('peak-shift','individual.json'))
         r.p('<a href="view.html?json=%sindividual.json">&rarr; Gene viewer, individual samples</a>' % r.file_prefix)
        
 

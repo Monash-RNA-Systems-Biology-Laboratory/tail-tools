@@ -187,6 +187,9 @@ class Test(config.Action_with_output_dir):
        model = [ row for row,selected in zip(model,select) if selected ]
        model_columns = [ term_name(item) for item in self.alt + self.null ]
        
+       #degust complains if name starts with '-'
+       model_columns = [ ('.' if item.startswith('-') else '') + item for item in model_columns ]
+       
        pairs_n_alt = n_alt       
        pairs_select = select + select
        pairs_model = (

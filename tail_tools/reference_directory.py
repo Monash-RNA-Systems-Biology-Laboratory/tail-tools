@@ -27,6 +27,11 @@ class Tailtools_reference(reference_directory.Reference):
         #    self.update_param(tail_tools_reference_version = VERSION)
         
 
+@config.help(
+    'Create a tail tools reference directory. '
+    'See the requirements for this in the README, they are quite strict.',
+    'You need a FASTA file containing sequences and a GFF file containing annotations.'
+    )
 @config.Bool_flag('index', 'Generate bowtie2 and shrimp indexes. Only disable if re-building reference directory.')
 @config.Main_section('filenames', 'Sequence and annotation files.')
 class Make_tt_reference(config.Action_with_output_dir):

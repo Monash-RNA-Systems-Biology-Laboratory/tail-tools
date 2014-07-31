@@ -1,4 +1,6 @@
 
+0.34 - .json files accidentally omitted from report.
+
 0.33 - Add average expression / average tail length column to "test:" degusts.
 
 0.32 - Add "AD" property to BAM files, number of adaptor sequence bases observed.
