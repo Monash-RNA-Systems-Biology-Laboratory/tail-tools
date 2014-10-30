@@ -68,7 +68,7 @@ class Reference(object):
 
     @memo_property
     def utrs(self):
-        return index(join(self.dirname,'utr.gff'))
+        return index(join(self.dirname,'utr.gff'), name=lambda item: item.attr['Parent'])
     
     @memo_property
     def utr_index(self):
@@ -99,7 +99,7 @@ class Analysis(object):
             [ ('Count',int), ('Tail_count',int), 
               ('Tail', float_or_none), ('Proportion', float_or_none) ],
             )
-
+        
 
 def load_analysis(dirname):
     return Analysis(dirname)
@@ -160,6 +160,32 @@ def kmer_pile(ref,feat,k,start,end):
                result.piles[result.kmer_index[kmer]][i] += 1
     return result
 
+def kmer_pile_excess(pile, background):
+    result = Kmer_pile()
+    result.k = pile.k
+    result.n = pile.n
+    result.start = pile.start
+    result.end = pile.end
+    result.x = pile.x
+    result.kmers = pile.kmers
+    result.kmer_index = pile.kmer_index
+    result.piles = numpy.maximum(0, pile.piles - background.piles*(float(pile.n)/background.n))
+    return result
+
+def kmer_pile_add(pile1, pile2):  
+    result = Kmer_pile()
+    result.k = pile1.k
+    result.n = pile1.n + pile2.n
+    result.start = pile1.start
+    result.end = pile1.end
+    result.x = pile1.x
+    result.kmers = pile1.kmers
+    result.kmer_index = pile1.kmer_index
+    result.piles = numpy.maximum(0, pile1.piles + pile2.piles)
+    return result
+    
+    
+
 #def show_piles(p):
 #    import pylab
 #    for name, pile in p.items():
@@ -169,6 +195,8 @@ def stack_kmer_pile(p):
     import pylab
     from matplotlib.patches import Rectangle
     pylab.figure(figsize=(20.0,6.0))
+    
+    pylab.axvline(alpha=0.5, color='black')
     
     k = p.k
     
@@ -198,7 +226,7 @@ def stack_kmer_pile(p):
         pylab.gca().add_patch(Rectangle((p.start-0.5+i,offset),k,height, fill=False,linewidth=1.5))
 
     for i,c in enumerate('ACGT'):
-        pylab.figtext(0.95,0.9-i*0.05, c, size=15.0, color=COLORS[c], ha='center')
+        pylab.figtext(0.95,0.9-i*0.05, c, size=15.0, backgroundcolor=COLORS[c], ha='center')
     
     pylab.xlim(p.start-1,p.end+1)
     pylab.ylim(0,max(heights))   

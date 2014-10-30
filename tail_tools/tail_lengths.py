@@ -780,7 +780,8 @@ class Collapse_counts(config.Action_with_prefix):
         group_tags = [ ]
         
         for item in self.groups:
-            select, name = item.split('=')
+            select = selection.term_specification(item)
+            name = selection.term_name(item)
             group = [ item for item in samples if selection.matches(select, tags[item]) ]
             assert group, 'Empty group: '+name
             
@@ -1050,27 +1051,27 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         for heatmap in heatmaps:
             r.report_heatmap(heatmap)
 
-        r.heading('Raw data')
-        
-        r.p(r.get(work/'counts.csv') + ' - raw counts and tail statistics')
-        r.p(r.get(work/'glog.csv') + ' - glog2 RPM counts')
-        r.p(r.get(work/'norm.csv') + ' - normalization factors used')
-        
-        r.write('<p/><hr>\n')
-        r.subheading('About normalization and log transformation')
-        
-        r.p('Counts are converted to '
-            'log2 Reads Per Million using a variance stabilised transformation. '
-            'Let the generalised logarithm with moderation m be')
-        
-        r.p('glog(x,m) = log2((x+sqrt(x*x+4*m*m))/2)')
-        
-        r.p('then the transformed values will be')
-        
-        r.p('glog( count/library_size*1e6, log_moderation/mean_library_size*1e6 )')
-        
-        r.p('where log_moderation is a parameter, here 5. '
-            'The library sizes used are effective library sizes after TMM normalization.')
+        #r.heading('Raw data')
+        #
+        #r.p(r.get(work/'counts.csv') + ' - raw counts and tail statistics')
+        #r.p(r.get(work/'glog.csv') + ' - glog2 RPM counts')
+        #r.p(r.get(work/'norm.csv') + ' - normalization factors used')
+        #
+        #r.write('<p/><hr>\n')
+        #r.subheading('About normalization and log transformation')
+        #
+        #r.p('Counts are converted to '
+        #    'log2 Reads Per Million using a variance stabilised transformation. '
+        #    'Let the generalised logarithm with moderation m be')
+        #
+        #r.p('glog(x,m) = log2((x+sqrt(x*x+4*m*m))/2)')
+        #
+        #r.p('then the transformed values will be')
+        #
+        #r.p('glog( count/library_size*1e6, log_moderation/mean_library_size*1e6 )')
+        #
+        #r.p('where log_moderation is a parameter, here 5. '
+        #    'The library sizes used are effective library sizes after TMM normalization.')
         
         r.close()
 

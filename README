@@ -38,9 +38,16 @@ Requirements:
 - bowtie2
   (SHRiMP for legacy color-space data)
 
+- samtools
+
 - The "convert" tool from ImageMagick.
 
 - rsync (for downloads from UCSC browser)
+
+- R+, with package "seriation" and BioConductor packages "limma" and "edgeR"
+
+- degust.py from 
+  https://victorian-bioinformatics-consortium.github.io/degust/dist/latest/degust.py
 
 
 Installation:
@@ -184,24 +191,21 @@ action = tail_tools.Analyse_polya_batch(
         extension = 200,
         
         # Whether to include .genome file for IGV in plots tarball
-        # Not necessary if for model organisms where IGV 
+        # Not necessary for model organisms where IGV 
         # already provides the genome.
         include_genome = False,
-        
-        # Whether to generate IGV plots.
-        # This is currently memory intensive!
-        include_plots = True,
-        
-        
+                
         # List of instances of tail_tools.Analyse_polya
         samples = samples,
         
         # List of sample groups
-        # A sample group is specified as <nesoni-selection-expression>=<name>
+        # A sample group is specified as 
+        # '<nesoni-selection-expression>=<name>'
+        # (=<name> may be omitted)
         # See nesoni help for description of selection expressions,
         # this uses the tags given to each sample to concisely 
         # specify sets of samples.
-        groups = [ 'BY=BY', 'ccr4=ccr4', 'ypeg=ypeg', 'gal=gal', 'glu10=glu10' ],
+        groups = [ 'BY', 'ccr4', 'ypeg', 'gal', 'glu10' ],
         
         # (Advanced)
         # Perform differential tests

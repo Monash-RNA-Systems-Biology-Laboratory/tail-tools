@@ -5,14 +5,6 @@ from os.path import join
 
 from nesoni import config, runr, io, selection, reporting
 
-def term_specification(term):
-    if '=' not in term: return term
-    return term.split('=',1)[0]
-
-def term_name(term):
-    if '=' not in term: return term
-    return term.split('=',1)[1]
-
 
 TEST_R = r"""
 
@@ -25,6 +17,77 @@ source(SOURCE)
 
 colnames(MODEL) <- sapply(basic.seq(ncol(MODEL)), function(i) sprintf("coef%d", i))
 colnames(PAIRS_MODEL) <- sapply(basic.seq(ncol(PAIRS_MODEL)), function(i) sprintf("coef%d", i))
+
+
+perform_test_fitnoise <- function(fitnoise_model, fitnoise_controls_model, name, elist, model, model_columns, n_alt, aveexpr.name) {
+    colnames(model) <- model_columns
+    
+    noise.model <- model    
+    stopifnot(ncol(model) <= nrow(model))
+    comment <- ''
+    if (ncol(model) == nrow(model)) {
+        comment <- 'NOISE FITTED USING NULL MODEL\nFDR AND P-VALUE NOT TO BE TRUSTED, MERELY A WAY TO RANK GENES\n'
+        noise.model <- model[, seq_len(ncol(model)-n_alt)+n_alt,drop=FALSE]
+    }
+    
+    
+    if (EMPIRICAL_CONTROLS) {
+        cat('\nSelecting empirical controls\n')
+        cfit <- fit.elist(
+            elist, 
+            design=model,
+            noise.design=noise.model, 
+            model=fitnoise_controls_model, 
+            cores=min(detectCores(),8) #TODO: make this configurable
+            )
+        cat(cfit$noise.description,"\n")
+        ctable <- test.fit(cfit, coefs=seq_len(n_alt), sort=F)
+        controls <- rank(ctable$P.Value) > nrow(elist)*0.5
+        cat(sum(controls),'control features chosen\n')
+    } else {
+        controls <- NULL
+    }
+    
+
+    cat('\nFitting noise model\n')
+    
+    fit <- fit.elist(
+        elist, 
+        design=model,
+        noise.design=noise.model, 
+        model=fitnoise_model, 
+        controls=controls,
+        control.design=model[,seq_len(ncol(model)-n_alt)+n_alt,drop=FALSE],
+        cores=min(detectCores(),8) #TODO: make this configurable
+        )
+    table <- test.fit(fit, coefs=seq_len(n_alt))
+
+    #for(i in basic.seq(ncol(table)))
+    #    for(j in basic.seq(n_alt))
+    #        if (colnames(table)[i] == sprintf("coef%d",j)) {
+    #            colnames(table)[i] <- model_columns[j]
+    #            break
+    #        }
+
+    for(i in basic.seq(ncol(table)))
+        if (colnames(table)[i] == 'AveExpr') {
+            colnames(table)[i] <- aveexpr.name
+            break
+        }
+
+    write.csv(table, sprintf('%s/%s-toptable.csv',DIR,name))
+    
+    cat(sprintf("\n%s/%s\n",DIR,name))    
+    sink(sprintf("%s/%s.txt",DIR,name), split=TRUE)
+    cat(comment)
+    cat(sprintf("Raw data format: %s\n",paste(colnames(elist),collapse="; ")))
+    cat(sprintf("%s%s\n%d with fdr<=0.01\n%d with fdr<=0.05\n", 
+        elist$info,
+        fit$noise.description,
+        sum(table$adj.P.Val<0.01), 
+        sum(table$adj.P.Val<0.05)))
+    sink()
+}
 
 
 perform_test <- function(name, elist, model, model_columns, n_alt, aveexpr.name) {
@@ -70,35 +133,72 @@ perform_tests <- function(name, counts_filename, norm_filename, select, model, m
 
     dgelist <- read.counts(counts_filename, norm.file=norm_filename, quiet=TRUE)
     dgelist <- dgelist[,select]
+    
+    stopifnot(all(rownames(counts) == rownames(dgelist$genes)))
 
     genes <- dgelist$genes
     genes <- genes[,colnames(genes) %in% c('locus_tag','Length','gene','product')]
     genes[,'reads'] = mapply(
-        function(genename) paste(counts[genename,],collapse='; '),
-        rownames(genes))
+        function(i) paste(counts[i,],collapse='; '),
+        seq_len(nrow(genes)))
     genes[,'polya.reads'] = mapply(
-        function(genename) paste(tail.counts[genename,],collapse='; '),
-        rownames(genes))
+        function(i) paste(tail.counts[i,],collapse='; '),
+        seq_len(nrow(genes)))
     genes[,'tail.lengths'] = mapply(
-        function(genename) paste(sprintf('%.1f',tails[genename,]),collapse='; '),
-        rownames(genes))
+        function(i) paste(sprintf('%.1f',tails[i,]),collapse='; '),
+        seq_len(nrow(genes)))
     dgelist$genes <- genes
 
 
-    voomed <- voom(dgelist, model)    
+    if (WEIGHT) {
+        fitnoise_voom_model <- model.t.per.sample.var
+        fitnoise_controls_voom_model <- model.t.standard
+        fitnoise_patseq_model <- model.t.patseq.per.sample.var
+        fitnoise_controls_patseq_model <- model.t.patseq
+    } else {
+        fitnoise_voom_model <- model.t.standard
+        fitnoise_controls_voom_model <- model.t.standard
+        fitnoise_patseq_model <- model.t.patseq
+        fitnoise_controls_patseq_model <- model.t.patseq
+    }
+    noise.model <- model
+    stopifnot(ncol(model) <= nrow(model))
+    if (ncol(model) == nrow(model)) {
+        noise.model <- model[, seq_len(ncol(model)-n_alt)+n_alt,drop=FALSE]
+        fitnoise_voom_model <- model.normal.standard
+        fitnoise_controls_voom_model <- model.normal.standard
+        fitnoise_patseq_model <- model.normal.patseq
+        fitnoise_controls_patseq_model <- model.normal.patseq
+        if (EMPIRICAL_CONTROLS) stop("Can't find empricical controls without any degrees of freedom.")
+    }
+
     good <- row.apply(dgelist$counts, max) >= MIN_READS
-    voomed <- voomed[good,]
+    png(sprintf("%s/%s-voom.png",DIR,name))
+    if (WEIGHT && !FITNOISE)
+        voomed <- voomWithQualityWeights(dgelist[good,], noise.model, plot=T)    
+    else
+        voomed <- voom(dgelist[good,], noise.model, plot=T)        
+    dev.off()
     voomed$info <- sprintf(
         paste(
             '%d of %d features kept after filtering\n',
             '(required at least one sample with %d reads)\n',
             sep=''), 
         sum(good),length(good),MIN_READS)
-    perform_test(sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')
+        
+    if (FITNOISE) {
+        perform_test_fitnoise(fitnoise_voom_model, fitnoise_controls_voom_model, sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')
+    } else {
+        perform_test(sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')
+    }
     
-
-    tail.elist <- elist.tails(tails, tail.counts, model, genes, MIN_READS)
-    perform_test(sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')
+    if (FITNOISE) {
+        tail.elist <- elist.tails.for.fitnoise(tails, tail.counts, model, genes, MIN_READS)
+        perform_test_fitnoise(fitnoise_patseq_model, fitnoise_controls_patseq_model, sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')    
+    } else {
+        tail.elist <- elist.tails(tails, tail.counts, model, genes, MIN_READS)
+        perform_test(sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')
+    }
 }
 
 perform_tests('genewise', GENEWISE_FILENAME, GENEWISE_NORM_FILENAME, SELECT, MODEL, MODEL_COLUMNS, N_ALT)
@@ -122,6 +222,12 @@ perform_tests('pairwise', PAIRWISE_FILENAME, PAIRWISE_NORM_FILENAME, PAIRS_SELEC
     )
 @config.String_flag('title', 'Report title.')
 @config.Bool_flag('tell', 'Show R+ code instead of executing it.')
+@config.Bool_flag('fitnoise', 'Use experimental fitnoise method.')
+@config.Bool_flag('weight', 
+    'Use sample per-sample quality weights. '
+    'With --fitnoise no, only expression levels are weighted using voomWithQualityWeights. With --fitnoise yes, tail lengths are also weighted.')
+@config.Bool_flag('empirical_controls',
+    'Fitnoise only: Select and use empirical control features, may improve sample weighting.')
 @config.Int_flag('min_reads', 
     'For expression testing, at least one sample must have this many reads. '
     'For tail length testing, sufficient samples must have this many reads to fit the linear model.'
@@ -131,6 +237,9 @@ perform_tests('pairwise', PAIRWISE_FILENAME, PAIRWISE_NORM_FILENAME, PAIRS_SELEC
 @config.Section('null', 'Terms in null hypothesis (H0).')
 @config.Section('alt', 'Additional terms in alternative hypothesis (H1).')
 class Test(config.Action_with_output_dir):
+   fitnoise = False
+   weight = False
+   empirical_controls = False
    min_reads = 10
    tell = False
    dedup = False
@@ -143,12 +252,14 @@ class Test(config.Action_with_output_dir):
    def get_title(self):
        title = self.title
        if not title:
-           title = ', '.join(filter(term_name,self.alt)) + ' in ' + ', '.join(filter(term_name,self.null))
+           title = ', '.join(filter(selection.term_name,self.alt)) + ' in ' + ', '.join(filter(selection.term_name,self.null))
        if self.dedup:
           title = '[dedup] ' + title
        return title
    
    def run(self):
+       assert self.fitnoise or not self.empirical_controls
+       
        title = self.get_title()
    
        n_alt = len(self.alt)
@@ -179,16 +290,17 @@ class Test(config.Action_with_output_dir):
               
        model = [ ]
        for term in self.alt + self.null:        
-           spec = term_specification(term)
-           model.append([ 1 if selection.matches(spec, tags[item]) else 0 for item in samples ])
+           spec = selection.term_specification(term)
+           model.append([ selection.weight(spec, tags[item]) for item in samples ])
        model = zip(*model) #Transpose
        
        select = [ any(row) for row in model ]
        model = [ row for row,selected in zip(model,select) if selected ]
-       model_columns = [ term_name(item) for item in self.alt + self.null ]
+       model_columns = [ selection.term_name(item) for item in self.alt + self.null ]
+       model_rows = [ item for keep, item in zip(select, samples) if keep ]
        
-       #degust complains if name starts with '-'
-       model_columns = [ ('.' if item.startswith('-') else '') + item for item in model_columns ]
+       #degust complains if name starts with '-', delimits with commas
+       model_columns = [ ('.' if item[:1] == '-' else '') + item.replace(',',';') for item in model_columns ]
        
        pairs_n_alt = n_alt       
        pairs_select = select + select
@@ -201,12 +313,29 @@ class Test(config.Action_with_output_dir):
            model_columns +
            [ 'pair2' ]
            )
+       pairs_model_rows = [ item+'-peak1' for item in model_rows ] + [ item+'-peak2' for item in model_rows ]
+       
+       print
+       print 'Design matrix'
+       print '['+('-'*(8*n_alt-2))+'] test coefficients'
+       for row, name in zip(model, model_rows):
+           print ''.join('%7g ' % item for item in row), name
+       print
+       print 'Pair design matrix'
+       print '['+('-'*(8*n_alt-2))+'] test coefficients'
+       for row, name in zip(pairs_model, pairs_model_rows):
+           print ''.join('%7g ' % item for item in row), name
+       print
+       
        
        workspace = self.get_workspace()
        
        runr.run_script(TEST_R, self.tell,
            SOURCE = os.path.join(os.path.dirname(__file__),'tail_tools.R'),
            DIR = workspace.working_dir,
+           FITNOISE = self.fitnoise,
+           WEIGHT = self.weight,
+           EMPIRICAL_CONTROLS = self.empirical_controls,
            MIN_READS = self.min_reads,
            GENEWISE_FILENAME = genewise_filename,
            GENEWISE_NORM_FILENAME = genewise_norm_filename,
@@ -231,6 +360,7 @@ class Test(config.Action_with_output_dir):
        if self.dedup:
            reporter.p('Read deduplication was used.')
        
+       reporter.write('<table>\n')
        for entities, result, aveexpr, subtitle, terms in [
            ('genes', 'genewise-voom', 'avg.expression', 'Genewise expression level', model_columns[:n_alt]),
            ('genes', 'genewise-tail', 'avg.tail', 'Genewise tail length', model_columns[:n_alt]),
@@ -261,12 +391,25 @@ class Test(config.Action_with_output_dir):
                '--out', workspace/(result+'.html'),
                workspace/(result+'-toptable.csv'),
                ])
-            
+
+           with open(workspace/(result+'.txt'),'rU') as f:
+               lines = f.readlines()
+           
+           reporter.write('<tr><td valign="top" width="33%">')
            reporter.subheading( reporter.href(workspace/(result+'.html'), subtitle) )
            #reporter.p( '%d %s, %d with fdr&lt;=0.01, %d with fdr&lt;=0.05' % (n,entities,n_01,n_05) )
-           with open(workspace/(result+'.txt'),'rU') as f:
-               for line in f:
-                   reporter.write(line.strip() + '<br/>\n')
+           line = reporter.href(workspace/(result+'-toptable.csv'), 'Spreadsheet')
+           if result.endswith('voom'):
+               line += ', ' + reporter.href(workspace/(result+'.png'), 'voom plot')
+           reporter.p(line)
+           for line in lines[-2:]:
+               reporter.p(line.strip())
+           reporter.write('</td><td valign="top"><br/><br/>')
+           for line in lines[:-2]:
+               reporter.write(line.strip() + '<br/>\n')
+           reporter.write('</td></tr>')
+
+       reporter.write('</table>\n')
         
        reporter.close()
 

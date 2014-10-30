@@ -358,37 +358,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             for item in samples:
                 item.process_make(stage)
 
-        
-        
-        nesoni.Norm_from_samples(
-            workspace/'norm',
-            working_dirs = dirs
-            ).make()
-
-        def writer():
-            for row in io.read_table(workspace/'norm.csv'):
-                row['Name'] = row['Name']+'-polyA'
-                yield row
-        io.write_csv(workspace/'norm-polyA.csv', writer(), comments=['Normalization'])
-
 
         with nesoni.Stage() as stage:
-            if self.include_plots:        
-                for plot_name, directories, norm_filename in [
-                      ('all',   dirs,       workspace/'norm.csv'),
-                      ('polyA', polya_dirs, workspace/'norm-polyA.csv'),
-                      ]:
-                    nesoni.IGV_plots(
-                        plotspace/plot_name,
-                        working_dirs = directories,
-                        label_prefix = plot_name+' ',
-                        raw = True,
-                        norm = True,
-                        genome = reference.get_genome_filename(),
-                        norm_file = norm_filename,
-                        #delete_igv = False,
-                        ).process_make(stage)
-
             analyse_gene_counts_0 = analyse_template(
                 output_dir = expressionspace/'genewise',
                 saturation = 0,
@@ -410,6 +381,34 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 workspace=workspace, expressionspace=expressionspace, reference=reference, 
                 polya_dirs=polya_dirs, analyse_template=analyse_template, file_prefix=file_prefix,
                 )
+
+            if self.include_plots:        
+                nesoni.Norm_from_samples(
+                    workspace/'norm',
+                    working_dirs = dirs
+                    ).make()
+                
+                def writer():
+                    for row in io.read_table(workspace/'norm.csv'):
+                        row['Name'] = row['Name']+'-polyA'
+                        yield row
+                io.write_csv(workspace/'norm-polyA.csv', writer(), comments=['Normalization'])
+                
+                for plot_name, directories, norm_filename in [
+                      ('all',   dirs,       workspace/'norm.csv'),
+                      ('polyA', polya_dirs, workspace/'norm-polyA.csv'),
+                      ]:
+                    nesoni.IGV_plots(
+                        plotspace/plot_name,
+                        working_dirs = directories,
+                        label_prefix = plot_name+' ',
+                        raw = True,
+                        norm = True,
+                        genome = reference.get_genome_filename(),
+                        norm_file = norm_filename,
+                        #delete_igv = False,
+                        ).process_make(stage)
+
             
         with nesoni.Stage() as stage:
             for test in self.tests:
@@ -418,12 +417,16 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                     analysis = self.output_dir
                     ).process_make(stage)
 
+            for test in self.tests:
                 test(
                     output_dir = testspace_dedup/test.output_dir,
                     analysis = self.output_dir,
                     dedup = True,
                     ).process_make(stage)
         
+
+        self._extract_raw()
+
         #===============================================
         #                   Report        
         #===============================================
@@ -435,7 +438,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.report_logs('alignment-statistics',
             #[ workspace/'stats.txt' ] +
             clipper_logs + filter_logs + #filter_polya_logs +
-            [ expressionspace/('genewise','aggregate-tail-counts_log.txt') ],
+            [ expressionspace/('genewise-dedup','aggregate-tail-counts_log.txt'), #for duplication level
+              expressionspace/('genewise','aggregate-tail-counts_log.txt') ], #but deduplicated statistics take priority
             filter=lambda sample, field: (
                 field not in [
                     
@@ -536,19 +540,52 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             r.p('<a href="view.html?json=%sgrouped.json">&rarr; Gene viewer, grouped samples</a>' % r.file_prefix)
         r.get(workspace/('peak-shift','individual.json'))
         r.p('<a href="view.html?json=%sindividual.json">&rarr; Gene viewer, individual samples</a>' % r.file_prefix)
-       
+        
+        
+        r.heading('Raw data')
+        
+        r.p(r.tar('csv-files',glob.glob(workspace/('raw','*.csv'))))
+        
+        r.write('<ul>\n')
+        r.write('<li> -info.csv = gene name and product, etc\n')
+        r.write('<li> -count.csv = read count\n')
+        r.write('<li> -glog2-RPM.csv = moderated log2 Reads Per Million\n')
+        r.write('<li> -tail.csv = average poly(A) tail length\n')
+        r.write('<li> -tail-count.csv = poly(A) read count\n')
+        r.write('<li> -proportion.csv = proportion of reads with poly(A)\n')
+        r.write('<li> -norm.csv = read count normalization used for glog2 transformation, heatmaps, differential tests, etc etc\n')
+        r.write('</ul>\n')
 
-        r.write('<p/><hr>\n')
-        
-        r.p('Note: Use deduplicated versions with care. '
-            'They may possibly provide more significant results, however they are less quantitative. '
-            'Read deduplication involves throwing away a large amount of data, much of which will not be a technical artifact. '
-            'Deduplicated versions might best be viewed as a check on data quality.')
-        
         r.p('This set of genes was used in the analysis:')
         
         r.p(r.get(reference/'reference.gff') + ' - Reference annotations in GFF3 format')
         r.p(r.get(reference/'utr.gff') + ' - 3\' UTR regions')
+
+        r.write('<p/><hr>\n')
+        r.subheading('About normalization and log transformation')
+        
+        r.p('Counts are converted to '
+            'log2 Reads Per Million using a variance stabilised transformation. '
+            'Let the generalised logarithm with moderation m be')
+        
+        r.p('glog(x,m) = log2((x+sqrt(x*x+4*m*m))/2)')
+        
+        r.p('then the transformed values will be')
+        
+        r.p('glog( count/library_size*1e6, log_moderation/mean_library_size*1e6 )')
+        
+        r.p('where log_moderation is a parameter, here 5. '
+            'The library sizes used are effective library sizes after TMM normalization.')
+
+        r.write('<p/><hr>\n')
+        r.subheading('About deduplication')
+        
+        r.p('Use deduplicated versions with care. '
+            'They may possibly provide more significant results, however they are less quantitative. '
+            'Read deduplication involves throwing away a large amount of data, much of which will not be a technical artifact. '
+            'Deduplicated versions might best be viewed as a check on data quality.')
+        
+        r.write('<p/><hr>\n')
 
         r.p('tail-tools version '+tail_tools.VERSION)
         r.p('nesoni version '+nesoni.VERSION)
@@ -651,7 +688,48 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 children=workspace/('peaks','relation-child.gff'),
                 counts=shiftspace/'grouped-counts.csv',
                 ).make()
-            
+
+
+    def _extract_raw(self):            
+        work = io.Workspace(self.output_dir, must_exist=False)
+        raw = io.Workspace(work/'raw', must_exist=False)
+        
+        with workspace.tempspace() as temp:
+            for dedup in ['','-dedup']:
+                for name, counts, norms in [
+                        ('genewise'+dedup,
+                            work/('expression','genewise'+dedup,'counts.csv'),
+                            work/('expression','genewise'+dedup,'norm.csv'),
+                            ),
+                        ('peakwise'+dedup,
+                            work/('expression','peakwise'+dedup,'counts.csv'),
+                            work/('expression','peakwise'+dedup,'norm.csv'),
+                            ),
+                        ('pairwise'+dedup,
+                            work/('peak-shift'+dedup,'individual-pairs.csv'),
+                            work/('peak-shift'+dedup,'individual-pairs-norm.csv'),
+                            ),
+                        ]:
+                    nesoni.Glog(
+                        temp/('glog-'+name),
+                        counts,
+                        norm_file = norms
+                        ).make()
+                    
+                    glog_table = io.read_grouped_table(temp/('glog-'+name+'.csv'))
+                    io.write_csv_2(raw/(name+'-glog2-RPM.csv'), glog_table['glog2'])
+                    
+                    counts_table = io.read_grouped_table(counts)
+                    io.write_csv_2(raw/(name+'-info.csv'), counts_table['Annotation'])
+                    io.write_csv_2(raw/(name+'-count.csv'), counts_table['Count'])
+                    io.write_csv_2(raw/(name+'-tail.csv'), counts_table['Tail'])
+                    io.write_csv_2(raw/(name+'-tail-count.csv'), counts_table['Tail_count'])
+                    io.write_csv_2(raw/(name+'-proportion.csv'), counts_table['Proportion'])
+                    
+                    norm_table = io.read_grouped_table(norms)
+                    io.write_csv_2(raw/(name+'-norm.csv'), norm_table['All'])
+                    
+                    
             
                 
 
