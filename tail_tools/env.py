@@ -11,8 +11,6 @@ import mmap, collections
 from os.path import join
 from nesoni import io, annotation, reference_directory, span_index
 
-import numpy
-
 COLORS = {
     'A':(0,1,0),
     'T':(1,0,0),
@@ -108,6 +106,7 @@ def load_analysis(dirname):
 
 class Piler(object):
     def __init__(self, start, end):
+        import numpy
         self.start = start
         self.end = end
         self.x = numpy.arange(start,end)
@@ -142,6 +141,7 @@ def kmers(k):
         ]
           
 def kmer_pile(ref,feat,k,start,end):
+    import numpy
     result = Kmer_pile()
     result.k = k
     result.n = len(feat)
@@ -161,6 +161,7 @@ def kmer_pile(ref,feat,k,start,end):
     return result
 
 def kmer_pile_excess(pile, background):
+    import numpy
     result = Kmer_pile()
     result.k = pile.k
     result.n = pile.n
@@ -173,6 +174,7 @@ def kmer_pile_excess(pile, background):
     return result
 
 def kmer_pile_add(pile1, pile2):  
+    import numpy
     result = Kmer_pile()
     result.k = pile1.k
     result.n = pile1.n + pile2.n
