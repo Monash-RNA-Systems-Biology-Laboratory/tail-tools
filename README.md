@@ -56,16 +56,16 @@ Installation:
 
 Easy way:
 
-  pip install tail-tools
+    pip install tail-tools
 
 From source:
 
-  python setup.py install
+    python setup.py install
 
 For PyPy it seems to be currently easiest to set up in a virtualenv:
 
-  virtualenv -p pypy myenv
-  myenv/bin/pip install tail-tools
+    virtualenv -p pypy myenv
+    myenv/bin/pip install tail-tools
 
 
 Usage:
@@ -73,12 +73,12 @@ Usage:
 
 This package contains a number of tools, which can be listed by typing:
 
-  tail-tools
+    tail-tools
   
 
 The package can be used directly from the source directory with:
 
-  python -m tail_tools
+    python -m tail_tools
 
 
 These tools may also be used as part of a nesoni-style workflow python script.
@@ -93,9 +93,9 @@ Before processing any reads, you need to create a "tail-tools reference director
 
 References are most easily downloaed from the UCSC browser using:
 
-   tail-tools make-ucsc-reference: \
-       <output_dir> \
-       <ucsc_reference_name>
+    tail-tools make-ucsc-reference: \
+        <output_dir> \
+        <ucsc_reference_name>
 
 If creating your own reference, it needs to consist of:
 
@@ -104,32 +104,32 @@ If creating your own reference, it needs to consist of:
 
 The reference directory is then created with the command:
 
-  tail-tools make-tt-reference: \
-      <output_dir> \
-      <sequence_file> \
-      <annotations_file>
+   tail-tools make-tt-reference: \
+       <output_dir> \
+       <sequence_file> \
+       <annotations_file>
 
 Annotations shall include the following feature types and attributes:
 
 gene
-    required attributes:
-    - ID      - unique identifier
-    optional attributes:
-    - Name    - nomenclature name
-    - Product - short description
+* required attributes:
+  * ID - unique identifier
+* optional attributes:
+  * Name - nomenclature name
+  * Product - short description
 
 mRNA
-    required attributes:
-    - ID      - unique identifier
-    - Parent  - gene ID
+* required attributes:
+  * ID      - unique identifier
+  * Parent  - gene ID
 
 CDS
-    required attributes:
-    - Parent  - mRNA ID
+* required attributes:
+  * Parent  - mRNA ID
 
 exon
-    required attributes:
-    - Parent  - mRNA ID
+* required attributes:
+  * Parent  - mRNA ID
 
 
 
