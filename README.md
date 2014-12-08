@@ -1,7 +1,6 @@
 
-==============
-= Tail Tools =
-==============
+Tail Tools
+==========
 
 http://www.vicbioinformatics.com/software.tail-tools.shtml
 
@@ -39,6 +38,8 @@ Requirements:
   (SHRiMP for legacy color-space data)
 
 - samtools
+
+- SplitsTree from http://www.splitstree.org/, note: v4.13.1 seems to be broken, v4.11.3 works
 
 - The "convert" tool from ImageMagick.
 
@@ -140,6 +141,7 @@ Having created a reference directory, the next step is to run the pipeline,
 usefully done from a python script. We suggest adapting the following example
 to your data:
 
+```python
 
 import tail_tools, nesoni, glob
 
@@ -244,7 +246,7 @@ if __name__ == '__main__':
 #     python myscript.py --make-do all --make-done analyse-polya
 #
 
-
+```
 
 BAM file annotations
 ====================

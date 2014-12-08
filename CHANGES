@@ -1,4 +1,6 @@
 
+0.36 - Prevent aggregate-tail-counts from running in parallel in pipeline.
+
 0.35 - Options for sample weighting and empirical controls in "test:".
 
 0.34 - .json files accidentally omitted from report.

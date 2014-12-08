@@ -2,7 +2,7 @@
 import itertools, collections, math
 
 import nesoni
-from nesoni import annotation, sam, span_index, config, working_directory, workspace, io, runr, reporting, selection
+from nesoni import annotation, sam, span_index, config, working_directory, workspace, io, runr, reporting, selection, legion
 
 import cPickle as pickle
 
@@ -20,8 +20,10 @@ class Tail_count(config.Action_with_prefix):
      working_dir = None
      
      extension = None
-
-     #_workspace_class = working_directory.Working
+     
+     #Memory intensive, don't run in parallel
+     def cores_required(self):
+         return legio.get_coordinator().get_cores()
 
      def run(self):
          assert self.extension is not None, '--extension must be specified'
