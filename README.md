@@ -104,32 +104,27 @@ If creating your own reference, it needs to consist of:
 
 The reference directory is then created with the command:
 
-   tail-tools make-tt-reference: \
-       <output_dir> \
-       <sequence_file> \
-       <annotations_file>
+    tail-tools make-tt-reference: \
+        <output_dir> \
+        <sequence_file> \
+        <annotations_file>
 
 Annotations shall include the following feature types and attributes:
 
 gene
-* required attributes:
-  * ID - unique identifier
-* optional attributes:
-  * Name - nomenclature name
-  * Product - short description
+* ID - unique identifier
+* Name (optional) - nomenclature name
+* Product (optional) - short description
 
 mRNA
-* required attributes:
-  * ID      - unique identifier
-  * Parent  - gene ID
+* ID      - unique identifier
+* Parent  - gene ID
 
 CDS
-* required attributes:
-  * Parent  - mRNA ID
+* Parent  - mRNA ID
 
 exon
-* required attributes:
-  * Parent  - mRNA ID
+* Parent  - mRNA ID
 
 
 
