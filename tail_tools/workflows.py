@@ -1,9 +1,9 @@
 
-import os, math, glob
+import os, math, glob, json, collections
 from os.path import join
 
 import nesoni
-from nesoni import config, workspace, working_directory, reference_directory, io, reporting, grace, annotation
+from nesoni import config, workspace, working_directory, reference_directory, io, reporting, grace, annotation, selection
 
 import tail_tools
 from . import clip_runs, extend_sam, proportions, tail_lengths, web, alternative_tails
@@ -79,6 +79,7 @@ class Call_peaks(config.Action_with_output_dir):
             use = 'in/upstrand/downstrand',
             to_child = 'Name/Product',
             ).make()
+            
         
 
 
@@ -282,15 +283,11 @@ class Analyse_polya(config.Action_with_output_dir):
 class Analyse_polya_batch(config.Action_with_output_dir):
     file_prefix = ''
     title = 'PAT-Seq analysis'
-    #blurb = ''
-    #extra_files = [ ]
     
     extension = 1000
     
     peak_min_depth = 50
     
-    #genome = None
-    #genome_dir = None
     include_plots = True
     include_genome = False
     include_bams = True
@@ -304,10 +301,10 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     #analyse_tail_lengths = tail_lengths.Analyse_tail_lengths()
     
     def run(self):
+        for test in self.tests:
+            assert not test.analysis, "analysis parameter for tests should not be set, will be filled in automatically"
+        
         names = [ sample.output_dir for sample in self.samples ]
-            #os.path.splitext(os.path.split(item)[1])[0]
-            #for item in self.reads
-            #]
         
         reference = reference_directory.Reference(self.reference, must_exist=True)
         
@@ -317,16 +314,13 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         expressionspace = io.Workspace(workspace/'expression', must_exist=False)
         testspace = io.Workspace(workspace/'test', must_exist=False)
         testspace_dedup = io.Workspace(workspace/'test-dedup', must_exist=False)
+        
+        self._create_json()
                 
         file_prefix = self.file_prefix
         if file_prefix and not file_prefix.endswith('-'):
             file_prefix += '-'
 
-
-        #dirs = [
-        #    workspace/item
-        #    for item in names
-        #]
 
         samples = [ ]
         for sample in self.samples:
@@ -341,9 +335,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         clipper_logs = [ join(item.output_dir, 'clipped_reads_log.txt') for item in samples ]
         filter_logs = [ join(item.output_dir, 'filter_log.txt') for item in samples ]
-        filter_polya_logs = [ join(item.output_dir + '-polyA', 'filter_log.txt') for item in samples ]                
-        #filter_logs = [ item.get_filter_action().log_filename() for item in samples ]
-        #filter_polya_logs = [ item.get_polya_filter_action().log_filename() for item in samples ]
+        filter_polya_logs = [ join(item.output_dir + '-polyA', 'filter_log.txt') for item in samples ]
 
         analyse_template = tail_lengths.Analyse_tail_counts(
             working_dirs = dirs,
@@ -409,12 +401,40 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                         #delete_igv = False,
                         ).process_make(stage)
 
+        
+        tail_tools.Call_utrs(
+            workspace/('peaks','primary-peak'),
+            self.reference,
+            self.output_dir,
+            extension=self.extension
+            ).make()
+        primpeak_template = analyse_template(
+            annotations=workspace/('peaks','primary-peak-peaks.gff'), 
+            extension=0,
+            types='peak',
+            )
+        with nesoni.Stage() as stage:
+            primpeak_template(
+                expressionspace/'primarypeakwise',
+                saturation=0,
+                title='Primary-peakwise expression - ' + self.title,
+                file_prefix=file_prefix+'primarypeakwise-',
+                ).process_make(stage)
+                
+            primpeak_template(
+                expressionspace/'primarypeakwise-dedup',
+                saturation=1,
+                title='Primary-peakwise expression with read deduplication - ' + self.title,
+                file_prefix=file_prefix+'primarypeakwise-dedup-',
+                ).process_make(stage)
+            
             
         with nesoni.Stage() as stage:
             for test in self.tests:
                 test(
                     output_dir = testspace/test.output_dir,
-                    analysis = self.output_dir
+                    analysis = self.output_dir,
+                    dedup = False,
                     ).process_make(stage)
 
             for test in self.tests:
@@ -490,6 +510,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
 
         r.heading('Genewise expression')
         
+        r.p("This is based on all reads within each gene (possibly from multiple peaks, or decay products).")
+        
         io.symbolic_link(source=expressionspace/('genewise','report'),link_name=r.workspace/'genewise')
         r.p('<a href="genewise/index.html">&rarr; Genewise expression</a>')
 
@@ -497,7 +519,20 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.p('<a href="genewise-dedup/index.html">&rarr; Genewise expression with read deduplication</a>')
 
 
+        r.heading('Primary-peakwise expression')
+        
+        r.p("This is based on the most prominent peak in the 3'UTR for each gene. (Peak can be up to %d bases downstrand of the annotated 3'UTR end, but not inside another gene on the same strand.)" % self.extension)
+        
+        io.symbolic_link(source=expressionspace/('primarypeakwise','report'),link_name=r.workspace/'primarypeakwise')
+        r.p('<a href="primarypeakwise/index.html">&rarr; Primary-peakwise expression</a>')
+
+        io.symbolic_link(source=expressionspace/('primarypeakwise-dedup','report'),link_name=r.workspace/'primarypeakwise-dedup')
+        r.p('<a href="primarypeakwise-dedup/index.html">&rarr; Primary-peakwise expression with read deduplication</a>')
+
+
         r.heading('Peakwise expression')
+        
+        r.p("This shows results from all called peaks.")
 
         web.Geneview_webapp(r.workspace/'view').run()        
         
@@ -701,6 +736,10 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                             work/('expression','genewise'+dedup,'counts.csv'),
                             work/('expression','genewise'+dedup,'norm.csv'),
                             ),
+                        ('primarypeakwise'+dedup,
+                            work/('expression','primarypeakwise'+dedup,'counts.csv'),
+                            work/('expression','primarypeakwise'+dedup,'norm.csv'),
+                            ),
                         ('peakwise'+dedup,
                             work/('expression','peakwise'+dedup,'counts.csv'),
                             work/('expression','peakwise'+dedup,'norm.csv'),
@@ -728,9 +767,43 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                     
                     norm_table = io.read_grouped_table(norms)
                     io.write_csv_2(raw/(name+'-norm.csv'), norm_table['All'])
-                    
-                    
+
+
+    def _create_json(self):                    
+        workspace = io.Workspace(self.output_dir, must_exist=False)
+        
+        samples = [ ]
+        groups = [ ]
+        for sample in self.samples:
+            this_groups = [ ]
+            for item in self.groups:
+                if selection.matches(
+                        selection.term_specification(item),
+                        sample.tags + [ sample.output_dir ]
+                        ):
+                    this_groups.append(selection.term_name(item))
+            group = '/'.join(this_groups) if this_groups else 'ungrouped'
+            if group not in groups: groups.append(group)
             
+            item = {
+                'name' : sample.output_dir,
+                'bam' : os.path.abspath( 
+                    workspace/('samples',sample.output_dir,'alignments_filtered_sorted.bam')
+                    ),
+                'group' : group,
+                #'tags' : sample.tags,
+                }
+            samples.append(item)
+            
+        obj = collections.OrderedDict()
+        obj['reference'] = os.path.abspath( self.reference )
+        obj['genes'] = os.path.abspath( workspace/('peaks','relation-parent.gff') )
+        obj['peaks'] = os.path.abspath( workspace/('peaks','relation-child.gff') )
+        obj['groups'] = groups
+        obj['samples'] = samples
+        
+        with open(workspace/"plotter-config.json","wb") as f:
+            json.dump(obj, f, indent=4)
                 
 
 
