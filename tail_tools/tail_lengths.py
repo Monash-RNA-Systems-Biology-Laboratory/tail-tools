@@ -23,7 +23,7 @@ class Tail_count(config.Action_with_prefix):
      
      #Memory intensive, don't run in parallel
      def cores_required(self):
-         return legio.get_coordinator().get_cores()
+         return legion.coordinator().get_cores()
 
      def run(self):
          assert self.extension is not None, '--extension must be specified'
@@ -131,6 +131,10 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
     saturation = 0
     tail = 4
     pickles = [ ]
+     
+    #Memory intensive, don't run in parallel
+    def cores_required(self):
+        return legion.coordinator().get_cores()
          
     def run(self):
         work = self.get_workspace()

@@ -24,7 +24,7 @@ def float_or_none(a_str):
 
     
 def index(filename, type=None, modify = lambda item: item, name = lambda item: item.get_id()):
-    result = { }
+    result = collections.OrderedDict()
     for item in annotation.read_annotations(filename):
         if type is not None and item.type != type: continue
         item = modify(item)
@@ -87,6 +87,10 @@ class Analysis(object):
             modify=lambda item: item.three_prime())
 
     @memo_property
+    def peaks_asis(self):
+        return index(join(self.dirname,'peaks','relation-child.gff'))
+
+    @memo_property
     def peak_index(self):
         return span_index.index_annotations(self.peaks.itervalues())
 
@@ -97,7 +101,24 @@ class Analysis(object):
             [ ('Count',int), ('Tail_count',int), 
               ('Tail', float_or_none), ('Proportion', float_or_none) ],
             )
+
+    @memo_property
+    def primary_peaks(self):
+        return index(join(self.dirname,'peaks','primary-peak-peaks.gff'),
+            modify=lambda item: item.three_prime())
+
+    @memo_property
+    def primary_peaks_asis(self):
+        return index(join(self.dirname,'peaks','primary-peak-peaks.gff'))
+
+    @memo_property
+    def primary_utrs(self):
+        return index(join(self.dirname,'peaks','primary-peak-utrs.gff'))
         
+    @memo_property
+    def primary_genes(self):
+        return index(join(self.dirname,'peaks','primary-peak-genes.gff'))
+
 
 def load_analysis(dirname):
     return Analysis(dirname)

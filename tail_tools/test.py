@@ -202,6 +202,7 @@ perform_tests <- function(name, counts_filename, norm_filename, select, model, m
 }
 
 perform_tests('genewise', GENEWISE_FILENAME, GENEWISE_NORM_FILENAME, SELECT, MODEL, MODEL_COLUMNS, N_ALT)
+perform_tests('primarypeakwise', PRIMARYPEAKWISE_FILENAME, PRIMARYPEAKWISE_NORM_FILENAME, SELECT, MODEL, MODEL_COLUMNS, N_ALT)
 perform_tests('peakwise', PEAKWISE_FILENAME, PEAKWISE_NORM_FILENAME, SELECT, MODEL, MODEL_COLUMNS, N_ALT)
 perform_tests('pairwise', PAIRWISE_FILENAME, PAIRWISE_NORM_FILENAME, PAIRS_SELECT, PAIRS_MODEL, PAIRS_MODEL_COLUMNS, PAIRS_N_ALT)
 
@@ -269,6 +270,9 @@ class Test(config.Action_with_output_dir):
    
        genewise_filename = join(self.analysis,'expression','genewise'+suffix,'counts.csv')
        genewise_norm_filename = join(self.analysis,'expression','genewise'+suffix,'norm.csv')
+
+       primarypeakwise_filename = join(self.analysis,'expression','primarypeakwise'+suffix,'counts.csv')
+       primarypeakwise_norm_filename = join(self.analysis,'expression','primarypeakwise'+suffix,'norm.csv')
 
        peakwise_filename = join(self.analysis,'expression','peakwise'+suffix,'counts.csv')
        peakwise_norm_filename = join(self.analysis,'expression','peakwise'+suffix,'norm.csv')
@@ -339,6 +343,8 @@ class Test(config.Action_with_output_dir):
            MIN_READS = self.min_reads,
            GENEWISE_FILENAME = genewise_filename,
            GENEWISE_NORM_FILENAME = genewise_norm_filename,
+           PRIMARYPEAKWISE_FILENAME = primarypeakwise_filename,
+           PRIMARYPEAKWISE_NORM_FILENAME = primarypeakwise_norm_filename,
            PEAKWISE_FILENAME = peakwise_filename,
            PEAKWISE_NORM_FILENAME = peakwise_norm_filename,
            PAIRWISE_FILENAME = pairwise_filename,
@@ -364,6 +370,8 @@ class Test(config.Action_with_output_dir):
        for entities, result, aveexpr, subtitle, terms in [
            ('genes', 'genewise-voom', 'avg.expression', 'Genewise expression level', model_columns[:n_alt]),
            ('genes', 'genewise-tail', 'avg.tail', 'Genewise tail length', model_columns[:n_alt]),
+           ('primary peaks', 'primarypeakwise-voom', 'avg.expression', 'Primary-peakwise expression level', model_columns[:n_alt]),
+           ('primary peaks', 'primarypeakwise-tail', 'avg.tail', 'Primary-peakwise tail length', model_columns[:n_alt]),
            ('peaks', 'peakwise-voom', 'avg.expression', 'Peakwise expression level', model_columns[:n_alt]),
            ('peaks', 'peakwise-tail', 'avg.tail', 'Peakwise tail length', model_columns[:n_alt]),
            ('peak pairs', 'pairwise-voom', 'avg.expression', 'Peak-pair expression shift', pairs_model_columns[:n_alt]),
