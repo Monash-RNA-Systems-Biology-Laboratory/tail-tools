@@ -2,12 +2,12 @@
 Tail Tools
 ==========
 
-http://www.vicbioinformatics.com/software.tail-tools.shtml
-
 This is a Python 2 based suite of tools for analysing SOLiD or Illumina
 sequencing reads with poly(A) tails.
 
-Use of PyPy is recommened for speed.
+Releases can be found in the Python Package Index:
+
+https://pypi.python.org/pypi/tail-tools/
 
 
 License:
@@ -27,7 +27,9 @@ excepting that:
 Requirements:
 =============
 
-- "nesoni", available from http://vicbioinformatics.com/nesoni.shtml or using
+Use of PyPy is recommened for speed.
+
+- "nesoni", available from https://github.com/Victorian-Bioinformatics-Consortium/nesoni or using
 
     pip install nesoni
 
