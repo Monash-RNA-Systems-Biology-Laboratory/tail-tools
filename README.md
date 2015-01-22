@@ -9,8 +9,8 @@ Releases can be found in the Python Package Index:
 https://pypi.python.org/pypi/tail-tools/
 
 
-License:
-========
+License
+-------
 
 This software is distributed under the terms of the GPL, version 2 or later,
 excepting that:
@@ -23,8 +23,8 @@ excepting that:
   public domain.
 
 
-Requirements:
-=============
+Requirements
+------------
 
 Use of PyPy is recommened for speed.
 
@@ -55,8 +55,8 @@ Optional:
   Note: v4.13.1 seems to be broken, v4.11.3 works
 
 
-Installation:
-=============
+Installation
+------------
 
 Easy way:
 
@@ -72,8 +72,8 @@ For PyPy it seems to be currently easiest to set up in a virtualenv:
     myenv/bin/pip install tail-tools
 
 
-Usage:
-======
+Usage
+-----
 
 This package contains a number of tools, which can be listed by typing:
 
@@ -90,8 +90,8 @@ These tools may also be used as part of a nesoni-style workflow python script.
 Typical usage of the pipeline is described below.
 
 
-Reference format:
-=================
+Reference format
+----------------
 
 Before processing any reads, you need to create a "tail-tools reference directory".
 
@@ -132,8 +132,8 @@ exon
 
 
 
-Pipeline:
-=========
+Pipeline
+--------
 
 Having created a reference directory, the next step is to run the pipeline,
 "analyse-polya-batch". This can be done from the command line, but is more
@@ -248,7 +248,7 @@ if __name__ == '__main__':
 ```
 
 BAM file annotations
-====================
+--------------------
 
 AA:i:...  
 - Will be present if the read is considered poly(A) (has at lest four non-templated As)
