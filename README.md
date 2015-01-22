@@ -2,8 +2,7 @@
 Tail Tools
 ==========
 
-This is a Python 2 based suite of tools for analysing SOLiD or Illumina
-sequencing reads with poly(A) tails.
+This is a Python 2 based suite of tools for analysing SOLiD or Illumina sequencing reads with poly(A) tails, as produced using the PAT-Seq technique developed by Traude Beilharz.
 
 Releases can be found in the Python Package Index:
 
@@ -29,19 +28,16 @@ Requirements:
 
 Use of PyPy is recommened for speed.
 
-- "nesoni", available from https://github.com/Victorian-Bioinformatics-Consortium/nesoni or using
+- [nesoni](https://github.com/Victorian-Bioinformatics-Consortium/nesoni), most easy installed with pip:
 
     pip install nesoni
 
-  You don't need to install all of nesoni's dependencies, just Python 2.7 
-  or later or PyPy.
+  You don't need to install all of nesoni's dependencies, just Python 2.7 or later or PyPy.
 
 - bowtie2
   (SHRiMP for legacy color-space data)
 
 - samtools
-
-- SplitsTree from http://www.splitstree.org/, note: v4.13.1 seems to be broken, v4.11.3 works
 
 - The "convert" tool from ImageMagick.
 
@@ -49,8 +45,14 @@ Use of PyPy is recommened for speed.
 
 - R+, with package "seriation" and BioConductor packages "limma" and "edgeR"
 
-- degust.py from 
-  https://victorian-bioinformatics-consortium.github.io/degust/dist/latest/degust.py
+- [degust.py](https://victorian-bioinformatics-consortium.github.io/degust/dist/latest/degust.py)
+
+
+
+Optional:
+
+- [SplitsTree](http://www.splitstree.org/)
+  Note: v4.13.1 seems to be broken, v4.11.3 works
 
 
 Installation:
