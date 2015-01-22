@@ -2,7 +2,7 @@
 Tail Tools
 ==========
 
-This is a Python 2 based suite of tools for analysing SOLiD or Illumina sequencing reads with poly(A) tails, as produced using the PAT-Seq technique developed by Traude Beilharz.
+This is a Python 2 based suite of tools for analysing SOLiD or Illumina sequencing reads with poly(A) tails, as produced using the PAT-Seq technique.
 
 Releases can be found in the Python Package Index:
 
