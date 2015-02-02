@@ -2,12 +2,17 @@
 Tail Tools
 ==========
 
-This is a Python 2 based suite of tools for analysing SOLiD or Illumina sequencing reads with poly(A) tails, as produced using the PAT-Seq technique.
+This is a Python 2 based suite of tools for analysing SOLiD or Illumina sequencing reads with poly(A) tails, as produced using the PAT-Seq technique. PAT-Seq is a sequencing technique developed by Dr. Traude Beilharz, who heads the RNA Systems Biology Laboratory at Monash University.
 
-Releases can be found in the Python Package Index:
+Tail Tools is developed by Dr. Paul Harrison (paul.harrison@monash.edu) at Monash University. Development was initially under the auspices of the Victorian Bioinformatics Consortium and now continues with the Monash Bioinformatics Platform.
 
-https://pypi.python.org/pypi/tail-tools/
+Please feel free to email Paul any questions you have about getting Tail Tools up and running.
 
+Links
+
+* [Tail-tools in the PYthon Package Index entry](https://pypi.python.org/pypi/tail-tools/)
+* [RNA Systems Biology Laboratory](http://rnasystems.erc.monash.edu)
+* [Monash Bioinformatics Platform](http://monash.edu/bioinformatics)
 
 License
 -------
