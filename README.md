@@ -2,7 +2,7 @@
 Tail Tools
 ==========
 
-This is a Python 2 based suite of tools for analysing SOLiD or Illumina sequencing reads with poly(A) tails, as produced using the PAT-Seq technique. The PAT-Seq technique was developed by Dr. Traude Beilharz, who heads the RNA Systems Biology Laboratory at Monash University.
+This is a Python 2 based suite of tools for analysing Illumina or SOLiD sequencing reads with poly(A) tails, as produced using the PAT-Seq technique. The PAT-Seq technique was developed by Dr. Traude Beilharz, who heads the RNA Systems Biology Laboratory at Monash University.
 
 Tail Tools is developed by Dr. Paul Harrison (paul.harrison@monash.edu) at Monash University. Development was initially under the auspices of the Victorian Bioinformatics Consortium and now continues with the Monash Bioinformatics Platform.
 
@@ -39,8 +39,7 @@ Use of PyPy is recommened for speed.
 
   You don't need to install all of nesoni's dependencies, just Python 2.7 or later or PyPy.
 
-- bowtie2
-  (SHRiMP for legacy color-space data)
+- bowtie2 for Illumina reads or SHRiMP for SOLiD reads
 
 - samtools
 
@@ -48,7 +47,7 @@ Use of PyPy is recommened for speed.
 
 - rsync (for downloads from UCSC browser)
 
-- R+, with package "seriation" and BioConductor packages "limma" and "edgeR"
+- R, with package "seriation" and BioConductor packages "limma" and "edgeR"
 
 - [degust.py](https://victorian-bioinformatics-consortium.github.io/degust/dist/latest/degust.py)
 
