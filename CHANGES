@@ -1,4 +1,6 @@
 
+0.37 - Use Fitnoise 2 for testing.
+
 0.36 - Prevent aggregate-tail-counts from running in parallel in pipeline.
        Call primary peaks as part of pipeline.
        Output a JSON file for Andrew and Jack's survival curver plotter.

@@ -19,7 +19,94 @@ colnames(MODEL) <- sapply(basic.seq(ncol(MODEL)), function(i) sprintf("coef%d", 
 colnames(PAIRS_MODEL) <- sapply(basic.seq(ncol(PAIRS_MODEL)), function(i) sprintf("coef%d", i))
 
 
-perform_test_fitnoise <- function(fitnoise_model, fitnoise_controls_model, name, elist, model, model_columns, n_alt, aveexpr.name) {
+
+
+
+perform_test_fitnoise2 <- function(fitnoise_model, fitnoise_controls_model, name, elist, model, model_columns, n_alt, aveexpr.name) {
+    library(fitnoise)
+
+    colnames(model) <- model_columns
+    
+    noise.model <- model    
+    stopifnot(ncol(model) <= nrow(model))
+    comment <- ''
+    if (ncol(model) == nrow(model)) {
+        comment <- 'NOISE FITTED USING NULL MODEL\nFDR AND P-VALUE NOT TO BE TRUSTED, MERELY A WAY TO RANK GENES\n'
+        noise.model <- model[, seq_len(ncol(model)-n_alt)+n_alt,drop=FALSE]
+    }
+    
+    
+    if (EMPIRICAL_CONTROLS) {
+        cat('\nSelecting empirical controls\n')
+        cfit <- fitnoise.fit(
+            elist, 
+            design=model,
+            noise.design=noise.model, 
+            model=fitnoise_controls_model,
+            verbose=VERBOSE
+            )
+        cat(cfit$description,"\n")
+        cfit <- fitnoise.test(cfit, coef=seq_len(n_alt))
+        controls <- rank(cfit$p.value) > nrow(elist)*0.5
+        cat(sum(controls),'control features chosen\n')
+    } else {
+        controls <- NULL
+    }
+    
+
+    cat('\nFitting noise model\n')
+    
+    fit <- fitnoise.fit(
+        elist, 
+        design=model,
+        noise.design=noise.model, 
+        model=fitnoise_model, 
+        controls=controls,
+        control.design=model[,seq_len(ncol(model)-n_alt)+n_alt,drop=FALSE],
+        verbose=VERBOSE
+        )
+    fit <- fitnoise.test(fit, coef=seq_len(n_alt))
+    
+    table <- data.frame(row.names=rownames(elist))
+    
+    table[,aveexpr.name] <- fit$averages
+    
+    for(i in seq_len(n_alt))
+        table[, model_columns[i]] <- fit$coef[,i]
+        
+    table$P.Value <- fit$p.value
+    table$adj.P.Val <- fit$q.value
+    table$noise.P.Value <- fit$noise.p.values
+    
+    for(i in seq_len(ncol(elist$genes)))
+        table[, colnames(elist$genes)[i]] <- elist$genes[,i]
+
+    table <- table[order(table$P.Value),]
+
+    write.csv(table, sprintf('%s/%s-toptable.csv',DIR,name))
+    
+    cat(sprintf("\n%s/%s\n",DIR,name))    
+    sink(sprintf("%s/%s.txt",DIR,name), split=TRUE)
+    cat(comment)
+    cat(sprintf("Raw data format: %s\n",paste(colnames(elist),collapse="; ")))
+    cat(sprintf("%s%s\n%d with fdr<=0.01\n%d with fdr<=0.05\n", 
+        elist$info,
+        fit$description,
+        sum(table$adj.P.Val<0.01), 
+        sum(table$adj.P.Val<0.05)))
+    sink()
+}
+
+
+
+
+
+
+
+
+
+
+perform_test_fitnoise1 <- function(fitnoise_model, fitnoise_controls_model, name, elist, model, model_columns, n_alt, aveexpr.name) {
     colnames(model) <- model_columns
     
     noise.model <- model    
@@ -62,13 +149,6 @@ perform_test_fitnoise <- function(fitnoise_model, fitnoise_controls_model, name,
         )
     table <- test.fit(fit, coefs=seq_len(n_alt))
 
-    #for(i in basic.seq(ncol(table)))
-    #    for(j in basic.seq(n_alt))
-    #        if (colnames(table)[i] == sprintf("coef%d",j)) {
-    #            colnames(table)[i] <- model_columns[j]
-    #            break
-    #        }
-
     for(i in basic.seq(ncol(table)))
         if (colnames(table)[i] == 'AveExpr') {
             colnames(table)[i] <- aveexpr.name
@@ -88,6 +168,10 @@ perform_test_fitnoise <- function(fitnoise_model, fitnoise_controls_model, name,
         sum(table$adj.P.Val<0.05)))
     sink()
 }
+
+
+
+
 
 
 perform_test <- function(name, elist, model, model_columns, n_alt, aveexpr.name) {
@@ -124,12 +208,16 @@ perform_test <- function(name, elist, model, model_columns, n_alt, aveexpr.name)
     sink()
 }
 
+
 perform_tests <- function(name, counts_filename, norm_filename, select, model, model_columns, n_alt) {
     table <- read.grouped.table(counts_filename)
     counts <- as.matrix(table$Count)[,select]
     tail.counts <- as.matrix(table$Tail_count)[,select]
     tails <- as.matrix(table$Tail)[,select]
-    tails[is.na(tails)] <- 0
+    
+    if (METHOD != "fitnoise2")
+        tails[is.na(tails)] <- 0
+        # fitnoise2 actually requires zero count tails to be NA
 
     dgelist <- read.counts(counts_filename, norm.file=norm_filename, quiet=TRUE)
     dgelist <- dgelist[,select]
@@ -151,30 +239,46 @@ perform_tests <- function(name, counts_filename, norm_filename, select, model, m
 
 
     if (WEIGHT) {
-        fitnoise_voom_model <- model.t.per.sample.var
-        fitnoise_controls_voom_model <- model.t.standard
-        fitnoise_patseq_model <- model.t.patseq.per.sample.var
-        fitnoise_controls_patseq_model <- model.t.patseq
+        fitnoise1_voom_model <- model.t.per.sample.var
+        fitnoise1_controls_voom_model <- model.t.standard
+        fitnoise1_patseq_model <- model.t.patseq.per.sample.var
+        fitnoise1_controls_patseq_model <- model.t.patseq
+        
+        fitnoise2_voom_model <- "Model_t_per_sample()"
+        fitnoise2_controls_voom_model <- "Model_t()"
+        fitnoise2_patseq_model <- "Model_t_patseq_per_sample()"
+        fitnoise2_controls_patseq_model <- "Model_t_patseq()"
     } else {
-        fitnoise_voom_model <- model.t.standard
-        fitnoise_controls_voom_model <- model.t.standard
-        fitnoise_patseq_model <- model.t.patseq
-        fitnoise_controls_patseq_model <- model.t.patseq
+        fitnoise1_voom_model <- model.t.standard
+        fitnoise1_controls_voom_model <- model.t.standard
+        fitnoise1_patseq_model <- model.t.patseq
+        fitnoise1_controls_patseq_model <- model.t.patseq
+        
+        fitnoise2_voom_model <- "Model_t()"
+        fitnoise2_controls_voom_model <- "Model_t()"
+        fitnoise2_patseq_model <- "Model_t_patseq()"
+        fitnoise2_controls_patseq_model <- "Model_t_patseq()"
     }
     noise.model <- model
     stopifnot(ncol(model) <= nrow(model))
     if (ncol(model) == nrow(model)) {
         noise.model <- model[, seq_len(ncol(model)-n_alt)+n_alt,drop=FALSE]
-        fitnoise_voom_model <- model.normal.standard
-        fitnoise_controls_voom_model <- model.normal.standard
-        fitnoise_patseq_model <- model.normal.patseq
-        fitnoise_controls_patseq_model <- model.normal.patseq
+        fitnoise1_voom_model <- model.normal.standard
+        fitnoise1_controls_voom_model <- model.normal.standard
+        fitnoise1_patseq_model <- model.normal.patseq
+        fitnoise1_controls_patseq_model <- model.normal.patseq
+        
+        fitnoise2_voom_model <- "Model_normal()"
+        fitnoise2_controls_voom_model <- "Model_normal()"
+        fitnoise2_patseq_model <- "Model_normal_patseq()"
+        fitnoise2_controls_patseq_model <- "Model_normal_patseq()"
+        
         if (EMPIRICAL_CONTROLS) stop("Can't find empricical controls without any degrees of freedom.")
     }
 
     good <- row.apply(dgelist$counts, max) >= MIN_READS
     png(sprintf("%s/%s-voom.png",DIR,name))
-    if (WEIGHT && !FITNOISE)
+    if (WEIGHT && METHOD == "limma")
         voomed <- voomWithQualityWeights(dgelist[good,], noise.model, plot=T)    
     else
         voomed <- voom(dgelist[good,], noise.model, plot=T)        
@@ -185,16 +289,21 @@ perform_tests <- function(name, counts_filename, norm_filename, select, model, m
             '(required at least one sample with %d reads)\n',
             sep=''), 
         sum(good),length(good),MIN_READS)
-        
-    if (FITNOISE) {
-        perform_test_fitnoise(fitnoise_voom_model, fitnoise_controls_voom_model, sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')
+    
+    if (METHOD == "fitnoise2") {    
+        perform_test_fitnoise2(fitnoise2_voom_model, fitnoise2_controls_voom_model, sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')        
+    } else if (METHOD == "fitnoise1") {
+        perform_test_fitnoise1(fitnoise1_voom_model, fitnoise1_controls_voom_model, sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')
     } else {
         perform_test(sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')
     }
-    
-    if (FITNOISE) {
+
+    if (METHOD == "fitnoise2") {    
         tail.elist <- elist.tails.for.fitnoise(tails, tail.counts, model, genes, MIN_READS)
-        perform_test_fitnoise(fitnoise_patseq_model, fitnoise_controls_patseq_model, sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')    
+        perform_test_fitnoise2(fitnoise2_patseq_model, fitnoise2_controls_patseq_model, sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')    
+    } else if (METHOD == "fitnoise1") {
+        tail.elist <- elist.tails.for.fitnoise(tails, tail.counts, model, genes, MIN_READS)
+        perform_test_fitnoise1(fitnoise1_patseq_model, fitnoise1_controls_patseq_model, sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')    
     } else {
         tail.elist <- elist.tails(tails, tail.counts, model, genes, MIN_READS)
         perform_test(sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')
@@ -223,7 +332,13 @@ perform_tests('pairwise', PAIRWISE_FILENAME, PAIRWISE_NORM_FILENAME, PAIRS_SELEC
     )
 @config.String_flag('title', 'Report title.')
 @config.Bool_flag('tell', 'Show R+ code instead of executing it.')
-@config.Bool_flag('fitnoise', 'Use experimental fitnoise method.')
+#@config.Bool_flag('fitnoise', 'Use experimental fitnoise method.')
+@config.String_flag('method', 
+    'Statistical method to use:\n'
+    'limma - Original method\n'
+    'fitnoise1 - First (R) version of Fitnoise\n'
+    'fitnoise2 - Second (Python) version of Fitnoise'
+    )
 @config.Bool_flag('weight', 
     'Use sample per-sample quality weights. '
     'With --fitnoise no, only expression levels are weighted using voomWithQualityWeights. With --fitnoise yes, tail lengths are also weighted.')
@@ -234,17 +349,19 @@ perform_tests('pairwise', PAIRWISE_FILENAME, PAIRWISE_NORM_FILENAME, PAIRS_SELEC
     'For tail length testing, sufficient samples must have this many reads to fit the linear model.'
     )
 @config.Bool_flag('dedup', 'Use deduplicated counts')
+@config.Bool_flag('verbose', 'Extra verbosity when fitting with fitnoise2.')
 @config.Positional('analysis', 'Output directory of "analyse-polya-batch:".')
 @config.Section('null', 'Terms in null hypothesis (H0).')
 @config.Section('alt', 'Additional terms in alternative hypothesis (H1).')
 class Test(config.Action_with_output_dir):
-   fitnoise = False
+   method = "fitnoise2"
    weight = False
    empirical_controls = False
    min_reads = 10
    tell = False
    dedup = False
    title = ''
+   verbose = False
    
    analysis = None
    null = [ ]
@@ -259,7 +376,8 @@ class Test(config.Action_with_output_dir):
        return title
    
    def run(self):
-       assert self.fitnoise or not self.empirical_controls
+       assert self.method in ("limma", "fitnoise1", "fitnoise2"), "Unknown method."
+       assert self.method != "limma" or not self.empirical_controls
        
        title = self.get_title()
    
@@ -337,10 +455,12 @@ class Test(config.Action_with_output_dir):
        runr.run_script(TEST_R, self.tell,
            SOURCE = os.path.join(os.path.dirname(__file__),'tail_tools.R'),
            DIR = workspace.working_dir,
-           FITNOISE = self.fitnoise,
+           METHOD = self.method,
            WEIGHT = self.weight,
            EMPIRICAL_CONTROLS = self.empirical_controls,
            MIN_READS = self.min_reads,
+           VERBOSE = self.verbose,
+           
            GENEWISE_FILENAME = genewise_filename,
            GENEWISE_NORM_FILENAME = genewise_norm_filename,
            PRIMARYPEAKWISE_FILENAME = primarypeakwise_filename,

@@ -55,6 +55,8 @@ Use of PyPy is recommened for speed.
 
 Optional:
 
+- [Fitnoise](https://github.com/pfh/fitnoise) for latest, greatest differential testing.
+
 - [SplitsTree](http://www.splitstree.org/)
   Note: v4.13.1 seems to be broken, v4.11.3 works
 
