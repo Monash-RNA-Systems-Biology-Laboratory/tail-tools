@@ -253,23 +253,15 @@ if __name__ == '__main__':
 
 ```
 
-BAM file annotations
---------------------
+BAM-file alignment attributes
+---
 
-AA:i:...  
-- Will be present if the read is considered poly(A) (has at lest four non-templated As)
+* [BAM-file alignment attributes](doc/bam-files.md)
 
-AN:i:...  
-- Gives the observed non-templated poly(A) tail length
+Statistics
+---
 
-AD:i:...  
-- Gives the number of adaptor sequence bases observed after the end of 
-  the poly(A) sequence. If the adaptor sequence is observed, then we have
-  sequenced the entirety of the poly(A) tail of this fragment.
-  If absent assume zero. Not supported for colorspace reads.
-
-
-
+* [Statistics produced by `tail-tools analyse-tail-counts:`](doc/statistics.md)
 
 
 

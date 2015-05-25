@@ -1,4 +1,4 @@
-VERSION = '0.37'
+VERSION = '0.38'
 #^ Note: this first line is read by the setup.py script to get the version
 
 import nesoni
@@ -7,7 +7,7 @@ from .fasta_qual_merge import Fasta_qual_merge
 from .clip_runs import Clip_runs_colorspace, Clip_runs_basespace
 from .extend_sam import Extend_sam_colorspace, Extend_sam_basespace
 from .proportions import Proportions, Proportions_heatmap 
-from .tail_lengths import Tail_count, Aggregate_tail_counts, Plot_pooled, Plot_comparison, Collapse_counts, Analyse_tail_counts
+from .tail_lengths import Tail_count, Aggregate_tail_counts, Plot_pooled, Plot_comparison, Analyse_tail_counts
 from .alternative_tails import Compare_peaks
 from .call_utrs import Call_utrs
 from .test import Test
@@ -29,10 +29,8 @@ def main():
             Proportions_heatmap,
             Tail_count,
             Aggregate_tail_counts,
-            #Tail_stats,
             Plot_pooled,
             Plot_comparison,
-            Collapse_counts,
             Compare_peaks,
             Call_utrs,
             Test,

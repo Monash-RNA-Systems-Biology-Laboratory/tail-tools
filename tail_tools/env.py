@@ -50,6 +50,8 @@ class Reference(object):
 
     @memo_property
     def seqs(self):    
+        #return dict(io.read_sequences( join(self.dirname,"reference.fa") ))
+        
         seqs = collections.OrderedDict()
         for name, length in self.ref.get_lengths():
             with open(join(self.dirname,self.ref.name,name+'.txt'),'rb') as f:
@@ -71,6 +73,42 @@ class Reference(object):
     @memo_property
     def utr_index(self):
         return span_index.index_annotations(self.utrs.values())
+
+    @memo_property
+    def coding_regions(self):
+        coding_regions = { }
+        annotations = list(annotation.read_annotations(join(self.dirname,'reference.gff')))
+        annotation.link_up_annotations(annotations)
+        for item in annotations:
+            if item.type == "CDS":
+                [ mrna ] = item.parents
+                [ gene ] = mrna.parents
+                name = gene.get_id()
+                if name not in coding_regions:
+                    coding_regions[name] = [ ]
+                coding_regions[name].append(item)
+        
+        for gene in annotations:
+            if gene.type != "gene": continue
+            name = gene.get_id()
+            if name not in coding_regions:
+                coding_region = gene.three_prime()
+                coding_region.attr = { "ID" : name }
+            else:
+                items = coding_regions[name]
+                coding_region = annotation.Annotation(
+                    type = "coding_region",
+                    seqid = items[0].seqid,
+                    strand= items[0].strand,
+                    start = min(item2.start for item2 in items),
+                    end = max(item2.end for item2 in items),
+                    attr = { "ID" : name },
+                    )
+            coding_regions[name] = coding_region
+        
+        return coding_regions
+
+
     
 
 def load_ref(dirname):
@@ -114,6 +152,10 @@ class Analysis(object):
     @memo_property
     def primary_utrs(self):
         return index(join(self.dirname,'peaks','primary-peak-utrs.gff'))
+
+    @memo_property
+    def primary_utrs_by_peak(self):
+        return index(join(self.dirname,'peaks','primary-peak-utrs.gff'), name=lambda item:item.attr["Peak"])
         
     @memo_property
     def primary_genes(self):

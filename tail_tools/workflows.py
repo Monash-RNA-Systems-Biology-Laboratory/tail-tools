@@ -301,8 +301,24 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     #analyse_tail_lengths = tail_lengths.Analyse_tail_lengths()
     
     def run(self):
+        #===============================================
+        #                Sanity checks
+        #===============================================
+        
+        assert len(set([ item.output_dir for item in self.samples ])) == len(self.samples), "Duplicate sample name."
+        
+        all_inputs = [ ]
+        for sample in self.samples:
+            all_inputs.extend(sample.reads)
+        assert len(set(all_inputs)) == len(all_inputs), "Duplicate read filename."
+        
         for test in self.tests:
             assert not test.analysis, "analysis parameter for tests should not be set, will be filled in automatically"
+        
+        
+        #===============================================
+        #                Run pipeline
+        #===============================================
         
         names = [ sample.output_dir for sample in self.samples ]
         

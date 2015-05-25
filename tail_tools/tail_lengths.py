@@ -1,10 +1,16 @@
 
-import itertools, collections, math
+import itertools, collections, math, os.path
 
 import nesoni
 from nesoni import annotation, sam, span_index, config, working_directory, workspace, io, runr, reporting, selection, legion
 
 import cPickle as pickle
+
+def str_na(value):
+    if value is None:
+        return "NA"
+    else:
+        return str(value)
 
 
 @config.help(
@@ -21,9 +27,9 @@ class Tail_count(config.Action_with_prefix):
      
      extension = None
      
-     #Memory intensive, don't run in parallel
-     def cores_required(self):
-         return legion.coordinator().get_cores()
+     ##Memory intensive, don't run in parallel
+     #def cores_required(self):
+     #    return legion.coordinator().get_cores()
 
      def run(self):
          assert self.extension is not None, '--extension must be specified'
@@ -126,10 +132,14 @@ class Tail_count(config.Action_with_prefix):
 @config.Int_flag('tail',
      'Minimum tail length to count as having a tail.'
      )
+@config.Int_flag('adaptor',
+     'Minimum number of adaptor bases required, 0 for no filtering.'
+     )
 @config.Main_section('pickles')
 class Aggregate_tail_counts(config.Action_with_output_dir):             
     saturation = 0
     tail = 4
+    adaptor = 0
     pickles = [ ]
      
     #Memory intensive, don't run in parallel
@@ -172,12 +182,13 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
             n_duplicates = 0
             n_good = 0
             for feature in sample:
+                feature.total_count = 0.0
                 feature.tail_counts = [ 0.0 ] * max_length
                 
                 buckets = collections.defaultdict(list)
                 for item in feature.hits:
-                    rel_start,rel_end,tail_length = item[:3]
-                    buckets[ (rel_start,rel_end) ].append(tail_length)
+                    rel_start,rel_end,tail_length,adaptor_bases = item
+                    buckets[ (rel_start,rel_end) ].append((tail_length,adaptor_bases))
                 for item in buckets.values():
                     n_alignments += len(item)
                     n_good += 1
@@ -186,8 +197,10 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
                     else:
                         weight = float(self.saturation) / len(item)
                         n_duplicates += len(item)
-                    for item2 in item:
-                        feature.tail_counts[item2] += weight                
+                    for tail_length, adaptor_bases in item:
+                        feature.total_count += weight
+                        if adaptor_bases >= self.adaptor:
+                            feature.tail_counts[tail_length] += weight                
 
             self.log.datum(names[i], 'Alignments to features', n_alignments)
             if self.saturation >= 1:
@@ -195,65 +208,64 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
                 self.log.datum(names[i], 'Alignments to features after deduplication', n_good)
                 
         
-        counts = [ ]  # [feature][sample][taillength]
+        counts = [ ]  # [feature][sample](total_count, [taillength])
         
         for item in data: 
             assert len(item) == len(data[0])
         for row in itertools.izip(*data):
-            this_counts = [ item.tail_counts for item in row ]
+            this_counts = [ (item.total_count, item.tail_counts) for item in row ]
             counts.append(this_counts)
         
-        sample_n = [ ]        # [feature][sample]  Total count
-        sample_n_tail = [ ]   # [feature][sample]  Polya count
-        sample_prop = [ ]     # [feature][sample]  Proportion of reads with tail
-        sample_tail = [ ]     # [feature][sample]  Mean tail length in each sample
-        sample_total_tail = [ ]
-        overall_n = [ ]
-        overall_prop = [ ]    # [feature]          Overall proportion with tail
-        overall_tail = [ ]    # [feature]          Overall mean tail length
-        overall_n_tail = [ ]  # [feature]          Overall polya count
-        overall_total_tail = [ ]
-        for row in counts:
-            this_n = [ ]
-            this_n_tail = [ ]
-            this_prop = [ ]
-            this_tail = [ ]
-            this_total_tail = [ ]
-            for item in row:
-                this_this_n = sum(item)
-                this_n.append( this_this_n )
+        n_features = len(counts)
+        n_samples = len(data)
+        
+        sample_n = [ [0.0]*n_features for i in xrange(n_features) ]        # [feature][sample]  Total count
+        sample_n_tail = [ [0.0]*n_features for i in xrange(n_features) ]   # [feature][sample]  Polya count
+        sample_prop = [ [None]*n_features for i in xrange(n_features) ]    # [feature][sample]  Proportion of reads with tail (deprecated)
+        sample_tail = [ [None]*n_features for i in xrange(n_features) ]    # [feature][sample]  Mean tail length in each sample
+        sample_sd_tail = [ [None]*n_features for i in xrange(n_features) ] # [feature][sample]  Std dev tail length in each sample
+        sample_total_tail = [ [0.0]*n_features for i in xrange(n_features) ]
+        
+        sample_quantile_tail = collections.OrderedDict( 
+            (item, [ [None]*n_features for i in xrange(n_features) ]) 
+            for item in [25,50,75,100]
+            )
+        
+        overall_n = [ 0.0 ]*n_features       # [feature]          Overall count
+        overall_prop = [ None ]*n_features   # [feature]          Overall proportion with tail
+        overall_tail = [ None ]*n_features   # [feature]          Overall mean tail length
+        overall_n_tail = [ 0.0 ]*n_features  # [feature]          Overall polya count
+        for i, row in enumerate(counts):
+            for j, (this_this_n, item) in enumerate(row):
+                sample_n[i][j] = this_this_n
+                sample_n_tail[i][j] = sum(item[self.tail:])
+                sample_total_tail[i][j] = sum( item[k]*k for k in xrange(self.tail,max_length) )
 
-                this_this_n_tail = sum(item[self.tail:])
-                this_n_tail.append( this_this_n_tail )
-
-                this_this_total_tail = sum( item[i]*i for i in xrange(self.tail,max_length) )
-                this_total_tail.append( this_this_total_tail )
-
-                if this_this_n < 1:
-                    this_prop.append(None)
-                else:
-                    this_prop.append(float(this_this_n_tail)/this_this_n)
-                if this_this_n_tail < 1:
-                    this_tail.append(None)
-                else:
-                    this_tail.append(this_this_total_tail/this_this_n_tail)
-
-            sample_n.append(this_n)
-            sample_n_tail.append(this_n_tail)
-            sample_prop.append(this_prop)
-            sample_tail.append(this_tail)
-            sample_total_tail.append(this_total_tail)
-            overall_n.append(sum(this_n))
-            overall_n_tail.append(sum(this_n_tail))
-            overall_total_tail.append(sum(this_total_tail))
-            if sum(this_n) < 1:
-                overall_prop.append(None)
-            else:
-                overall_prop.append(float(sum(this_n_tail))/sum(this_n))
-            if sum(this_n_tail) < 1:
-                overall_tail.append(None)
-            else:
-                overall_tail.append(float(sum(this_total_tail))/sum(this_n_tail))
+                if sample_n[i][j] >= 1:
+                    sample_prop[i][j] = float(sample_n_tail[i][j])/sample_n[i][j]
+                
+                if sample_n_tail[i][j] >= 1:
+                    sample_tail[i][j] = float(sample_total_tail[i][j])/sample_n_tail[i][j]
+                
+                    for quantile in sample_quantile_tail:
+                        counter = sample_n_tail[i][j] * quantile / 100.0
+                        for k in xrange(self.tail, max_length):
+                            counter -= item[k]
+                            if counter <= 0: break
+                        sample_quantile_tail[quantile][i][j] = k
+                
+                if sample_n_tail[i][j] >= 2:
+                    sample_sd_tail[i][j] = math.sqrt(
+                        float(sum( item[k]*((k-sample_tail[i][j])**2) for k in xrange(self.tail,max_length) ))
+                        / (sample_n_tail[i][j]-1)
+                        )
+                    
+            overall_n[i] = sum(sample_n[i])
+            overall_n_tail[i] = sum(sample_n_tail[i])
+            if overall_n[i] >= 1:
+                overall_prop[i] = float(sum(sample_n_tail[i]))/overall_n[i]
+            if overall_n_tail[i] >= 1:
+                overall_tail[i] = float(sum(sample_total_tail[i]))/overall_n_tail[i]
              
         for i, name in enumerate(names):
             this_total = sum( item[i] for item in sample_total_tail )
@@ -266,15 +278,6 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
             this_n = sum( item[i] for item in sample_n )
             if this_n:
                 self.log.datum(name, 'Average proportion of reads with tail', float(this_total)/this_n)
-            
-        
-        #max_length = max(max(len(item) for item in row) for row in counts)
-        #
-        #for row in counts:
-        #    for item in row:
-        #        while len(item) < max_length:
-        #            item.append(0)
-                
         
         with open(work/'features-with-data.gff','wb') as f:
             annotation.write_gff3_header(f)
@@ -301,12 +304,14 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
             '"Tail" group is mean tail per sample',
             '"Proportion" group is proportion of reads with tail',
             ]
+            
+          
 
         def counts_iter():
-            for i in xrange(len(counts)):
+            for i in xrange(n_features):
                 row = collections.OrderedDict()
                 row['Feature'] = annotations[i].get_id()
-                for j in xrange(len(names)):
+                for j in xrange(n_samples):
                     row[('Count',names[j])] = '%d' % sample_n[i][j]
 
                 row[('Annotation','Length')] = annotations[i].end - annotations[i].start
@@ -315,19 +320,45 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
                 #row[('Annotation','Strand')] = str(annotations[i].strand)
                 row[('Annotation','reads')] = str(overall_n[i])
                 row[('Annotation','reads-with-tail')] = str(overall_n_tail[i])
-                row[('Annotation','mean-tail')] = str(overall_tail[i]) if overall_tail[i] is not None else 'NA'
-                row[('Annotation','proportion-with-tail')] = str(overall_prop[i]) if overall_prop[i] is not None else 'NA'
-                for j in xrange(len(names)):
+                row[('Annotation','mean-tail')] = str_na(overall_tail[i])
+                row[('Annotation','proportion-with-tail')] = str_na(overall_prop[i])
+                for j in xrange(n_samples):
                     row[('Tail_count',names[j])] = '%d' % sample_n_tail[i][j]
+                for j in xrange(n_samples):
+                    row[('Tail',names[j])] = str_na(sample_tail[i][j])
+                for j in xrange(n_samples):
+                    row[('Tail_sd',names[j])] = str_na(sample_sd_tail[i][j])
+                
+                for quantile in sample_quantile_tail:
+                    for j in xrange(n_samples):
+                        row[('Tail_quantile_%d'%quantile,names[j])] = str_na(sample_quantile_tail[quantile][i][j])                    
+                
                 for j in xrange(len(names)):
-                    row[('Tail',names[j])] = str(sample_tail[i][j]) if sample_tail[i][j] is not None else 'NA'
-                for j in xrange(len(names)):
-                    row[('Proportion',names[j])] = str(sample_prop[i][j]) if sample_prop[i][j] is not None else 'NA'
+                    row[('Proportion',names[j])] = str_na(sample_prop[i][j])
                 yield row
         io.write_csv(work/'counts.csv', counts_iter(), comments=comments)
+        
+        
+        def write_csv_matrix(filename, matrix):
+            def emitter():
+                for i in xrange(n_features):
+                    row = collections.OrderedDict()
+                    row["Feature"] = annotations[i].get_id()
+                    for j in xrange(n_samples):
+                        row[names[j]] = str_na(matrix[i][j])
+                    yield row
+            io.write_csv(filename, emitter())
+            
+        write_csv_matrix(work/'read_count.csv', sample_n)
+        write_csv_matrix(work/'tail_count.csv', sample_n_tail)
+        write_csv_matrix(work/'tail.csv', sample_tail)
+        write_csv_matrix(work/'tail_sd.csv', sample_sd_tail)
+        for quantile in sample_quantile_tail:
+            write_csv_matrix(work/('tail_quantile_%d.csv'%quantile), sample_quantile_tail[quantile])
+
 
         def raw_columns():
-            for i in xrange(len(names)):
+            for i in xrange(n_samples):
                 row = collections.OrderedDict()
                 row['Sample'] = names[i]
                 for j in xrange(max_length):
@@ -337,21 +368,21 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
 
         #Somewhat inefficient        
         def raw():
-            for i in xrange(len(counts)):
+            for i in xrange(n_features):
                 row = collections.OrderedDict()
                 row['Feature'] = annotations[i].get_id()
-                for j in xrange(len(names)):
+                for j in xrange(n_samples):
                     for k in xrange(max_length):
-                        row['%d %s' % (k,names[j])] = str( counts[i][j][k] )
+                        row['%d %s' % (k,names[j])] = str( counts[i][j][1][k] )
                 yield row
         io.write_csv(work/'raw.csv', raw())
         
         def pooled():
-            for i in xrange(len(counts)):
+            for i in xrange(n_features):
                 row = collections.OrderedDict()
                 row['Feature'] = annotations[i].get_id()
                 for j in xrange(max_length):
-                    row[str(j)] = str( sum( counts[i][k][j] for k in xrange(len(names)) ) )
+                    row[str(j)] = str( sum( counts[i][k][1][j] for k in xrange(n_samples) ) )
                 yield row
         io.write_csv(work/'pooled.csv', pooled())
 
@@ -753,102 +784,102 @@ class Plot_comparison(config.Action_with_prefix, runr.R_action):
 
 
 
-@config.help(
-    'Merge counts from groups of samples (eg replicates) into one.',
-    'Counts are added, and tail lengths and proportions averaged.'
-    )
-@config.Positional('counts', '...-counts.csv file produced by "aggregate-tail-lengths:".')
-@config.Main_section('groups', 'New samples, given as a list of <selection>=<name>.')
-class Collapse_counts(config.Action_with_prefix):
-    counts = None
-    groups = [ ]
-    
-    def run(self):
-        data = io.read_grouped_table(
-            self.counts,
-            [('Count',str), ('Annotation',str), ('Tail_count',str), ('Tail',str), ('Proportion',str)],
-            'Count',
-            )
-        
-        features = data['Count'].keys()
-        samples = data['Count'].value_type().keys()
-        
-        tags = { }
-        for sample in samples:
-            tags[sample] = [sample]        
-        for line in data.comments:
-            if line.startswith('#sampleTags='):
-                parts = line[len('#sampleTags='):].split(',')
-                tags[parts[0]] = parts
-        
-        group_names = [ ]
-        groups = [ ]
-        group_tags = [ ]
-        
-        for item in self.groups:
-            select = selection.term_specification(item)
-            name = selection.term_name(item)
-            group = [ item for item in samples if selection.matches(select, tags[item]) ]
-            assert group, 'Empty group: '+name
-            
-            this_group_tags = [ name ]
-            for tag in tags[group[0]]:
-                if tag == name: continue
-                for item in group[1:]:
-                    for item2 in tags[item]:
-                        if tag not in item2: break
-                    else:
-                        this_group_tags.append(tag)
-            
-            group_names.append(name)
-            groups.append(group)
-            group_tags.append(this_group_tags)
-        
-        result = io.Grouped_table()
-        result.comments = [ '#Counts' ]
-        for item in group_tags:
-            result.comments.append('#sampleTags='+','.join(item))
-        
-        
-        count = [ ]
-        tail_count = [ ]
-        tail = [ ]
-        proportion = [ ]
-        for feature in features:
-            this_count = [ ]
-            this_tail_count = [ ]
-            this_tail = [ ]
-            this_proportion = [ ]
-            for group in groups:
-                this_this_count = [ ]
-                this_this_tail_count = [ ]
-                this_this_tail = [ ]
-                this_this_proportion = [ ]
-                for sample in group:
-                    this_this_count.append(int(data['Count'][feature][sample]))
-                    this_this_tail_count.append(int(data['Tail_count'][feature][sample]))
-                    item = data['Tail'][feature][sample]
-                    if item != 'NA': this_this_tail.append(float(item))
-                    item = data['Proportion'][feature][sample]
-                    if item != 'NA': this_this_proportion.append(float(item))
-                
-                this_count.append(str(sum(this_this_count)))
-                this_tail_count.append(str(sum(this_this_tail_count)))
-                this_tail.append(str(sum(this_this_tail)/len(this_this_tail)) if this_this_tail else 'NA')
-                this_proportion.append(str(sum(this_this_proportion)/len(this_this_proportion)) if this_this_proportion else 'NA')
-                    
-            count.append(this_count)
-            tail_count.append(this_tail_count)
-            tail.append(this_tail)
-            proportion.append(this_proportion)
-        
-        matrix = io.named_matrix_type(features,group_names)
-        result['Count'] = matrix(count)
-        result['Annotation'] = data['Annotation']
-        result['Tail_count'] = matrix(tail_count)
-        result['Tail'] = matrix(tail)
-        result['Proportion'] = matrix(proportion)
-        result.write_csv(self.prefix + '.csv')
+#@config.help(
+#    'Merge counts from groups of samples (eg replicates) into one.',
+#    'Counts are added, and tail lengths and proportions averaged.'
+#    )
+#@config.Positional('counts', '...-counts.csv file produced by "aggregate-tail-lengths:".')
+#@config.Main_section('groups', 'New samples, given as a list of <selection>=<name>.')
+#class Collapse_counts(config.Action_with_prefix):
+#    counts = None
+#    groups = [ ]
+#    
+#    def run(self):
+#        data = io.read_grouped_table(
+#            self.counts,
+#            [('Count',str), ('Annotation',str), ('Tail_count',str), ('Tail',str), ('Proportion',str)],
+#            'Count',
+#            )
+#        
+#        features = data['Count'].keys()
+#        samples = data['Count'].value_type().keys()
+#        
+#        tags = { }
+#        for sample in samples:
+#            tags[sample] = [sample]        
+#        for line in data.comments:
+#            if line.startswith('#sampleTags='):
+#                parts = line[len('#sampleTags='):].split(',')
+#                tags[parts[0]] = parts
+#        
+#        group_names = [ ]
+#        groups = [ ]
+#        group_tags = [ ]
+#        
+#        for item in self.groups:
+#            select = selection.term_specification(item)
+#            name = selection.term_name(item)
+#            group = [ item for item in samples if selection.matches(select, tags[item]) ]
+#            assert group, 'Empty group: '+name
+#            
+#            this_group_tags = [ name ]
+#            for tag in tags[group[0]]:
+#                if tag == name: continue
+#                for item in group[1:]:
+#                    for item2 in tags[item]:
+#                        if tag not in item2: break
+#                    else:
+#                        this_group_tags.append(tag)
+#            
+#            group_names.append(name)
+#            groups.append(group)
+#            group_tags.append(this_group_tags)
+#        
+#        result = io.Grouped_table()
+#        result.comments = [ '#Counts' ]
+#        for item in group_tags:
+#            result.comments.append('#sampleTags='+','.join(item))
+#        
+#        
+#        count = [ ]
+#        tail_count = [ ]
+#        tail = [ ]
+#        proportion = [ ]
+#        for feature in features:
+#            this_count = [ ]
+#            this_tail_count = [ ]
+#            this_tail = [ ]
+#            this_proportion = [ ]
+#            for group in groups:
+#                this_this_count = [ ]
+#                this_this_tail_count = [ ]
+#                this_this_tail = [ ]
+#                this_this_proportion = [ ]
+#                for sample in group:
+#                    this_this_count.append(int(data['Count'][feature][sample]))
+#                    this_this_tail_count.append(int(data['Tail_count'][feature][sample]))
+#                    item = data['Tail'][feature][sample]
+#                    if item != 'NA': this_this_tail.append(float(item))
+#                    item = data['Proportion'][feature][sample]
+#                    if item != 'NA': this_this_proportion.append(float(item))
+#                
+#                this_count.append(str(sum(this_this_count)))
+#                this_tail_count.append(str(sum(this_this_tail_count)))
+#                this_tail.append(str(sum(this_this_tail)/len(this_this_tail)) if this_this_tail else 'NA')
+#                this_proportion.append(str(sum(this_this_proportion)/len(this_this_proportion)) if this_this_proportion else 'NA')
+#                    
+#            count.append(this_count)
+#            tail_count.append(this_tail_count)
+#            tail.append(this_tail)
+#            proportion.append(this_proportion)
+#        
+#        matrix = io.named_matrix_type(features,group_names)
+#        result['Count'] = matrix(count)
+#        result['Annotation'] = data['Annotation']
+#        result['Tail_count'] = matrix(tail_count)
+#        result['Tail'] = matrix(tail)
+#        result['Proportion'] = matrix(proportion)
+#        result.write_csv(self.prefix + '.csv')
 
 
 
@@ -863,6 +894,12 @@ class Collapse_counts(config.Action_with_prefix):
 @config.String_flag('types', 'Comma separated list of feature types to use.')
 @config.String_flag('spike_in', 'Comma separated list of spike-in "genes".')
 @config.Int_flag('extension', 'How far downstrand of the given annotations a read or peak belonging to a gene might be.')
+@config.Int_flag('tail',
+     'Minimum tail length to count as having a tail.'
+     )
+@config.Int_flag('adaptor',
+     'Minimum number of adaptor bases required, 0 for no filtering.'
+     )
 @config.Int_flag('saturation',
      'Duplicate start position saturation level. '
      'Reads that start at the same position will only '
@@ -873,12 +910,14 @@ class Collapse_counts(config.Action_with_prefix):
      )
 @config.String_flag('title', 'Report title.')
 @config.String_flag('file_prefix', 'Prefix for filenames in report.')
-@config.Main_section('working_dirs')
+@config.Main_section('working_dirs', 'Sample directories, or full pipeline output directories')
 class Analyse_tail_counts(config.Action_with_output_dir):         
     annotations = None
     types = 'gene'
     spike_in = ''
     extension = None
+    tail = 4
+    adaptor = 0
     saturation = 0
     glog_moderation = 5.0
     title = 'PAT-Seq expression analysis'
@@ -891,11 +930,24 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         
     def run(self):
         assert self.extension is not None, '--extension must be specified'
+        
+        # Also allow simply the analyse-polya-batch directory
+        working_dirs = [ ]        
+        for item in self.working_dirs:
+            state_filename = os.path.join(item,'analyse-polya-batch.state')
+            if not os.path.exists(state_filename):
+                working_dirs.append(item)
+            else:
+                with open(state_filename,'rb') as f:
+                    state = pickle.load(f)
+
+                for sample in state.samples:
+                    working_dirs.append(os.path.join(item,'samples',sample.output_dir))
 
         work = self.get_workspace()
-        
-        names = [ ]        
         pickle_workspace = workspace.Workspace(work/'pickles')
+        plot_workspace = workspace.Workspace(work/'plots')
+        
         pickle_filenames = [ ]
         
         file_prefix = self.file_prefix
@@ -903,7 +955,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
             file_prefix += '-'
 
         with nesoni.Stage() as stage:
-            for dir in self.working_dirs:
+            for dir in working_dirs:
                 working = working_directory.Working(dir, must_exist=True)
                 pickle_filenames.append(pickle_workspace/working.name+'.pickle.gz')
                 Tail_count(
@@ -914,10 +966,14 @@ class Analyse_tail_counts(config.Action_with_output_dir):
                     extension=self.extension,
                     ).process_make(stage)    
         
+        assert len(set(pickle_filenames)) == len(pickle_filenames), "Duplicate sample name."
+        
         Aggregate_tail_counts(
             output_dir=self.output_dir, 
             pickles=pickle_filenames,
             saturation=self.saturation,
+            tail=self.tail,
+            adaptor=self.adaptor
             ).make()
         
         nesoni.Norm_from_counts(
@@ -933,13 +989,13 @@ class Analyse_tail_counts(config.Action_with_output_dir):
             )
             
         similarity = nesoni.Similarity(
-            prefix=work/'similarity',
+            prefix=plot_workspace/'similarity',
             counts=work/'counts.csv',
             )
         
         plot_pooleds = [        
             Plot_pooled(
-                prefix = work/'pooled-heatmap',
+                prefix = plot_workspace/'pooled-heatmap',
                 aggregate = self.output_dir,
                 #min_tails = min_tails,
                 min_tails = 1,
@@ -950,7 +1006,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
 
         plot_comparisons = [
             Plot_comparison(
-                prefix = work/('comparison-min-tails-%d-min-span-%.1f' % (min_tails,min_span)),
+                prefix = plot_workspace/('comparison-min-tails-%d-min-span-%.1f' % (min_tails,min_span)),
                 aggregate = self.output_dir,
                 min_tails = min_tails,
                 min_span = min_span,
@@ -962,7 +1018,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
 
         heatmaps = [
             nesoni.Heatmap(
-                prefix = work/('heatmap-min-fold-%.1f' % fold),
+                prefix = plot_workspace/('heatmap-min-fold-%.1f' % fold),
                 counts = work/'counts.csv',
                 norm_file = work/'norm.csv',
                 min_span = math.log(fold)/math.log(2.0),
@@ -1025,6 +1081,22 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         for heatmap in plot_pooleds:
             r.report_heatmap(heatmap)
             
+        r.heading('Heatmaps')
+        
+        r.p(
+            'Genes were selected based '
+            'on there being at least some fold change difference between '
+            'some pair of samples.'
+        )
+        
+        #r.p(
+        #    'The log2 counts have been quantile normalized.'
+        #)
+        
+        for heatmap in heatmaps:
+            r.report_heatmap(heatmap)
+
+
         r.heading('Average poly(A) tail length and its relation to expression levels')
         
         r.p(
@@ -1039,23 +1111,6 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         for heatmap in plot_comparisons:
             r.report_heatmap(heatmap)
         
-        r.heading('Heatmaps')
-        
-        r.p(
-            'Genes were selected based on there being '
-            #'at least some number of reads '
-            #'in at least one of the samples (min-max), '
-            #'and '
-            'on there being at least some fold change difference between '
-            'some pair of samples.'
-        )
-        
-        #r.p(
-        #    'The log2 counts have been quantile normalized.'
-        #)
-        
-        for heatmap in heatmaps:
-            r.report_heatmap(heatmap)
 
         #r.heading('Raw data')
         #

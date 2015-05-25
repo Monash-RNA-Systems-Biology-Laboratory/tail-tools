@@ -1,4 +1,7 @@
 
+0.38 - Allow more parallelism for tail-count, memory usage doesn't seem to be severe.
+       Check for duplicate sample name or duplicate read filename in "analyse-polya-batch:".
+
 0.37 - Use Fitnoise 2 for testing.
 
 0.36 - Prevent aggregate-tail-counts from running in parallel in pipeline.
