@@ -51,7 +51,8 @@ and our alternative hypothesis design matrix would be a 4x2 matrix:
 
 Here the `experimental` term is in addition to the baseline level given by `control`, and therefore is the difference between the experimental and control groups. Terms coefficients fitted for terms in `alt:` are reported in the output of `tail-tools test:`.
 
-Hint: In R, you can check how the coefficients of a linear model will be calculated using the `ginv` function from the libaray `MASS`, which computes the pseudo-inverse. (Fitnoise2 uses weighting of observations, which slightly modifies this for each gene.)
+Hint: In R, you can check how the coefficients of a linear model will be calculated using the `ginv` function from the libaray `MASS`, which computes the pseudo-inverse.
+
 
 ### Example 2
 
