@@ -4,7 +4,7 @@ Differential expression and tail length testing
 
 Tail Tools provides differential expression, as in RNA-seq, and also differential tail length testing.
 
-Tail Tools uses a package called [Fitnoise2](https://github.com/pfh/fitnoise) to perform differential testing. This is very similar to the popular Limma package. Like Limma, Fitnoise2 is based on the idea of linear models, a general idea that encompasses many popular statistical tests, such as t-tests, ANOVA-style tests, linear regression, and testing in the presence of a batch effect.
+Tail Tools uses a package called [Fitnoise](https://github.com/pfh/fitnoise) to perform differential testing. This is very similar to the popular Limma package. Like Limma, Fitnoise2 is based on the idea of linear models, a general idea that encompasses many popular statistical tests, such as t-tests, ANOVA-style tests, linear regression, and testing in the presence of a batch effect.
 
 In a differential test based on linear models, there are two models, a null hypothesis model and an alternative hypothesis model. The alternative hypothesis contains all the terms of the null hypothesis plus some additional terms. That is, the null hypothesis is nested within the alternative hypothesis. The alternative hypothesis will therefore always fit better than the null hypothesis. The significance test is whether how much better it fits is more than would have been expected just by chance (an F-test).
 
@@ -52,6 +52,6 @@ Here the `experimental` term is in addition to the baseline level given by `cont
 Hint: In R, you can check how the coefficients of a linear model will be calculated using the `ginv` function from the libaray `MASS`, which computes the pseudo-inverse. (Fitnoise2 uses weighting of observations, which slightly modifies this for each gene.)
 
 
-See the [Fitnoise2](https://github.com/pfh/fitnoise) documentation for further details of the mathematics behind this.
+See the [Fitnoise](https://github.com/pfh/fitnoise) documentation for further details of the mathematics behind this.
 
 
