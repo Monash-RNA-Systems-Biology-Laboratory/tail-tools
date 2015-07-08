@@ -12,9 +12,9 @@ Differential testing with Tail Tools may be performed using the `tail-tools test
 
 The basic form this takes is:
 
-  tail-tools test: test-output-dir pipeline-dir \
-      null: <terms in null linear model> \
-      alt: <additional terms in alternative linear model>
+    tail-tools test: test-output-dir pipeline-dir \
+        null: <terms in null linear model> \
+        alt: <additional terms in alternative linear model>
 
 Terms are expressions involving sample names and sample tags, which specify columns of a design matrix. Matching samples are given a value of 1 in this column, and non-matching samples given a value of 0. Type `nesoni` for documentation on these, but briefly:
 
@@ -29,21 +29,21 @@ Sample names may be used as well as tags.
 
 For example, if you had samples which you have tagged as being either "experimental" or "control" group when you ran the pipeline, with two replicates within each group, a possible test would be:
 
-  tail-tools test: test-output-dir pipeline-dir null: control/experimental alt: experimental
+    tail-tools test: test-output-dir pipeline-dir null: control/experimental alt: experimental
   
 From this, our null hypothesis design matrix would be a 4x1 matrix:
 
-  1    control-replicate-1
-  1    control-replicate-2
-  1    experimental-replicate-1
-  1    experimental-replicate-2
+    1    control-replicate-1
+    1    control-replicate-2
+    1    experimental-replicate-1
+    1    experimental-replicate-2
 
 and our alternative hypothesis design matrix would be a 4x2 matrix:
 
-  1 0  control-replicate-1
-  1 0  control-replicate-2
-  1 1  experimental-replicate-1
-  1 1  experimental-replicate-2
+    1 0  control-replicate-1
+    1 0  control-replicate-2
+    1 1  experimental-replicate-1
+    1 1  experimental-replicate-2
 
 `tail-tools test` will print out the design matrix when it is run, so you can check that is what you wanted.
 
