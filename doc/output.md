@@ -48,6 +48,8 @@ These are produced for several types of feature:
 
 * `peakwise` - peaks called based on poly(A) reads.
 
+* `primarypeakwise` - the most prominent peak in the 3' UTR of each gene. These peaks are likely to be "real", associated with gene transcription and not some decay process. `primarypeakwise` is useful for investigating genomic features associated with the polyadenylation stop site.
+
 * `pairwise` - the two most prominent peaks in the 3' UTR of each gene.
 
 The files contain:
