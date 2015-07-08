@@ -33,6 +33,8 @@ If the model matrix needs to contain values other than 0 and 1, there is an alte
 
 (Any other samples would be given value zero in this term.)
 
+Hint: If you're familiar with linear models in R, you can examine the model matrix of a linear model with the `model.matrix( )` function.
+
 
 ### Example 1
 
