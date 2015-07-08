@@ -60,7 +60,7 @@ and our alternative hypothesis model matrix would be a 4x2 matrix:
 
 Here the `experimental` term is in addition to the baseline level given by `control`, and therefore is the difference between the experimental and control groups. Terms coefficients fitted for terms in `alt:` are reported in the output of `tail-tools test:`.
 
-Hint: In R, you can check how the coefficients of a linear model will be calculated using the `ginv` function from the library `MASS`, which computes the pseudo-inverse.
+Hint: In R, you can check how the coefficients of a linear model will be calculated using the `ginv( )` function from the library `MASS`, which computes the pseudo-inverse.
 
 
 ### Example 2
@@ -88,7 +88,7 @@ and our alternative hypothesis model would be:
     1 0 1  group3-rep2
 
 The two additional coefficients will be group2 minus group1 and group3 minus group1,
-group1 acting as a "baseline". Again, you can check this in R with `ginv`.
+group1 acting as a "baseline". Again, you can check this in R with `ginv( )`.
 
 ### See also
 
