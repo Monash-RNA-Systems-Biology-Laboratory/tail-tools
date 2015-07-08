@@ -8,7 +8,7 @@ Tail Tools uses a package called [Fitnoise](https://github.com/pfh/fitnoise) to 
 
 In a differential test based on linear models, there are two models, a null hypothesis model and an alternative hypothesis model. The alternative hypothesis contains all the terms of the null hypothesis plus some additional terms. That is, the null hypothesis is nested within the alternative hypothesis. The alternative hypothesis will therefore always fit better than the null hypothesis. The significance test is whether how much better it fits is more than would have been expected just by chance (an F-test).
 
-Differential testing with Tail Tools may be performed using the `tail-tools test:` tool from the command line. (Instances of `tail_tools.Test( )` may also be passed to the `tests` parameter of the pipeline.)
+Differential testing with Tail Tools may be performed using the `tail-tools test:` tool from the command line. Instances of `tail_tools.Test( )` may also be passed to the `tests` parameter of the pipeline.
 
 The basic form this takes is:
 
@@ -26,6 +26,8 @@ Terms are expressions involving sample names and sample tags, which specify colu
 * `[expression]` - square brackets can be used to group more complex expressions
 
 Sample names may be used as well as tags.
+
+### Example 1
 
 For example, if you had samples which you have tagged as being either "experimental" or "control" group when you ran the pipeline, with two replicates within each group, a possible test would be:
 
@@ -51,6 +53,34 @@ Here the `experimental` term is in addition to the baseline level given by `cont
 
 Hint: In R, you can check how the coefficients of a linear model will be calculated using the `ginv` function from the libaray `MASS`, which computes the pseudo-inverse. (Fitnoise2 uses weighting of observations, which slightly modifies this for each gene.)
 
+### Example 2
+
+Say you had samples from three experimental groups, "group1", "group2", and "group3" and you wanted to know if there were any differences between the group. A suitable ANOVA-style test would be:
+
+    tail-tools test: test-output-dir pipeline-dir null: group1/group2/group3 alt: group2 group3
+
+From this our null hypothesis would be:
+
+    1      group1-rep1
+    1      group1-rep2
+    1      group2-rep1
+    1      group2-rep2
+    1      group3-rep1
+    1      group3-rep2
+
+and our alternative hypothesis would be:
+
+    1 0 0  group1-rep1
+    1 0 0  group1-rep2
+    1 1 0  group2-rep1
+    1 1 0  group2-rep2
+    1 0 1  group3-rep1
+    1 0 1  group3-rep2
+
+The two additional coefficients will be group2 minus group1 and group3 minus group1,
+group1 acting as a "baseline". Again, you can check this in R with `ginv`.
+
+### See also
 
 See the [Fitnoise](https://github.com/pfh/fitnoise) documentation for further details of the mathematics behind this.
 
