@@ -1,4 +1,8 @@
 
+0.39 - Bugfix with groups.
+       More documentation of pipeline output.
+       Include design matrix in report from "test:".
+
 0.38 - Allow more parallelism for tail-count, memory usage doesn't seem to be severe.
        Check for duplicate sample name or duplicate read filename in "analyse-polya-batch:".
 

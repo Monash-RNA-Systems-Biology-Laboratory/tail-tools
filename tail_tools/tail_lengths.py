@@ -784,102 +784,102 @@ class Plot_comparison(config.Action_with_prefix, runr.R_action):
 
 
 
-#@config.help(
-#    'Merge counts from groups of samples (eg replicates) into one.',
-#    'Counts are added, and tail lengths and proportions averaged.'
-#    )
-#@config.Positional('counts', '...-counts.csv file produced by "aggregate-tail-lengths:".')
-#@config.Main_section('groups', 'New samples, given as a list of <selection>=<name>.')
-#class Collapse_counts(config.Action_with_prefix):
-#    counts = None
-#    groups = [ ]
-#    
-#    def run(self):
-#        data = io.read_grouped_table(
-#            self.counts,
-#            [('Count',str), ('Annotation',str), ('Tail_count',str), ('Tail',str), ('Proportion',str)],
-#            'Count',
-#            )
-#        
-#        features = data['Count'].keys()
-#        samples = data['Count'].value_type().keys()
-#        
-#        tags = { }
-#        for sample in samples:
-#            tags[sample] = [sample]        
-#        for line in data.comments:
-#            if line.startswith('#sampleTags='):
-#                parts = line[len('#sampleTags='):].split(',')
-#                tags[parts[0]] = parts
-#        
-#        group_names = [ ]
-#        groups = [ ]
-#        group_tags = [ ]
-#        
-#        for item in self.groups:
-#            select = selection.term_specification(item)
-#            name = selection.term_name(item)
-#            group = [ item for item in samples if selection.matches(select, tags[item]) ]
-#            assert group, 'Empty group: '+name
-#            
-#            this_group_tags = [ name ]
-#            for tag in tags[group[0]]:
-#                if tag == name: continue
-#                for item in group[1:]:
-#                    for item2 in tags[item]:
-#                        if tag not in item2: break
-#                    else:
-#                        this_group_tags.append(tag)
-#            
-#            group_names.append(name)
-#            groups.append(group)
-#            group_tags.append(this_group_tags)
-#        
-#        result = io.Grouped_table()
-#        result.comments = [ '#Counts' ]
-#        for item in group_tags:
-#            result.comments.append('#sampleTags='+','.join(item))
-#        
-#        
-#        count = [ ]
-#        tail_count = [ ]
-#        tail = [ ]
-#        proportion = [ ]
-#        for feature in features:
-#            this_count = [ ]
-#            this_tail_count = [ ]
-#            this_tail = [ ]
-#            this_proportion = [ ]
-#            for group in groups:
-#                this_this_count = [ ]
-#                this_this_tail_count = [ ]
-#                this_this_tail = [ ]
-#                this_this_proportion = [ ]
-#                for sample in group:
-#                    this_this_count.append(int(data['Count'][feature][sample]))
-#                    this_this_tail_count.append(int(data['Tail_count'][feature][sample]))
-#                    item = data['Tail'][feature][sample]
-#                    if item != 'NA': this_this_tail.append(float(item))
-#                    item = data['Proportion'][feature][sample]
-#                    if item != 'NA': this_this_proportion.append(float(item))
-#                
-#                this_count.append(str(sum(this_this_count)))
-#                this_tail_count.append(str(sum(this_this_tail_count)))
-#                this_tail.append(str(sum(this_this_tail)/len(this_this_tail)) if this_this_tail else 'NA')
-#                this_proportion.append(str(sum(this_this_proportion)/len(this_this_proportion)) if this_this_proportion else 'NA')
-#                    
-#            count.append(this_count)
-#            tail_count.append(this_tail_count)
-#            tail.append(this_tail)
-#            proportion.append(this_proportion)
-#        
-#        matrix = io.named_matrix_type(features,group_names)
-#        result['Count'] = matrix(count)
-#        result['Annotation'] = data['Annotation']
-#        result['Tail_count'] = matrix(tail_count)
-#        result['Tail'] = matrix(tail)
-#        result['Proportion'] = matrix(proportion)
-#        result.write_csv(self.prefix + '.csv')
+@config.help(
+    'Merge counts from groups of samples (eg replicates) into one.',
+    'Counts are added, and tail lengths and proportions averaged.'
+    )
+@config.Positional('counts', '...-counts.csv file produced by "aggregate-tail-lengths:".')
+@config.Main_section('groups', 'New samples, given as a list of <selection>=<name>.')
+class Collapse_counts(config.Action_with_prefix):
+    counts = None
+    groups = [ ]
+    
+    def run(self):
+        data = io.read_grouped_table(
+            self.counts,
+            [('Count',str), ('Annotation',str), ('Tail_count',str), ('Tail',str), ('Proportion',str)],
+            'Count',
+            )
+        
+        features = data['Count'].keys()
+        samples = data['Count'].value_type().keys()
+        
+        tags = { }
+        for sample in samples:
+            tags[sample] = [sample]        
+        for line in data.comments:
+            if line.startswith('#sampleTags='):
+                parts = line[len('#sampleTags='):].split(',')
+                tags[parts[0]] = parts
+        
+        group_names = [ ]
+        groups = [ ]
+        group_tags = [ ]
+        
+        for item in self.groups:
+            select = selection.term_specification(item)
+            name = selection.term_name(item)
+            group = [ item for item in samples if selection.matches(select, tags[item]) ]
+            assert group, 'Empty group: '+name
+            
+            this_group_tags = [ name ]
+            for tag in tags[group[0]]:
+                if tag == name: continue
+                for item in group[1:]:
+                    for item2 in tags[item]:
+                        if tag not in item2: break
+                    else:
+                        this_group_tags.append(tag)
+            
+            group_names.append(name)
+            groups.append(group)
+            group_tags.append(this_group_tags)
+        
+        result = io.Grouped_table()
+        result.comments = [ '#Counts' ]
+        for item in group_tags:
+            result.comments.append('#sampleTags='+','.join(item))
+        
+        
+        count = [ ]
+        tail_count = [ ]
+        tail = [ ]
+        proportion = [ ]
+        for feature in features:
+            this_count = [ ]
+            this_tail_count = [ ]
+            this_tail = [ ]
+            this_proportion = [ ]
+            for group in groups:
+                this_this_count = [ ]
+                this_this_tail_count = [ ]
+                this_this_tail = [ ]
+                this_this_proportion = [ ]
+                for sample in group:
+                    this_this_count.append(int(data['Count'][feature][sample]))
+                    this_this_tail_count.append(int(data['Tail_count'][feature][sample]))
+                    item = data['Tail'][feature][sample]
+                    if item != 'NA': this_this_tail.append(float(item))
+                    item = data['Proportion'][feature][sample]
+                    if item != 'NA': this_this_proportion.append(float(item))
+                
+                this_count.append(str(sum(this_this_count)))
+                this_tail_count.append(str(sum(this_this_tail_count)))
+                this_tail.append(str(sum(this_this_tail)/len(this_this_tail)) if this_this_tail else 'NA')
+                this_proportion.append(str(sum(this_this_proportion)/len(this_this_proportion)) if this_this_proportion else 'NA')
+                    
+            count.append(this_count)
+            tail_count.append(this_tail_count)
+            tail.append(this_tail)
+            proportion.append(this_proportion)
+        
+        matrix = io.named_matrix_type(features,group_names)
+        result['Count'] = matrix(count)
+        result['Annotation'] = data['Annotation']
+        result['Tail_count'] = matrix(tail_count)
+        result['Tail'] = matrix(tail)
+        result['Proportion'] = matrix(proportion)
+        result.write_csv(self.prefix + '.csv')
 
 
 

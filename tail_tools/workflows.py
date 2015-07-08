@@ -798,7 +798,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                         sample.tags + [ sample.output_dir ]
                         ):
                     this_groups.append(selection.term_name(item))
-            group = '/'.join(this_groups) if this_groups else 'ungrouped'
+            group = ','.join(this_groups) if this_groups else 'ungrouped'
             if group not in groups: groups.append(group)
             
             item = {
@@ -807,7 +807,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                     workspace/('samples',sample.output_dir,'alignments_filtered_sorted.bam')
                     ),
                 'group' : group,
-                #'tags' : sample.tags,
+                'tags' : sample.tags,
                 }
             samples.append(item)
             

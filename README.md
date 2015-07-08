@@ -258,6 +258,12 @@ BAM-file alignment attributes
 
 * [BAM-file alignment attributes](doc/bam-files.md)
 
+
+Pipeline output
+---
+
+* [Directories and files produced by the pipeline](doc/output.md)
+
 Statistics
 ---
 

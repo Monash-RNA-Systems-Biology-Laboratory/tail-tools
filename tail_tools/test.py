@@ -437,11 +437,14 @@ class Test(config.Action_with_output_dir):
            )
        pairs_model_rows = [ item+'-peak1' for item in model_rows ] + [ item+'-peak2' for item in model_rows ]
        
-       print
-       print 'Design matrix'
-       print '['+('-'*(8*n_alt-2))+'] test coefficients'
+       
+       design_str = '['+('-'*(8*n_alt-2))+'] test coefficients\n'
        for row, name in zip(model, model_rows):
-           print ''.join('%7g ' % item for item in row), name
+           design_str += "%s %s\n" % (''.join('%7g ' % item for item in row), name)
+       
+       print
+       print "Design matrix"
+       print design_str
        print
        print 'Pair design matrix'
        print '['+('-'*(8*n_alt-2))+'] test coefficients'
@@ -538,7 +541,11 @@ class Test(config.Action_with_output_dir):
            reporter.write('</td></tr>')
 
        reporter.write('</table>\n')
-        
+       
+       reporter.subheading("Design matrix")
+       
+       reporter.write('<pre>' + design_str + '</pre>')
+       
        reporter.close()
 
 
