@@ -16,7 +16,7 @@ The basic form this takes is:
         null: <terms in null linear model> \
         alt: <additional terms in alternative linear model>
 
-Terms are expressions involving sample names and sample tags, which specify columns of a design matrix. Matching samples are given a value of 1 in this column, and non-matching samples given a value of 0. Type `nesoni` for documentation on these, but briefly:
+Terms are expressions involving sample names and sample tags, which specify columns of a model matrix. Matching samples are given a value of 1 in this column, and non-matching samples given a value of 0. Type `nesoni` for documentation on these, but briefly:
 
 * `tag1` - an expression selecting tag1
 * `all` - an expression selecting select all samples
@@ -27,31 +27,38 @@ Terms are expressions involving sample names and sample tags, which specify colu
 
 Sample names may be used as well as tags.
 
+If the model matrix needs to contain values other than 0 and 1, there is an alternative form for the terms. For example if sample1, sample2, and sample3 needed to be given values -0.5, 2 and 0.5 in a column, this could be specified with:
+
+    {-0.5}sample1,{2}sample2,{0.5}sample3
+
+
+
+
 ### Example 1
 
 For example, if you had samples which you have tagged as being either "experimental" or "control" group when you ran the pipeline, with two replicates within each group, a possible test would be:
 
     tail-tools test: test-output-dir pipeline-dir null: control/experimental alt: experimental
   
-From this, our null hypothesis design matrix would be a 4x1 matrix:
+From this, our null hypothesis model matrix would be a 4x1 matrix:
 
     1    control-replicate-1
     1    control-replicate-2
     1    experimental-replicate-1
     1    experimental-replicate-2
 
-and our alternative hypothesis design matrix would be a 4x2 matrix:
+and our alternative hypothesis model matrix would be a 4x2 matrix:
 
     1 0  control-replicate-1
     1 0  control-replicate-2
     1 1  experimental-replicate-1
     1 1  experimental-replicate-2
 
-`tail-tools test` will print out the design matrix when it is run, so you can check that is what you wanted.
+`tail-tools test` will print out the model matrix when it is run, so you can check that is what you wanted.
 
 Here the `experimental` term is in addition to the baseline level given by `control`, and therefore is the difference between the experimental and control groups. Terms coefficients fitted for terms in `alt:` are reported in the output of `tail-tools test:`.
 
-Hint: In R, you can check how the coefficients of a linear model will be calculated using the `ginv` function from the libaray `MASS`, which computes the pseudo-inverse.
+Hint: In R, you can check how the coefficients of a linear model will be calculated using the `ginv` function from the library `MASS`, which computes the pseudo-inverse.
 
 
 ### Example 2
@@ -60,7 +67,7 @@ Say you had samples from three experimental groups, "group1", "group2", and "gro
 
     tail-tools test: test-output-dir pipeline-dir null: group1/group2/group3 alt: group2 group3
 
-From this our null hypothesis would be:
+From this our null hypothesis model would be:
 
     1      group1-rep1
     1      group1-rep2
@@ -69,7 +76,7 @@ From this our null hypothesis would be:
     1      group3-rep1
     1      group3-rep2
 
-and our alternative hypothesis would be:
+and our alternative hypothesis model would be:
 
     1 0 0  group1-rep1
     1 0 0  group1-rep2
