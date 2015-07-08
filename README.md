@@ -268,7 +268,7 @@ Statistics
 ---
 
 * [Statistics produced by `tail-tools analyse-tail-counts:`](doc/statistics.md)
-
+* [Differential expression and tail length](doc/differential.md)
 
 
 
