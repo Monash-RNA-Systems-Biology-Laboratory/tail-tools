@@ -55,7 +55,7 @@ Hint: In R, you can check how the coefficients of a linear model will be calcula
 
 ### Example 2
 
-Say you had samples from three experimental groups, "group1", "group2", and "group3" and you wanted to know if there were any differences between the group. A suitable ANOVA-style test would be:
+Say you had samples from three experimental groups, "group1", "group2", and "group3" and you wanted to know if there were any differences between the groups. A suitable ANOVA-style test would be:
 
     tail-tools test: test-output-dir pipeline-dir null: group1/group2/group3 alt: group2 group3
 
@@ -79,7 +79,7 @@ and our alternative hypothesis would be:
 
 The two additional coefficients will be group2 minus group1 and group3 minus group1,
 group1 acting as a "baseline". Again, you can check this in R with `ginv`.
-
+r
 ### See also
 
 See the [Fitnoise](https://github.com/pfh/fitnoise) documentation for further details of the mathematics behind this.
