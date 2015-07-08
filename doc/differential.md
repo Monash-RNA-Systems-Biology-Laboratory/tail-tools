@@ -31,7 +31,7 @@ If the model matrix needs to contain values other than 0 and 1, there is an alte
 
     {-0.5}sample1,{2}sample2,{0.5}sample3
 
-
+(Any other samples would be given value zero in this term.)
 
 
 ### Example 1
