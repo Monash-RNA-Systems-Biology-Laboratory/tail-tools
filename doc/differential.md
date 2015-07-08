@@ -79,7 +79,7 @@ and our alternative hypothesis would be:
 
 The two additional coefficients will be group2 minus group1 and group3 minus group1,
 group1 acting as a "baseline". Again, you can check this in R with `ginv`.
-r
+
 ### See also
 
 See the [Fitnoise](https://github.com/pfh/fitnoise) documentation for further details of the mathematics behind this.
