@@ -1,4 +1,8 @@
 
+0.40 - Hack to reduce parallelism on tail_count, reduce memory usage.
+       Fix very silly overuse of memory.
+       Other memory improvements in aggregate-tail-counts.
+
 0.39 - Bugfix with groups.
        More documentation of pipeline output.
        Include design matrix in report from "test:".

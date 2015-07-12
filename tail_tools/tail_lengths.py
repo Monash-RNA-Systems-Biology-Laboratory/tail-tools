@@ -27,9 +27,10 @@ class Tail_count(config.Action_with_prefix):
      
      extension = None
      
-     ##Memory intensive, don't run in parallel
-     #def cores_required(self):
-     #    return legion.coordinator().get_cores()
+     #Memory intensive, hack to run with reduced parallelism
+     # as nesoni doesn't have any memory usage management, only core usage
+     def cores_required(self):
+         return min(4, legion.coordinator().get_cores())
 
      def run(self):
          assert self.extension is not None, '--extension must be specified'
@@ -71,7 +72,7 @@ class Tail_count(config.Action_with_prefix):
              item.hits = [] # [ (rel_start, rel_end, tail_length) ]
          
          for item in index.itervalues(): 
-             item.prepare()
+             item.prepare()         
          
          for read_name, fragment_alignments, unmapped in sam.bam_iter_fragments(workspace/'alignments_filtered.bam'):
              for fragment in fragment_alignments:
@@ -153,31 +154,42 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
         names = [ ]
         sample_tags = [ ]
         
-        for item in self.pickles:
+        #TODO: store max_length separately, avoid loading twice
+        
+        max_length = 1
+        for i, item in enumerate(self.pickles):
             f = io.open_possibly_compressed_file(item)
             name, tags, datum = pickle.load(f)
             f.close()
-            data.append(datum)
+            #data.append(datum)
             names.append(name)
             sample_tags.append(tags)
+            
+            try:
+                max_length = max(max_length, max( 
+                    item[2] #tail_length
+                    for feature in datum
+                    for item in feature.hits
+                    ) + 1)
+            except ValueError:
+                pass
+            
+            if i == 0:
+               annotations = datum
+               for item in annotations:
+                   del item.hits
         
-        annotations = data[0]
+        del datum
         
-        all_lengths = [ 
-            #tail_length
-            item[2]
-            for sample in data
-            for feature in sample
-            #for rel_start,rel_end,tail_length in feature.hits
-            for item in feature.hits
-            ]
-        if all_lengths: 
-            max_length = max(all_lengths)+1
-        else:
-            max_length = 1
-        del all_lengths
-        
-        for i, sample in enumerate(data):
+        self.log.log("Maximum tail length %d\n" % max_length)
+
+        data = [ ]                    
+        for i, item in enumerate(self.pickles):
+            f = io.open_possibly_compressed_file(item)
+            name, tags, sample = pickle.load(f)
+            f.close()
+            data.append(sample)            
+            
             n_alignments = 0
             n_duplicates = 0
             n_good = 0
@@ -189,6 +201,8 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
                 for item in feature.hits:
                     rel_start,rel_end,tail_length,adaptor_bases = item
                     buckets[ (rel_start,rel_end) ].append((tail_length,adaptor_bases))
+                del feature.hits
+                
                 for item in buckets.values():
                     n_alignments += len(item)
                     n_good += 1
@@ -227,7 +241,7 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
         sample_total_tail = [ [0.0]*n_features for i in xrange(n_features) ]
         
         sample_quantile_tail = collections.OrderedDict( 
-            (item, [ [None]*n_features for i in xrange(n_features) ]) 
+            (item, [ [None]*n_samples for i in xrange(n_features) ]) 
             for item in [25,50,75,100]
             )
         
@@ -968,13 +982,14 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         
         assert len(set(pickle_filenames)) == len(pickle_filenames), "Duplicate sample name."
         
-        Aggregate_tail_counts(
-            output_dir=self.output_dir, 
-            pickles=pickle_filenames,
-            saturation=self.saturation,
-            tail=self.tail,
-            adaptor=self.adaptor
-            ).make()
+        with nesoni.Stage() as stage:
+            Aggregate_tail_counts(
+                output_dir=self.output_dir, 
+                pickles=pickle_filenames,
+                saturation=self.saturation,
+                tail=self.tail,
+                adaptor=self.adaptor
+                ).process_make(stage)
         
         nesoni.Norm_from_counts(
             prefix=work/'norm',

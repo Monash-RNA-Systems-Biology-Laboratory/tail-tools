@@ -88,7 +88,7 @@ and our alternative hypothesis model would be:
     1 0 1  group3-rep2
 
 The two additional coefficients will be group2 minus group1 and group3 minus group1,
-group1 acting as a "baseline". Again, you can check this in R with `ginv( )`.
+group1 acting as a "baseline". Again, you can check this in R with `ginv( )q`.
 
 ### See also
 

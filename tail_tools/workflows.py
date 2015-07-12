@@ -366,7 +366,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             for item in samples:
                 item.process_make(stage)
 
-
+        
         with nesoni.Stage() as stage:
             analyse_gene_counts_0 = analyse_template(
                 output_dir = expressionspace/'genewise',
@@ -416,7 +416,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                         norm_file = norm_filename,
                         #delete_igv = False,
                         ).process_make(stage)
-
+        
         
         tail_tools.Call_utrs(
             workspace/('peaks','primary-peak'),
