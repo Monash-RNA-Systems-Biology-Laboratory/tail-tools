@@ -4,9 +4,7 @@ import csv, re
 from nesoni import config, io, bio, annotation
 from . import env
 
-@config.help("""\
-Create a GFF file for regions amplified in a REPAT experiment.
-
+@config.help("Create a GFF file for regions amplified in a REPAT experiment.","""\
 <csv-file> should be a CSV file with headings "ID" and "Primer", for example:
 
 ID,Primer
