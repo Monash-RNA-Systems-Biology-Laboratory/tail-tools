@@ -1,4 +1,6 @@
 
+0.41 - Add "primer-gff" tool.
+
 0.40 - Hack to reduce parallelism on tail_count, reduce memory usage.
        Fix very silly overuse of memory.
        Other memory improvements in aggregate-tail-counts.
