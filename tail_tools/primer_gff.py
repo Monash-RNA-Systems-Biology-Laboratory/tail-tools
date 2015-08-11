@@ -12,6 +12,8 @@ gene1,ACGTACGTACGT
 gene2,CGTACGTAGCAT
 
 """)
+@config.Int_flag("skip",
+    "Discard first n bases of primer sequences.")
 @config.Int_flag("length",
     "Length of features to produce, should be at least intended read length.")
 @config.Positional("reference",
@@ -24,6 +26,7 @@ class Primer_gff(config.Action_with_prefix):
     reference = None
     csv_file = None
 
+    skip = 0
     length = 400
 
     def run(self):
@@ -44,7 +47,9 @@ class Primer_gff(config.Action_with_prefix):
                 id = row[id_col].strip()
                 assert " " not in id, "ID contains space: "+id
                 primer = row[primer_col].strip().upper()
+                assert len(primer) > self.skip, "Primer too short: "+id
                 assert [ char in "ACGT" for char in primer ], "Primer not ACGT: "+id
+                primer = primer[self.skip:]
                 rprimer = bio.reverse_complement(primer)
                 
                 hits = [ ]
