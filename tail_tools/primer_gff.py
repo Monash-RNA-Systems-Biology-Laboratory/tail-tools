@@ -60,28 +60,32 @@ class Primer_gff(config.Action_with_prefix):
                     for match in re.finditer(
                             rprimer, seqs[seq_name], re.IGNORECASE):
                         hits.append( (seq_name, -1, match.end()-self.length, match.end()) )
+                    if len(hits) > 100:
+                        raise config.Error("Many many hits for "+id+".")
                 
                 if not hits:
                     errors.append("No hits for "+id+".")
                     continue
-                if len(hits) != 1:
-                    errors.append("Multiple hits for "+id+".")
-                    continue
+
+                if len(hits) > 1:
+                    self.log.log("Warning: %d hits for %s.\n" % (len(hits),id))
                     
-                [hit] = hits
-                
-                result.append(annotation.Annotation(
-                    seqid = hit[0],
-                    source = "tail-tools",
-                    type = "region",
-                    start = hit[2],
-                    end = hit[3],
-                    strand = hit[1],
-                    attr = dict(
-                        ID=id,
-                        Primer=primer
-                        )
-                    ))
+                for i, hit in enumerate(hits):
+                    hit_name = id
+                    if len(hits) > 1:
+                        hit_name += "-%dof%d" % (i+1,len(hits))
+                    result.append(annotation.Annotation(
+                        seqid = hit[0],
+                        source = "tail-tools",
+                        type = "region",
+                        start = hit[2],
+                        end = hit[3],
+                        strand = hit[1],
+                        attr = dict(
+                            ID=hit_name,
+                            Primer=primer
+                            )
+                        ))
         
         if errors:
             raise config.Error("\n".join(errors))

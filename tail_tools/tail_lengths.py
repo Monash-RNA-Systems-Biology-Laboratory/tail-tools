@@ -643,12 +643,12 @@ class Plot_pooled(config.Action_with_prefix, runr.R_action):
 @config.Positional('aggregate', 'Prefix of output from "aggregate-tail-lengths:"')
 @config.Int_flag('min_tails', 'Minimum number of reads with tails *in each sample* required in order to include a gene.')
 @config.Float_flag('min_span', 'Minimum difference in average tail lengths required in order to include a gene.')
-@config.Float_flag('glog_moderation', 'Amount of moderation used in log transformation of expression level.')
+@config.String_flag('vst_method')
 class Plot_comparison(config.Action_with_prefix, runr.R_action):
     aggregate = None
     min_tails = 100
     min_span = 4.0
-    glog_moderation = 5.0
+    vst_method = "anscombe.nb"
 
     script = r"""
     library(nesoni)
@@ -660,7 +660,7 @@ class Plot_comparison(config.Action_with_prefix, runr.R_action):
     #expression <- voom( as.matrix(data$Count), normalize.method='quantile' )$E
     
     dgelist <- read.counts(sprintf('%s/counts.csv',aggregate))
-    expression <- glog2.rpm.counts(dgelist, glog_moderation)$E
+    expression <- vst.rpm.counts(dgelist, vst_method)$E
     annotation <- dgelist$genes
     
     raw <- as.matrix(read.grouped.table(sprintf('%s/raw.csv',aggregate))$All)
@@ -919,9 +919,6 @@ class Collapse_counts(config.Action_with_prefix):
      'Reads that start at the same position will only '
      'count as up to this many. Zero for no saturation.'
      )
-@config.Float_flag('glog_moderation',
-     'Moderation amount for heatmaps.'
-     )
 @config.String_flag('title', 'Report title.')
 @config.String_flag('file_prefix', 'Prefix for filenames in report.')
 @config.Main_section('working_dirs', 'Sample directories, or full pipeline output directories')
@@ -933,7 +930,6 @@ class Analyse_tail_counts(config.Action_with_output_dir):
     tail = 4
     adaptor = 0
     saturation = 0
-    glog_moderation = 5.0
     title = 'PAT-Seq expression analysis'
     file_prefix = ''
     working_dirs = [ ]
@@ -997,11 +993,11 @@ class Analyse_tail_counts(config.Action_with_output_dir):
             ).make() 
 
 
-        glog = nesoni.Glog(
-            prefix=work/'glog',
-            counts=work/'counts.csv',
-            norm_file=work/'norm.csv',
-            )
+        #vst = nesoni.Vst(
+        #    prefix=work/'mlog',
+        #    counts=work/'counts.csv',
+        #    norm_file=work/'norm.csv',
+        #    )
             
         similarity = nesoni.Similarity(
             prefix=plot_workspace/'similarity',
@@ -1025,7 +1021,6 @@ class Analyse_tail_counts(config.Action_with_output_dir):
                 aggregate = self.output_dir,
                 min_tails = min_tails,
                 min_span = min_span,
-                glog_moderation = self.glog_moderation,
                 )
             for min_tails in [50,100,200,500]
             for min_span in [2,4,8,10,15,20,25,30]
@@ -1037,13 +1032,12 @@ class Analyse_tail_counts(config.Action_with_output_dir):
                 counts = work/'counts.csv',
                 norm_file = work/'norm.csv',
                 min_span = math.log(fold)/math.log(2.0),
-                glog_moderation = self.glog_moderation,
                 )            
             for fold in [ 1.5, 2.0, 4.0, 6.0, 8.0, 10.0, 20.0, 30.0, 40.0 ]
             ]
 
         with nesoni.Stage() as stage:        
-            glog.process_make(stage)
+            #vst.process_make(stage)
             similarity.process_make(stage)
             for action in plot_pooleds + plot_comparisons + heatmaps:
                 action.process_make(stage)

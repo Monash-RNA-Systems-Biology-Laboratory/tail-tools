@@ -47,15 +47,15 @@ Use of PyPy is recommened for speed.
 
 - rsync (for downloads from UCSC browser)
 
-- R, with package "seriation" and BioConductor packages "limma" and "edgeR"
+- R, with package "seriation" and BioConductor packages "limma" and "edgeR", and ["varistran"](https://github.com/MonashBioinformaticsPlatform/varistran)
+
+- [Fitnoise](https://github.com/pfh/fitnoise) for differential testing.
 
 - [degust.py](https://victorian-bioinformatics-consortium.github.io/degust/dist/latest/degust.py)
 
 
 
 Optional:
-
-- [Fitnoise](https://github.com/pfh/fitnoise) for latest, greatest differential testing.
 
 - [SplitsTree](http://www.splitstree.org/)
   Note: v4.13.1 seems to be broken, v4.11.3 works

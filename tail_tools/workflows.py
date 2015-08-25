@@ -600,11 +600,11 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.write('<ul>\n')
         r.write('<li> -info.csv = gene name and product, etc\n')
         r.write('<li> -count.csv = read count\n')
-        r.write('<li> -glog2-RPM.csv = moderated log2 Reads Per Million\n')
+        r.write('<li> -mlog2-RPM.csv = moderated log2 Reads Per Million\n')
         r.write('<li> -tail.csv = average poly(A) tail length\n')
         r.write('<li> -tail-count.csv = poly(A) read count\n')
         r.write('<li> -proportion.csv = proportion of reads with poly(A)\n')
-        r.write('<li> -norm.csv = read count normalization used for glog2 transformation, heatmaps, differential tests, etc etc\n')
+        r.write('<li> -norm.csv = read count normalization used for log2 transformation, heatmaps, differential tests, etc etc\n')
         r.write('</ul>\n')
 
         r.p('This set of genes was used in the analysis:')
@@ -614,21 +614,27 @@ class Analyse_polya_batch(config.Action_with_output_dir):
 
         r.write('<p/><hr>\n')
         r.subheading('About normalization and log transformation')
-        
-        r.p('Counts are converted to '
-            'log2 Reads Per Million using a variance stabilised transformation. '
-            'Let the generalised logarithm with moderation m be')
-        
-        r.p('glog(x,m) = log2((x+sqrt(x*x+4*m*m))/2)')
-        
-        r.p('then the transformed values will be')
-        
-        r.p('glog( count/library_size*1e6, log_moderation/mean_library_size*1e6 )')
-        
-        r.p('where log_moderation is a parameter, here 5. '
-            'The library sizes used are effective library sizes after TMM normalization.')
 
-        r.write('<p/><hr>\n')
+        r.p('Counts are converted to '
+            'log2 Reads Per Million using Anscombe\'s variance stabilizing transformation '
+            'for the negative binomial distribution, implemented in '
+            'R package "varistran".')
+        
+        #r.p('Counts are converted to '
+        #    'log2 Reads Per Million using a variance stabilised transformation. '
+        #    'Let the generalised logarithm with moderation m be')
+        #
+        #r.p('glog(x,m) = log2((x+sqrt(x*x+4*m*m))/2)')
+        #
+        #r.p('then the transformed values will be')
+        #
+        #r.p('glog( count/library_size*1e6, log_moderation/mean_library_size*1e6 )')
+        #
+        #r.p('where log_moderation is a parameter, here 5. '
+        #    'The library sizes used are effective library sizes after TMM normalization.')
+        #
+        #r.write('<p/><hr>\n')
+        
         r.subheading('About deduplication')
         
         r.p('Use deduplicated versions with care. '
@@ -745,44 +751,40 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         work = io.Workspace(self.output_dir, must_exist=False)
         raw = io.Workspace(work/'raw', must_exist=False)
         
-        with workspace.tempspace() as temp:
-            for dedup in ['','-dedup']:
-                for name, counts, norms in [
-                        ('genewise'+dedup,
-                            work/('expression','genewise'+dedup,'counts.csv'),
-                            work/('expression','genewise'+dedup,'norm.csv'),
-                            ),
-                        ('primarypeakwise'+dedup,
-                            work/('expression','primarypeakwise'+dedup,'counts.csv'),
-                            work/('expression','primarypeakwise'+dedup,'norm.csv'),
-                            ),
-                        ('peakwise'+dedup,
-                            work/('expression','peakwise'+dedup,'counts.csv'),
-                            work/('expression','peakwise'+dedup,'norm.csv'),
-                            ),
-                        ('pairwise'+dedup,
-                            work/('peak-shift'+dedup,'individual-pairs.csv'),
-                            work/('peak-shift'+dedup,'individual-pairs-norm.csv'),
-                            ),
-                        ]:
-                    nesoni.Glog(
-                        temp/('glog-'+name),
-                        counts,
-                        norm_file = norms
-                        ).make()
-                    
-                    glog_table = io.read_grouped_table(temp/('glog-'+name+'.csv'))
-                    io.write_csv_2(raw/(name+'-glog2-RPM.csv'), glog_table['glog2'])
-                    
-                    counts_table = io.read_grouped_table(counts)
-                    io.write_csv_2(raw/(name+'-info.csv'), counts_table['Annotation'])
-                    io.write_csv_2(raw/(name+'-count.csv'), counts_table['Count'])
-                    io.write_csv_2(raw/(name+'-tail.csv'), counts_table['Tail'])
-                    io.write_csv_2(raw/(name+'-tail-count.csv'), counts_table['Tail_count'])
-                    io.write_csv_2(raw/(name+'-proportion.csv'), counts_table['Proportion'])
-                    
-                    norm_table = io.read_grouped_table(norms)
-                    io.write_csv_2(raw/(name+'-norm.csv'), norm_table['All'])
+        for dedup in ['','-dedup']:
+            for name, counts, norms in [
+                    ('genewise'+dedup,
+                        work/('expression','genewise'+dedup,'counts.csv'),
+                        work/('expression','genewise'+dedup,'norm.csv'),
+                        ),
+                    ('primarypeakwise'+dedup,
+                        work/('expression','primarypeakwise'+dedup,'counts.csv'),
+                        work/('expression','primarypeakwise'+dedup,'norm.csv'),
+                        ),
+                    ('peakwise'+dedup,
+                        work/('expression','peakwise'+dedup,'counts.csv'),
+                        work/('expression','peakwise'+dedup,'norm.csv'),
+                        ),
+                    ('pairwise'+dedup,
+                        work/('peak-shift'+dedup,'individual-pairs.csv'),
+                        work/('peak-shift'+dedup,'individual-pairs-norm.csv'),
+                        ),
+                    ]:
+                nesoni.Vst(
+                    raw/(name+'-mlog2-RPM'),
+                    counts,
+                    norm_file = norms
+                    ).make()
+                
+                counts_table = io.read_grouped_table(counts)
+                io.write_csv_2(raw/(name+'-info.csv'), counts_table['Annotation'])
+                io.write_csv_2(raw/(name+'-count.csv'), counts_table['Count'])
+                io.write_csv_2(raw/(name+'-tail.csv'), counts_table['Tail'])
+                io.write_csv_2(raw/(name+'-tail-count.csv'), counts_table['Tail_count'])
+                io.write_csv_2(raw/(name+'-proportion.csv'), counts_table['Proportion'])
+                
+                norm_table = io.read_grouped_table(norms)
+                io.write_csv_2(raw/(name+'-norm.csv'), norm_table['All'])
 
 
     def _create_json(self):                    
