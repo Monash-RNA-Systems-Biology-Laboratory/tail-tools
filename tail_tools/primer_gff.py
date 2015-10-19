@@ -44,7 +44,7 @@ class Primer_gff(config.Action_with_prefix):
             primer_col = headings.index("primer")
             
             for row in reader:
-                if not row[id_col].strip() and not row[primer_col].strip():
+                if len(row) == 0 or (not row[id_col].strip() and not row[primer_col].strip()):
                     continue
                 
                 id = row[id_col].strip()
