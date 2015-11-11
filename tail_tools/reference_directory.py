@@ -2,7 +2,7 @@
 import os, collections, gzip, re, sys
 
 import nesoni
-from nesoni import reference_directory, workspace, io, config, annotation, annotation_tools
+from nesoni import reference_directory, workspace, io, config, annotation, annotation_tools, span_index
 
 def natural_sorted(l): 
     convert = lambda text: int(text) if text.isdigit() else text.lower() 
@@ -25,7 +25,20 @@ class Tailtools_reference(reference_directory.Reference):
         #make-tt should do this
         #else:
         #    self.update_param(tail_tools_reference_version = VERSION)
-        
+
+
+
+def _max_extension(exon, cds_index, mrna_end_index):
+    # Get maximum extension until hit a CDS, arbitrarily max out at 10000
+    # Also do not extend through the end of another mRNA
+    max_extension = 10000
+    exon_end = exon.three_prime()
+    for hit in cds_index.get(exon_end.shifted(0,10000), same_strand=True):
+        max_extension = min(max_extension, hit.relative_to(exon_end).start)
+    for hit in mrna_end_index.get(exon_end.shifted(2,10000), same_strand=True):
+        max_extension = min(max_extension, hit.relative_to(exon_end).start)
+    return max(0,max_extension)
+
 
 @config.help(
     'Create a tail tools reference directory. '
@@ -56,50 +69,105 @@ class Make_tt_reference(config.Action_with_output_dir):
         annotations = list(annotation.read_annotations(work/'reference.gff'))
         annotation.link_up_annotations(annotations)
         
-        with open(work/'utr.gff','wb') as f:
-            annotation.write_gff3_header(f)
-            for gene in annotations:
-                if gene.type != 'gene': continue
-                mrnas = [ item for item in gene.children if item.type == 'mRNA' ]
+        cds_index = span_index.index_annotations([
+            item for item in annotations if item.type == "CDS"
+            ])
+        mrna_end_index = span_index.index_annotations([
+            item.three_prime() for item in annotations if item.type == "mRNA"
+            ])
+        
+        mrna_utrs = [ ]
+        gene_utrs = [ ]
+        
+        for gene in annotations:
+            if gene.type != 'gene': continue
+
+            gene.attr['color'] = '#880088'
+
+            mrnas = [ item for item in gene.children if item.type == 'mRNA' ]
+        
+            gene_utr_5primes = [ ]
             
-                utr_5primes = [ ]
+            for mrna in mrnas:
+                mrna.attr["max_extension"] = str(_max_extension(mrna, cds_index, mrna_end_index))
+            
+                cdss = [ item for item in mrna.children if item.type == 'CDS' ]
+                exons = [ item for item in mrna.children if item.type == 'exon' ]
                 
-                for mrna in mrnas:
-                    cdss = [ item for item in mrna.children if item.type == 'CDS' ]
-                    exons = [ item for item in mrna.children if item.type == 'exon' ]
-                    if not cdss or not exons: continue
-                    if gene.strand >= 0:
-                       cds_3prime = max(item.end for item in cdss)
-                       for item in exons:
-                           if item.end > cds_3prime:
-                               utr_5primes.append(max(item.start,cds_3prime))
-                    else:
-                       cds_3prime = min(item.start for item in cdss)
-                       for item in exons:
-                           if item.start < cds_3prime:
-                               utr_5primes.append(min(item.end,cds_3prime))
+                if not exons: continue
                 
+                #link up annotations sorts children, so final is really final
+                for item in exons[:-1]:
+                    item.attr["max_extension"] = "0"
+                exons[-1].attr["max_extension"] = mrna.attr["max_extension"]
+                
+                if not cdss: continue
+                
+                mrna_utr_5primes = [ ]
                 if gene.strand >= 0:
-                    utr_start = max(utr_5primes) if utr_5primes else gene.end
-                    utr_end = max(utr_start+1,gene.end)
+                   cds_3prime = max(item.end for item in cdss)
+                   for item in exons:
+                       if item.end >= cds_3prime:
+                           mrna_utr_5primes.append(max(item.start,cds_3prime))
                 else:
-                    utr_end = min(utr_5primes) if utr_5primes else gene.start
-                    utr_start = min(gene.start,utr_end-1)
+                   cds_3prime = min(item.start for item in cdss)
+                   for item in exons:
+                       if item.start <= cds_3prime:
+                           mrna_utr_5primes.append(min(item.end,cds_3prime))
                 
-                attr = gene.attr.copy()
+                if mrna.strand >= 0:
+                    utr_start = min(mrna_utr_5primes) if mrna_utr_5primes else mrna.end
+                    utr_end = max(utr_start+1,mrna.end)
+                    gene_utr_5primes.append(utr_start)
+                else:
+                    utr_end = max(mrna_utr_5primes) if mrna_utr_5primes else mrna.start
+                    utr_start = min(mrna.start,utr_end-1)
+                    gene_utr_5primes.append(utr_end)
+                
+                attr = mrna.attr.copy()
                 attr['Parent'] = attr['ID']
                 attr['ID'] = attr['ID']+'-3UTR'
-                thing = annotation.Annotation(
+                attr['color'] = '#008888'
+                utr = annotation.Annotation(
                     source = 'tt',
                     type = 'three_prime_utr',
-                    seqid = gene.seqid,
-                    strand = gene.strand,
+                    seqid = mrna.seqid,
+                    strand = mrna.strand,
                     start = utr_start,
                     end = utr_end,
                     attr = attr,
                     )
-                print >> f, thing.as_gff()
+                max_ext = _max_extension(utr, cds_index, mrna_end_index)
+                utr.attr["max_extension"] = str(max_ext)
+                #Only include if there is an annotated 3' UTR or end is not in the middle of some other isoform's CDS
+                if utr_end-utr_start+max_ext > 1:
+                    mrna_utrs.append(utr)
             
+            if gene.strand >= 0:
+                utr_start = max(gene_utr_5primes) if gene_utr_5primes else gene.end
+                utr_end = max(utr_start+1,gene.end)
+            else:
+                utr_end = min(gene_utr_5primes) if gene_utr_5primes else gene.start
+                utr_start = min(gene.start,utr_end-1)
+            
+            attr = gene.attr.copy()
+            attr['Parent'] = attr['ID']
+            attr['ID'] = attr['ID']+'-3UTR'
+            attr['color'] = '#008888'
+            utr = annotation.Annotation(
+                source = 'tt',
+                type = 'three_prime_utr',
+                seqid = gene.seqid,
+                strand = gene.strand,
+                start = utr_start,
+                end = utr_end,
+                attr = attr,
+                )
+            utr.attr["max_extension"] = str(_max_extension(utr, cds_index, mrna_end_index))
+            gene_utrs.append(utr)
+        
+        annotation.write_gff3(work/'reference.gff', annotations + mrna_utrs)
+        annotation.write_gff3(work/'utr.gff', gene_utrs)
             
         work.update_param(tail_tools_reference_version=work.VERSION)
         

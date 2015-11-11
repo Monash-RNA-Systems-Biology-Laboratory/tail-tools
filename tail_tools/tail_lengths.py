@@ -13,24 +13,30 @@ def str_na(value):
         return str(value)
 
 
-@config.help(
-'Create file to be used by "aggregate-tail-lengths:".'
-)
+@config.help("""
+Create file to be used by "aggregate-tail-lengths:".
+
+Reads are aligned to "parts" features. A parent is then sought of type "types", possibly several levels up, or possibly zero levels up.
+
+If part features have a "max_extension" attribute, this is respected when extending them. Typically this is used to avoid extending into a following CDS.
+""")
 @config.String_flag('annotations', 'Filename containing annotations. Defaults to annotations in reference directory.')
 @config.String_flag('types', 'Comma separated list of feature types to use.')
+@config.String_flag('parts', 'Comma separated list of feature types that make up features. Defaults to types if blank.')
 @config.Int_flag('extension', 'How far downstrand of the given annotations a read or peak belonging to a gene might be.')
 @config.Positional('working_dir', 'Working directory to use as input.')
 class Tail_count(config.Action_with_prefix):
      annotations = None
      types = 'gene'
+     parts = 'exon'
      working_dir = None
      
      extension = None
      
-     #Memory intensive, hack to run with reduced parallelism
-     # as nesoni doesn't have any memory usage management, only core usage
-     def cores_required(self):
-         return min(4, legion.coordinator().get_cores())
+     ##Memory intensive, hack to run with reduced parallelism
+     ## as nesoni doesn't have any memory usage management, only core usage
+     #def cores_required(self):
+     #    return min(4, legion.coordinator().get_cores())
 
      def run(self):
          assert self.extension is not None, '--extension must be specified'
@@ -44,35 +50,61 @@ class Tail_count(config.Action_with_prefix):
              annotations_filename = self.annotations
          
          types = [ item.lower() for item in self.types.split(',') ]
+         
+         parts = self.parts or self.types 
+         parts = [ item.lower() for item in parts.split(',') ]
+         
+         
+         all_annotations = list(annotation.read_annotations(annotations_filename))
+         annotation.link_up_annotations(all_annotations)
+         for item in all_annotations: 
+             item.primary = None
      
          annotations = [ 
              item 
-             for item in annotation.read_annotations(annotations_filename)
+             for item in all_annotations
              if item.type.lower() in types
          ]
          
+         part_annotations = [ ]
+         seen = set()
+         queue = [ (item,item) for item in annotations ]
+         while queue:
+             primary, item = queue.pop()
+             if item.type.lower() in parts:
+                 assert item.primary is None, "Feature with multiple parents"
+                 item.primary = primary
+                 key = (id(primary),item.start,item.end,item.seqid,item.strand)
+                 # Ignore duplicate exons (many isoforms will have the same exons)
+                 if key not in seen:
+                     seen.add(key)
+                     part_annotations.append(item)
+             queue.extend( (primary, item2) for item2 in item.children )
+         
+         del seen
+         del all_annotations
+         
          self.log.log('%d annotations\n' % len(annotations))
+         self.log.log('%d part annotations\n' % len(part_annotations))
          
          assert annotations, 'No annotations of specified types in file'
          
-         index = { }
-         
-         for item in annotations:
+         for item in part_annotations:
+             this_extension = self.extension
+             if "max_extension" in item.attr:
+                 this_extension = min(this_extension,int(item.attr["max_extension"]))
+                 
              if item.strand >= 0:
                  item.tail_pos = item.end
-                 item.end += self.extension
+                 item.end += this_extension
              else:
                  item.tail_pos = item.start
-                 item.start -= self.extension
+                 item.start -= this_extension
          
-             if item.seqid not in index:
-                 index[item.seqid] = span_index.Span_index()
-             index[item.seqid].insert(item)
-             
+         for item in annotations:    
              item.hits = [] # [ (rel_start, rel_end, tail_length) ]
          
-         for item in index.itervalues(): 
-             item.prepare()         
+         index = span_index.index_annotations(part_annotations)
          
          for read_name, fragment_alignments, unmapped in sam.bam_iter_fragments(workspace/'alignments_filtered.bam'):
              for fragment in fragment_alignments:
@@ -80,6 +112,12 @@ class Tail_count(config.Action_with_prefix):
                  end = max(item.pos+item.length-1 for item in fragment)
                  alignment_length = end-start
                  strand = -1 if fragment[0].flag&sam.FLAG_REVERSE else 1
+                 fragment_feature = annotation.Annotation(
+                     seqid=fragment[0].rname,
+                     start=start,
+                     end=end,
+                     strand=strand
+                     )
                  
                  if strand >= 0:
                      tail_pos = end
@@ -94,25 +132,25 @@ class Tail_count(config.Action_with_prefix):
                      elif item.startswith('AD:i:'):
                          adaptor_bases = int(item[5:])
                  
-                 if fragment[0].rname in index:
-                     hits = [ 
-                         gene
-                         for gene in index[fragment[0].rname].get(start,end)
-                         if gene.strand == strand
-                         ]                         
-                     if hits:
-                         gene = min(hits, key=lambda gene: (abs(tail_pos - gene.tail_pos), gene.get_id()))
-                             # Nearest by tail_pos
-                             # failing that, by id to ensure a deterministic choice
-                             
-                         if strand > 0:
-                             rel_start = start - gene.start
-                             rel_end = end - gene.start
-                         else:
-                             rel_start = gene.end - end
-                             rel_end = gene.end - start
+                 hits = index.get(fragment_feature, same_strand=True)
+                 if hits:
+                     gene = min(hits, key=lambda gene: (abs(tail_pos - gene.tail_pos), gene.primary.get_id()))
+                         # Nearest by tail_pos
+                         # failing that, by id to ensure a deterministic choice
                          
-                         gene.hits.append( (rel_start,rel_end,tail_length,adaptor_bases) )
+                     if strand > 0:
+                         rel_start = start - gene.start
+                         rel_end = end - gene.start
+                     else:
+                         rel_start = gene.end - end
+                         rel_end = gene.end - start
+                     
+                     gene.primary.hits.append( (rel_start,rel_end,tail_length,adaptor_bases) )
+
+         for item in annotations:
+             del item.parents
+             del item.children
+             del item.primary
 
          f = io.open_possibly_compressed_writer(self.prefix + '.pickle.gz')
          pickle.dump((workspace.name, workspace.get_tags(), annotations), f, pickle.HIGHEST_PROTOCOL)
@@ -319,7 +357,9 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
             '"Proportion" group is proportion of reads with tail',
             ]
             
-          
+        have_biotype = any("Biotype" in item.attr for item in annotations)
+        have_parent = any("Parent" in item.attr for item in annotations)
+        have_relation = any("Relation" in item.attr for item in annotations)
 
         def counts_iter():
             for i in xrange(n_features):
@@ -331,7 +371,18 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
                 row[('Annotation','Length')] = annotations[i].end - annotations[i].start
                 row[('Annotation','gene')] = annotations[i].attr.get('Name','')
                 row[('Annotation','product')] = annotations[i].attr.get('Product','')
-                #row[('Annotation','Strand')] = str(annotations[i].strand)
+                if have_biotype:
+                    row[('Annotation','biotype')] = annotations[i].attr.get('Biotype','')
+                if have_parent:
+                    row[('Annotation','parent')] = annotations[i].attr.get('Parent','')
+                if have_relation:
+                    row[('Annotation','relation')] = annotations[i].attr.get('Relation','')
+                
+                row[('Annotation','chromosome')] = str(annotations[i].seqid)
+                row[('Annotation','strand')] = str(annotations[i].strand)
+                row[('Annotation','start')] = str(annotations[i].start+1)
+                row[('Annotation','end')] = str(annotations[i].end)
+                
                 row[('Annotation','reads')] = str(overall_n[i])
                 row[('Annotation','reads-with-tail')] = str(overall_n_tail[i])
                 row[('Annotation','mean-tail')] = str_na(overall_tail[i])
@@ -906,6 +957,7 @@ class Collapse_counts(config.Action_with_prefix):
 )
 @config.String_flag('annotations', 'Filename containing annotations. Defaults to annotations in reference directory.')
 @config.String_flag('types', 'Comma separated list of feature types to use.')
+@config.String_flag('parts', 'Comma separated list of feature types that make up features. Defaults to types if blank.')
 @config.String_flag('spike_in', 'Comma separated list of spike-in "genes".')
 @config.Int_flag('extension', 'How far downstrand of the given annotations a read or peak belonging to a gene might be.')
 @config.Int_flag('tail',
@@ -921,10 +973,12 @@ class Collapse_counts(config.Action_with_prefix):
      )
 @config.String_flag('title', 'Report title.')
 @config.String_flag('file_prefix', 'Prefix for filenames in report.')
+@config.String_flag('reuse')
 @config.Main_section('working_dirs', 'Sample directories, or full pipeline output directories')
 class Analyse_tail_counts(config.Action_with_output_dir):         
     annotations = None
     types = 'gene'
+    parts = 'exon'
     spike_in = ''
     extension = None
     tail = 4
@@ -933,6 +987,8 @@ class Analyse_tail_counts(config.Action_with_output_dir):
     title = 'PAT-Seq expression analysis'
     file_prefix = ''
     working_dirs = [ ]
+    
+    reuse = ''
 
     #def log_filename(self):
     #    if self.prefix is None: return None
@@ -955,7 +1011,11 @@ class Analyse_tail_counts(config.Action_with_output_dir):
                     working_dirs.append(os.path.join(item,'samples',sample.output_dir))
 
         work = self.get_workspace()
-        pickle_workspace = workspace.Workspace(work/'pickles')
+        
+        if self.reuse:
+            pickle_workspace = workspace.Workspace(os.path.join(self.reuse,'pickles'))
+        else:
+            pickle_workspace = workspace.Workspace(work/'pickles')
         plot_workspace = workspace.Workspace(work/'plots')
         
         pickle_filenames = [ ]
@@ -968,11 +1028,13 @@ class Analyse_tail_counts(config.Action_with_output_dir):
             for dir in working_dirs:
                 working = working_directory.Working(dir, must_exist=True)
                 pickle_filenames.append(pickle_workspace/working.name+'.pickle.gz')
+                if self.reuse: continue
                 Tail_count(
                     pickle_workspace/working.name,
                     working_dir=dir, 
                     annotations=self.annotations,
                     types=self.types,
+                    parts=self.parts,
                     extension=self.extension,
                     ).process_make(stage)    
         

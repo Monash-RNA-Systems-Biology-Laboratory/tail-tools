@@ -2,6 +2,10 @@
 import nesoni
 from nesoni import config, annotation
 from . import env
+import collections
+
+def _extend(feature, extension):
+    return feature.shifted(0, min(extension,int(feature.attr.get("max_extension","10000"))))
 
 
 @config.help(
@@ -35,6 +39,11 @@ class Call_utrs(config.Action_with_prefix):
         #get the most highly expressed peak in that region
         #output something useful
         
+        peaks_of = collections.defaultdict(list)
+        for peak in analysis.peaks.values():
+            if "Parent" in peak.attr:
+                peaks_of[peak.attr["Parent"]].append(peak)
+        
         called_peaks = [ ]
         called_utrs = [ ]
         called_genes = [ ]
@@ -42,19 +51,15 @@ class Call_utrs(config.Action_with_prefix):
         n_good = 0
         n_bad = 0
         for utr in ref.utrs.values():
-            query = utr.shifted(0,self.extension)
-            this_ext = query.end-query.start
-            for hit in ref.gene_index.get(query, True):
-                relhit = hit.relative_to(query)
-                if relhit.start >= 0:
-                   this_ext = min(this_ext, relhit.start)
+            query = _extend(utr, self.extension)
             
-            query = utr.five_prime().shifted(0,this_ext)
             candidates = [ ]
-            for peak in analysis.peak_index.get(query, True):
+            for peak in peaks_of[utr.attr["Parent"]]:
+            	if peak.attr.get("Relation") != "3'UTR": continue
+            
                 relpeak = peak.relative_to(query)
-                assert relpeak.start >= 0
-                #print relpeak.start, total_count(peak.get_id())
+                if relpeak.end <= 0: continue
+                
                 candidates.append((-total_count(peak.get_id()), peak.get_id()))
             candidates.sort()
             
@@ -92,4 +97,4 @@ class Call_utrs(config.Action_with_prefix):
             
             
 if __name__ == '__main__':
-    nesoni.run_tool(Call_utrs)        
+    nesoni.run_tool(Call_utrs)

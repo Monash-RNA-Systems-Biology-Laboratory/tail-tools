@@ -1,4 +1,4 @@
-VERSION = '0.41dev'
+VERSION = '0.41'
 #^ Note: this first line is read by the setup.py script to get the version
 
 import nesoni
@@ -14,6 +14,7 @@ from .test import Test
 from .web import Geneview_webapp
 from .workflows import Call_peaks, Analyse_polya, Analyse_polya_batch
 from .reference_directory import Make_tt_reference, Make_ucsc_reference
+from .reference_directory_ensembl import Make_ensembl_reference
 from .primer_gff import Primer_gff
 
 def main():
@@ -48,6 +49,7 @@ def main():
             'Reference directory creation:',
             Make_tt_reference,
             Make_ucsc_reference,
+            Make_ensembl_reference,
 
             'Utilities:',
             Primer_gff,            

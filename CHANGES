@@ -1,6 +1,12 @@
 
-0.41 - Add "primer-gff" tool.
+0.41 - Add Ensembl genome downloader.
+       Read counting can be restricted to exons of genes.
+       Relation between peaks and genes includes more informative information.
+       Add "primer-gff" tool.
        Use Varistran for moderated log transformation.
+       analyse-polya-sample deletes some unneeded files after running.
+       Re-use pickles for dedup counts.
+       call-utrs and compare-peaks use output of relate-peaks-to-genes when determining which are in 3'UTR
 
 0.40 - Hack to reduce parallelism on tail_count, reduce memory usage.
        Fix very silly overuse of memory.

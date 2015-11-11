@@ -74,8 +74,8 @@ perform_test_fitnoise2 <- function(fitnoise_model, fitnoise_controls_model, name
     for(i in seq_len(n_alt))
         table[, model_columns[i]] <- fit$coef[,i]
         
-    table$P.Value <- fit$p.value
-    table$adj.P.Val <- fit$q.value
+    table$P.Value <- fit$p.values
+    table$adj.P.Val <- fit$q.values
     table$noise.P.Value <- fit$noise.p.values
     
     for(i in seq_len(ncol(elist$genes)))

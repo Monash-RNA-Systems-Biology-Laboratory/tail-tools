@@ -194,8 +194,9 @@ action = tail_tools.Analyse_polya_batch(
         
         # Allow reads/peaks this far downstrand of 
         # the annotated transcript end point
-        # For sparser genomes than yeast, perhaps use 1000
-        extension = 200,
+        # (however extension will not continue into CDS on the same strand)
+        # For sparser genomes than yeast, perhaps use 2000
+        extension = 400,
         
         # Whether to include .genome file for IGV in plots tarball
         # Not necessary for model organisms where IGV 

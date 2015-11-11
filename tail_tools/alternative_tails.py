@@ -250,7 +250,7 @@ class Compare_peaks(config.Action_with_prefix):
         for item in children:
             item.transcription_stop = item.end if item.strand >= 0 else item.start #End of transcription, 0-based, ie between-positions based
             
-            if 'Parent' in item.attr:
+            if 'Parent' in item.attr  and item.attr.get("Relation") != "Antisense":
                 for item_parent in item.attr['Parent'].split(','):
                     parent = id_to_parent[item_parent]
                     parent.children.append(item)
@@ -269,10 +269,16 @@ class Compare_peaks(config.Action_with_prefix):
                 #def relative_start(peak):
                 #    return item.end-peak.end if item.strand < 0 else peak.start-item.start
                 #relevant = [ peak for peak in relevant if relative_start(peak) >= relative_utr_start ]
-                relevant = [ 
-                    peak for peak in relevant 
-                    if (peak.end >= item.utr_pos if item.strand >= 0 else peak.start <= item.utr_pos)
-                    ]
+                
+                #relevant = [ 
+                #    peak for peak in relevant 
+                #    if (peak.end >= item.utr_pos if item.strand >= 0 else peak.start <= item.utr_pos)
+                #    ]
+                
+                relevant = [
+                     peak for peak in relevant
+                     if peak.attr.get("Relation") == "3'UTR"
+                     ]
                     
             if self.top:
                 relevant.sort(key=lambda peak:peak.weight, reverse=True)

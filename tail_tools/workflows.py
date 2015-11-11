@@ -3,10 +3,96 @@ import os, math, glob, json, collections
 from os.path import join
 
 import nesoni
-from nesoni import config, workspace, working_directory, reference_directory, io, reporting, grace, annotation, selection
+from nesoni import config, workspace, working_directory, reference_directory, io, reporting, grace, annotation, selection, span_index
 
 import tail_tools
 from . import clip_runs, extend_sam, proportions, tail_lengths, web, alternative_tails
+
+def _make_each(actions):
+    for item in actions:
+        item.make()
+
+def join_descriptions(seq, joiner='/'):
+    result = [ ]
+    for item in seq:
+        if item and item not in result: 
+            result.append(item)
+    return joiner.join(result)
+
+
+def _extend(feature, extension):
+    result = feature.shifted(0, min(extension,int(feature.attr.get("max_extension","10000"))))
+    result.parents = feature.parents
+    return result
+
+def _three_prime(feature):
+    result = feature.three_prime()
+    result.parents = feature.parents
+    return result
+
+@config.String_flag('parent')
+@config.String_flag('child')
+@config.Int_flag('extension', 'How far downstrand of the gene can the peak be.')
+class Relate_peaks_to_genes(config.Action_with_prefix):
+    parent = None
+    child = None
+    extension = None
+    
+    def run(self):
+        items = list(annotation.read_annotations(self.parent))
+                
+        annotation.link_up_annotations(items)
+        for item in items:
+            assert len(item.parents) <= 1
+        
+        genes = [ item for item in items if item.type == "gene" ]
+        downstrand_genes = [ _extend(_three_prime(item), self.extension) for item in genes ]
+        exons = [ item for item in items if item.type == "exon" ]
+        utrs = [ _extend(item, self.extension) for item in items if item.type == "three_prime_utr" ]
+        
+        gene_index = span_index.index_annotations(genes)
+        downstrand_gene_index = span_index.index_annotations(downstrand_genes)
+        exon_index = span_index.index_annotations(exons)
+        utr_index = span_index.index_annotations(utrs)
+        
+        peaks = list(annotation.read_annotations(self.child))
+        
+        for peak in peaks:
+            # Query is final base in genome before poly(A) starts
+            query = peak.three_prime().shifted(-1,0)
+            
+            hit_to = "3'UTR"
+            hits = [ item.parents[0].parents[0] for item in
+                     utr_index.get(query, True) ]
+            
+            if not hits:
+                hit_to = "Exon"
+                hits = [ item.parents[0].parents[0] for item in
+                         exon_index.get(query, True) ]
+            
+            # For non-coding RNAs, which don't have a 3' UTR
+            if not hits:
+                hit_to = "Downstrand"
+                hits = downstrand_gene_index.get(query, True)
+            
+            if not hits:
+                hit_to = "Intron"
+                hits = gene_index.get(query, True)
+
+            if not hits:
+                hit_to = "Antisense"
+                hits = gene_index.get(query.reversed(), True)
+            
+            if hits:
+                peak.attr["Parent"] = join_descriptions([ item.get_id() for item in hits ], ",")
+                peak.attr["Relation"] = hit_to
+                peak.attr["Name"] = join_descriptions([ item.attr.get("Name","") for item in hits ])
+                peak.attr["Product"] = hit_to + " " + join_descriptions([ item.attr.get("Product","") for item in hits ])
+                peak.attr["Biotype"] = join_descriptions([ item.attr.get("Biotype","") for item in hits ])
+                
+        
+        annotation.write_gff3(self.prefix+"-parent.gff", genes) #Hmm
+        annotation.write_gff3(self.prefix+"-child.gff", peaks)
 
 
 @config.help(
@@ -26,10 +112,8 @@ from . import clip_runs, extend_sam, proportions, tail_lengths, web, alternative
 @config.Int_flag('radius', '--radius value for "nesoni modes:". How close peaks can be to one another.')
 @config.Int_flag('min_depth', '--min-depth value for "nesoni modes:".')
 @config.Int_flag('peak_length', 'Number of bases to extend peak back from 3\' end point.')
-@config.String_flag('annotations', 'Annotation file.')
-@config.String_flag('types', 'What feature types from annotation file to relate peaks to (comma separated list).')
-@config.Int_flag('shift_start', 'How far downstrand of the start of features do peaks need to end to be related to a feature.')
-@config.Int_flag('shift_end', 'How far downstrand of the end of the feature can a peak start in order to be related to a feature.')
+@config.String_flag('annotations', 'Annotation file. A GFF file containing genes, which contain mRNAs, which contain exons and a three_prime_utr.')
+@config.Int_flag('extension', 'How far downstrand of the gene can the peak be.')
 @config.Main_section('polyas', 'List of ...-polyA directories as produced by "analyse-polya:" or "analyse-polya-batch:".')
 class Call_peaks(config.Action_with_output_dir):
     lap = 10
@@ -38,17 +122,12 @@ class Call_peaks(config.Action_with_output_dir):
     peak_length = 100
     
     annotations = None
-    types = 'gene'
-    shift_start = None # Must specify
-    shift_end = None
-    
+    extension = None
     
     polyas = [ ]
     
     def run(self):
-        assert self.shift_start is not None, '--shift-start must be specified'
-        assert self.shift_end is not None, '--shift-end must be specified'
-        assert self.types is not None, '--types must be specified'
+        assert self.extension is not None, '--extension must be specified'
         assert self.annotations is not None, '--annotations must be specified'
     
         outspace = self.get_workspace()
@@ -69,15 +148,16 @@ class Call_peaks(config.Action_with_output_dir):
             shift_start = str(-self.peak_length),
             ).make()
         
-        nesoni.Relate_features(
+        Relate_peaks_to_genes(
             outspace/'relation',
             parent = self.annotations,
-            select_parent = '/'.join(self.types.split(',')),
+            #select_parent = '/'.join(self.types.split(',')),
             child = working/'peaks.gff',
-            upstrand = -self.shift_start,
-            downstrand = self.shift_end,
-            use = 'in/upstrand/downstrand',
-            to_child = 'Name/Product',
+            extension = self.extension
+            #upstrand = -self.shift_start,
+            #downstrand = self.shift_end,
+            #use = 'in/upstrand/downstrand',
+            #to_child = 'Name/Product/Biotype',
             ).make()
             
         
@@ -183,6 +263,7 @@ class Analyse_polya(config.Action_with_output_dir):
                 execution_options = [ '-N', str(cores) ],
                 output=raw_filename,
                 cores=cores,
+                prefix=working/'run_alignment'
                 ).make()
         
         else:
@@ -198,6 +279,7 @@ class Analyse_polya(config.Action_with_output_dir):
                 execution_options = [ '--threads', str(cores) ],
                 output=raw_filename,
                 cores=cores,
+                prefix=working/'run_alignment'
                 ).make()
                 
         if colorspace:
@@ -241,6 +323,15 @@ class Analyse_polya(config.Action_with_output_dir):
         
         nesoni.Tag(self.output_dir, tags=self.tags).make()
         nesoni.Tag(polya_dir, tags=self.tags).make()
+        
+        
+        # Delete unneeded files
+        os.unlink(clipped_prefix+'.state')
+        os.unlink(clipped_filename)
+        os.unlink(working/'run_alignment.state')
+        os.unlink(raw_filename)
+        os.unlink(extended_filename)
+        os.unlink(polya_filename)
 
 
 
@@ -254,7 +345,9 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.Int_flag('peak_min_depth', 
     'Number of poly(A) reads ending at nearly the same position required in order to call a peak.'
     )
-@config.Int_flag('extension', 'How far downstrand of the given annotations a read or peak belonging to a gene might be.')
+@config.Int_flag('extension', 'How far downstrand of the given annotations a read or peak belonging to a gene might be. However tail-tools (with a recently created reference directory) will not extend over coding sequence.')
+@config.String_flag('types', 'Comma separated list of feature types to use as genes. Default is "gene".')
+@config.String_flag('parts', 'Comma separated list of feature types that make up features. Default is "exon". Alternatively you might use "three_prime_utr" for a stricter definition of where we expect reads or "gene" for a broad definition including introns.')
 #@config.String_flag('blurb', 'Introductory HTML text for report')
 #@config.String_flag('genome', 'IGV .genome file, to produce IGV plots')
 #@config.String_flag('genome_dir', 'IGV directory of reference sequences to go with .genome file')
@@ -287,6 +380,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     extension = 1000
     
     peak_min_depth = 50
+    
+    types = "gene"
+    parts = "exon"
     
     include_plots = True
     include_genome = False
@@ -358,7 +454,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             saturation = 0,
             extension = self.extension,
             annotations = reference/'reference.gff',
-            types = 'gene',
+            types = self.types,
+            parts = self.parts
             )
         
 
@@ -375,15 +472,16 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 title = 'Genewise expression - ' + self.title,
                 file_prefix = file_prefix+'genewise-',
                 )
-            analyse_gene_counts_0.process_make(stage)
             
             analyse_gene_counts_1 = analyse_template(
                 output_dir = expressionspace/'genewise-dedup',
                 saturation = 1,
                 title = 'Genewise expression with read deduplication - ' + self.title,
                 file_prefix = file_prefix+'genewise-dedup-',
+                reuse =  expressionspace/'genewise'
                 )
-            analyse_gene_counts_1.process_make(stage)
+
+            stage.process(_make_each, [analyse_gene_counts_0, analyse_gene_counts_1])
             
             stage.process(self._run_peaks, 
                 workspace=workspace, expressionspace=expressionspace, reference=reference, 
@@ -424,25 +522,28 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             self.output_dir,
             extension=self.extension
             ).make()
+            
         primpeak_template = analyse_template(
             annotations=workspace/('peaks','primary-peak-peaks.gff'), 
             extension=0,
             types='peak',
+            parts='peak'
             )
-        with nesoni.Stage() as stage:
-            primpeak_template(
-                expressionspace/'primarypeakwise',
-                saturation=0,
-                title='Primary-peakwise expression - ' + self.title,
-                file_prefix=file_prefix+'primarypeakwise-',
-                ).process_make(stage)
-                
-            primpeak_template(
-                expressionspace/'primarypeakwise-dedup',
-                saturation=1,
-                title='Primary-peakwise expression with read deduplication - ' + self.title,
-                file_prefix=file_prefix+'primarypeakwise-dedup-',
-                ).process_make(stage)
+        
+        primpeak_template(
+            expressionspace/'primarypeakwise',
+            saturation=0,
+            title='Primary-peakwise expression - ' + self.title,
+            file_prefix=file_prefix+'primarypeakwise-',
+            ).make()
+            
+        primpeak_template(
+            expressionspace/'primarypeakwise-dedup',
+            saturation=1,
+            title='Primary-peakwise expression with read deduplication - ' + self.title,
+            file_prefix=file_prefix+'primarypeakwise-dedup-',
+            reuse=expressionspace/'primarypeakwise'
+            ).make()
             
             
         with nesoni.Stage() as stage:
@@ -468,7 +569,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         #===============================================
 
         r = reporting.Reporter(os.path.join(self.output_dir, 'report'), self.title, self.file_prefix)
-                    
+        
+        r.p('Allowed %d bases 3\' extension to gene annotations.' % self.extension)
+        
         r.heading('Alignment to reference')
         
         r.report_logs('alignment-statistics',
@@ -545,18 +648,23 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         io.symbolic_link(source=expressionspace/('primarypeakwise-dedup','report'),link_name=r.workspace/'primarypeakwise-dedup')
         r.p('<a href="primarypeakwise-dedup/index.html">&rarr; Primary-peakwise expression with read deduplication</a>')
 
+        r.p(r.get(workspace/('peaks','primary-peak-peaks.gff')) + ' - primary peaks for each gene.')
+        r.p(r.get(workspace/('peaks','primary-peak-utrs.gff')) + ' - 3\' UTR regions, based on primary peak call.')
+        r.p(r.get(workspace/('peaks','primary-peak-genes.gff')) + ' - full extent of gene, based on primary peak call.')
 
         r.heading('Peakwise expression')
         
         r.p("This shows results from all called peaks.")
+        
+        peak_filename = expressionspace/('peakwise','features-with-data.gff')
+        r.p(r.get(peak_filename, name='peaks.gff') + ' - peaks called')        
+
+        self._describe_peaks(r)
 
         web.Geneview_webapp(r.workspace/'view').run()        
         
-        peak_filename = expressionspace/('peakwise','features-with-data.gff')
-        n_peaks = len(list(annotation.read_annotations(peak_filename)))
-        r.p('%d peaks called (%d poly(A) reads were required to call a peak).' % (n_peaks, self.peak_min_depth))
-        
-        r.p(r.get(peak_filename, name='peaks.gff') + ' - peaks called')        
+        #n_peaks = len(list(annotation.read_annotations(peak_filename)))
+        #r.p('%d peaks called (%d poly(A) reads were required to call a peak).' % (n_peaks, self.peak_min_depth))
 
         #if self.groups:
             #r.subheading('Peak shift between groups')
@@ -658,10 +766,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         Call_peaks(
             workspace/'peaks',
             annotations = reference/'reference.gff',
-            shift_start = 0,
-            shift_end = self.extension,
+            extension = self.extension,
             min_depth = self.peak_min_depth,
-            types = 'gene',
             polyas = polya_dirs,
             ).make()
 
@@ -669,22 +775,23 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             annotations=workspace/('peaks','relation-child.gff'), 
             extension=0,
             types='peak',
+            parts='peak',
             )
 
-        with nesoni.Stage() as stage:
-            peak_template(
-                expressionspace/'peakwise',
-                saturation=0,
-                title='Peakwise expression - ' + self.title,
-                file_prefix=file_prefix+'peakwise-',
-                ).process_make(stage)
-                
-            peak_template(
-                expressionspace/'peakwise-dedup',
-                saturation=1,
-                title='Peakwise expression with read deduplication - ' + self.title,
-                file_prefix=file_prefix+'peakwise-dedup-',
-                ).process_make(stage)
+        peak_template(
+            expressionspace/'peakwise',
+            saturation=0,
+            title='Peakwise expression - ' + self.title,
+            file_prefix=file_prefix+'peakwise-',
+            ).make()
+            
+        peak_template(
+            expressionspace/'peakwise-dedup',
+            saturation=1,
+            title='Peakwise expression with read deduplication - ' + self.title,
+            file_prefix=file_prefix+'peakwise-dedup-',
+            reuse=expressionspace/'peakwise',
+            ).make()
 
         alternative_tails.Compare_peaks(
             shiftspace/'individual',
@@ -822,7 +929,39 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         with open(workspace/"plotter-config.json","wb") as f:
             json.dump(obj, f, indent=4)
-                
+    
+    
+    def _describe_peaks(self, r):        
+        workspace = io.Workspace(self.output_dir, must_exist=False)
+        
+        counts = io.read_grouped_table(workspace/("expression","peakwise","counts.csv"))["Count"]
+        
+        peak_counts = collections.defaultdict(int)
+        read_counts = collections.defaultdict(int)
+        total = 0
+        for item in annotation.read_annotations(workspace/("peaks","relation-child.gff")):
+            peak_counts[item.attr.get("Relation","None")] += 1
+            read_counts[item.attr.get("Relation","None")] += sum(int(c) for c in counts[item.get_id()].values())            
+            total += 1
+        
+        total_reads = sum(read_counts.values())
+        
+        r.write("<p>\n")
+        r.write("%d peaks\n" % total)
+        
+        for name, desc in [
+                ("3'UTR", "in a 3' UTR"),
+                ("Exon", "otherwise in an exon"),
+                ("Downstrand", "otherwise downstrand of a non-coding RNA"),
+                ("Intron", "otherwise in an intron"),
+                ("Antisense", "otherwise antisense to a gene"),
+                ("None", "couldn't be related to annotated genes"),
+                ]:
+            r.write("<br/>%d peaks and %.1f%% of reads %s\n" % (peak_counts[name], read_counts[name]*100.0/total_reads, desc))
+        r.write("</p>\n")
+        
+
+
 
 
 

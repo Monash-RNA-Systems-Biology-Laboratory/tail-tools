@@ -19,7 +19,8 @@ setup(
     author_email = 'paul.harrison@monash.edu',
 
     packages = [ 
-        'tail_tools' 
+        'tail_tools',
+        'tail_tools.motifer'
         ],
         
     package_data = {
