@@ -28,12 +28,12 @@ class Tailtools_reference(reference_directory.Reference):
 
 
 
-def _max_extension(exon, cds_index, mrna_end_index):
+def _max_extension(exon, exon_index, mrna_end_index):
     # Get maximum extension until hit a CDS, arbitrarily max out at 10000
     # Also do not extend through the end of another mRNA
     max_extension = 10000
     exon_end = exon.three_prime()
-    for hit in cds_index.get(exon_end.shifted(0,10000), same_strand=True):
+    for hit in exon_index.get(exon_end.shifted(0,10000), same_strand=True):
         max_extension = min(max_extension, hit.relative_to(exon_end).start)
     for hit in mrna_end_index.get(exon_end.shifted(2,10000), same_strand=True):
         max_extension = min(max_extension, hit.relative_to(exon_end).start)
@@ -69,8 +69,8 @@ class Make_tt_reference(config.Action_with_output_dir):
         annotations = list(annotation.read_annotations(work/'reference.gff'))
         annotation.link_up_annotations(annotations)
         
-        cds_index = span_index.index_annotations([
-            item for item in annotations if item.type == "CDS"
+        exon_index = span_index.index_annotations([
+            item for item in annotations if item.type == "exon"
             ])
         mrna_end_index = span_index.index_annotations([
             item.three_prime() for item in annotations if item.type == "mRNA"
@@ -82,14 +82,21 @@ class Make_tt_reference(config.Action_with_output_dir):
         for gene in annotations:
             if gene.type != 'gene': continue
 
-            gene.attr['color'] = '#880088'
-
             mrnas = [ item for item in gene.children if item.type == 'mRNA' ]
+            assert mrnas, "Gene without any mRNAs"
+
+            gene.attr['color'] = '#880088'
+            gene.start = min(item.start for item in mrnas)
+            gene.end = max(item.end for item in mrnas)
+            gene.attr["max_extension"] = str(_max_extension(gene, exon_index, mrna_end_index))
         
             gene_utr_5primes = [ ]
             
             for mrna in mrnas:
-                mrna.attr["max_extension"] = str(_max_extension(mrna, cds_index, mrna_end_index))
+                assert mrna.strand == gene.strand
+                assert mrna.seqid == gene.seqid
+                
+                mrna.attr["max_extension"] = str(_max_extension(mrna, exon_index, mrna_end_index))
             
                 cdss = [ item for item in mrna.children if item.type == 'CDS' ]
                 exons = [ item for item in mrna.children if item.type == 'exon' ]
@@ -137,9 +144,9 @@ class Make_tt_reference(config.Action_with_output_dir):
                     end = utr_end,
                     attr = attr,
                     )
-                max_ext = _max_extension(utr, cds_index, mrna_end_index)
+                max_ext = _max_extension(utr, exon_index, mrna_end_index)
                 utr.attr["max_extension"] = str(max_ext)
-                #Only include if there is an annotated 3' UTR or end is not in the middle of some other isoform's CDS
+                #Only include if there is an annotated 3' UTR or end is not in the middle of some other isoform's exon
                 if utr_end-utr_start+max_ext > 1:
                     mrna_utrs.append(utr)
             
@@ -163,7 +170,7 @@ class Make_tt_reference(config.Action_with_output_dir):
                 end = utr_end,
                 attr = attr,
                 )
-            utr.attr["max_extension"] = str(_max_extension(utr, cds_index, mrna_end_index))
+            utr.attr["max_extension"] = str(_max_extension(utr, exon_index, mrna_end_index))
             gene_utrs.append(utr)
         
         annotation.write_gff3(work/'reference.gff', annotations + mrna_utrs)

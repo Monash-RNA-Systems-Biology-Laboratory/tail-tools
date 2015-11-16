@@ -1,4 +1,8 @@
 
+0.42 - When extended, don't extend over another exon on the same strand 
+       (previously: another CDS on the same strand).
+       Another excess memory usage bug removed from aggregate-tail-counts.
+
 0.41 - Add Ensembl genome downloader.
        Read counting can be restricted to exons of genes.
        Relation between peaks and genes includes more informative information.

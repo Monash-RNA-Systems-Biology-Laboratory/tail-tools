@@ -271,12 +271,12 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
         n_features = len(counts)
         n_samples = len(data)
         
-        sample_n = [ [0.0]*n_features for i in xrange(n_features) ]        # [feature][sample]  Total count
-        sample_n_tail = [ [0.0]*n_features for i in xrange(n_features) ]   # [feature][sample]  Polya count
-        sample_prop = [ [None]*n_features for i in xrange(n_features) ]    # [feature][sample]  Proportion of reads with tail (deprecated)
-        sample_tail = [ [None]*n_features for i in xrange(n_features) ]    # [feature][sample]  Mean tail length in each sample
-        sample_sd_tail = [ [None]*n_features for i in xrange(n_features) ] # [feature][sample]  Std dev tail length in each sample
-        sample_total_tail = [ [0.0]*n_features for i in xrange(n_features) ]
+        sample_n = [ [0.0]*n_samples for i in xrange(n_features) ]        # [feature][sample]  Total count
+        sample_n_tail = [ [0.0]*n_samples for i in xrange(n_features) ]   # [feature][sample]  Polya count
+        sample_prop = [ [None]*n_samples for i in xrange(n_features) ]    # [feature][sample]  Proportion of reads with tail (deprecated)
+        sample_tail = [ [None]*n_samples for i in xrange(n_features) ]    # [feature][sample]  Mean tail length in each sample
+        sample_sd_tail = [ [None]*n_samples for i in xrange(n_features) ] # [feature][sample]  Std dev tail length in each sample
+        sample_total_tail = [ [0.0]*n_samples for i in xrange(n_features) ]
         
         sample_quantile_tail = collections.OrderedDict( 
             (item, [ [None]*n_samples for i in xrange(n_features) ]) 
