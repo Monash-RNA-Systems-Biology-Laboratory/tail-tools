@@ -40,6 +40,8 @@ def all_within(item):
 
 
 def translate_gene(item, transcript_type, transcript_biotype):
+    if "ID" not in item.attr: return [ ]
+    
     result = item.copy()
     assert result.attr["ID"].count(":") == 1
     result.attr["ID"] = result.attr["ID"].split(":")[1]
@@ -54,6 +56,7 @@ def translate_gene(item, transcript_type, transcript_biotype):
         return [result]
     else:
         return [ ]
+
 
 def translate_transcript(item):
     result = item.copy()
@@ -255,7 +258,7 @@ use flags
     'If available specify "dna.primary_assembly", otherwise "dna.toplevel".'
     )
 @config.String_flag('genes',
-    'Comma separated list of gene_type/gene_biotype/transcript_type/transcript_biotype. biotypes can be left blank.'
+    'Comma separated list of gene_type/gene_biotype/transcript_type/transcript_biotype. Any of these can be left blank. Regular expressions can be used.'
     )
 @config.String_flag('rename',
     'Comma separated list of old=new chromosome renamings.'
@@ -273,7 +276,7 @@ class Make_ensembl_reference(config.Action_with_output_dir):
     
     rename = ''
     
-    genes = "gene/protein_coding/transcript/protein_coding"
+    genes = "///"
     
     def run(self):
         assert self.release

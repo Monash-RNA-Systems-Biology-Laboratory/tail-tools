@@ -196,6 +196,10 @@ class Analyse_polya(config.Action_with_output_dir):
     reads = [ ]    
     consensus = False
     
+    # Allow tweaking by subclassing
+    clip_runs_colorspace = clip_runs.Clip_runs_colorspace()
+    clip_runs_basespace = clip_runs.Clip_runs_basespace()
+    
     _workspace_class = working_directory.Working
     
     def get_polya_dir(self):
@@ -243,13 +247,13 @@ class Analyse_polya(config.Action_with_output_dir):
         polya_filename = working/'alignments_filtered_polyA.sam.gz'
 
         if colorspace:
-            clip_runs.Clip_runs_colorspace(
+            self.clip_runs_colorspace(
                 filenames=self.reads,
                 prefix=clipped_prefix,
                 sample=working.name,
             ).make()
         else:
-            clip_runs.Clip_runs_basespace(
+            self.clip_runs_basespace(
                 filenames=self.reads,
                 prefix=clipped_prefix,
                 sample=working.name,

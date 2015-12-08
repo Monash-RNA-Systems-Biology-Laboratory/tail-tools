@@ -1,4 +1,7 @@
 
+0.43 - Clip Illumina reads to a region containing 90% bases with quality at
+       least 20.
+
 0.42 - When extended, don't extend over another exon on the same strand 
        (previously: another CDS on the same strand).
        Another excess memory usage bug removed from aggregate-tail-counts.

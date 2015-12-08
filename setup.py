@@ -14,7 +14,7 @@ setup(
     name='tail-tools',
     version=VERSION,
     description='Analyse PAT-Seq RNA expression data.',
-    url = 'http://bioinformatics.net.au/software.tail-tools.shtml',
+    url = 'https://github.com/Victorian-Bioinformatics-Consortium/tail-tools',
     author = 'Paul Harrison',
     author_email = 'paul.harrison@monash.edu',
 
@@ -30,6 +30,10 @@ setup(
             'web/*.css',
             'web/*.js',
             'web/third_party/*',
+            
+            'DESCRIPTION',
+            'NAMESPACE',
+            'R/*',
             ],
         },
 
