@@ -82,11 +82,9 @@ class Clip_runs_colorspace(config.Action_with_prefix):
 @config.help(
 'Clip low quality sequence and poly-A runs from the end of basespace reads.',
 """\
-Looks for a run of As, followed by an adaptor sequence, followed by anything. \
-The run of As and the adaptor sequence can contain up to one fifth errors, to allow \
-for sequencing errors.
+Looks for a run of As, followed by an adaptor sequence, followed by anything.
 
-A good quality region is found, containing 90% bases with quality at least --clip-quality. The run of As and/or adaptor sequence must start before or at the end of this region and must extend beyond this, or to the end of the read if the whole read is high quality, or until the whole adaptor has been seen. Up to 20% errors are allowed in the poly(A) and adaptor sequence.
+A good quality region is found, containing 90% bases with quality at least --clip-quality. The run of As must lie withing this region, but the adaptor sequence may extend beyond this. Up to 20% errors are allowed in the poly(A) and adaptor sequence.
 
 Reads should be in FASTQ format.
 """)
@@ -200,7 +198,11 @@ class Clip_runs_basespace(config.Action_with_prefix):
                                         score -= 4
                                 i += 1
                                 
-                            if a_end >= len(seq): break
+                            #if a_end >= len(seq): break
+                            
+                            # poly(A) tail only within good quality region.
+                            if a_end >= good_quality_end: break
+                            
                             
                             if qual[a_end] >= ignore_quality:
                                 if seq[a_end] == 'A':

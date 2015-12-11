@@ -380,7 +380,7 @@ class Compare_peaks(config.Action_with_prefix):
         output_tail_counts = [ ]
         output_proportions = [ ]
         output_tails = [ ]
-        output_annotation_fields = [ 'gene', 'product', 'mean_tail_1', 'mean_tail_2', 'chromosome', 'strand', 
+        output_annotation_fields = [ 'gene', 'product', 'biotype', 'mean_tail_1', 'mean_tail_2', 'chromosome', 'strand', 
                                      'transcription_stops' ] #, 'interpeak_seq', ]
         output_annotations = [ ]
             
@@ -416,6 +416,7 @@ class Compare_peaks(config.Action_with_prefix):
                     output_annotations.append([
                         item.attr.get('Name',item.attr.get('gene','')),
                         item.attr.get('Product',item.attr.get('product','')),
+                        item.attr.get('Biotype',''),
                         count_table['Annotation'][id_i]['mean-tail'],
                         count_table['Annotation'][id_j]['mean-tail'],
                         

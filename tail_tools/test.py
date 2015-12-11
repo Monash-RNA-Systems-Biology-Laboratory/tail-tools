@@ -221,11 +221,37 @@ perform_tests <- function(name, counts_filename, norm_filename, select, model, m
 
     dgelist <- read.counts(counts_filename, norm.file=norm_filename, quiet=TRUE)
     dgelist <- dgelist[,select]
+
+
+
+    row_select <- rep(TRUE, nrow(counts))
+    
+    if (BIOTYPE != "" && "biotype" %in% colnames(dgelist$genes)) {
+        want_biotype <- strsplit(BIOTYPE, ",")[[1]]
+        row_biotype <- strsplit(as.character(dgelist$genes$biotype), "/")
+        row_select <- row_select & sapply(row_biotype, function(i) any(i %in% want_biotype)) 
+    }
+    
+    if (RELATION != "" && "relation" %in% colnames(dgelist$genes)) {
+        want_relation <- strsplit(RELATION, ",")[[1]]
+        row_select <- row_select & (as.character(dgelist$genes$relation) %in% want_relation)
+    }
+
+    counts <- counts[row_select,,drop=F]
+    tail.counts <- tail.counts[row_select,,drop=F]
+    tails <- tails[row_select,,drop=F]
+    dgelist <- dgelist[row_select,]
     
     stopifnot(all(rownames(counts) == rownames(dgelist$genes)))
 
+    
+    if (QUANTILE_TAIL)
+        tails <- normalizeQuantiles(tails)
+
+
     genes <- dgelist$genes
-    genes <- genes[,colnames(genes) %in% c('locus_tag','Length','gene','product')]
+    genes <- genes[,colnames(genes) %in% 
+        c('locus_tag','Length','gene','product','biotype','relation')]
     genes[,'reads'] = mapply(
         function(i) paste(counts[i,],collapse='; '),
         seq_len(nrow(genes)))
@@ -277,6 +303,7 @@ perform_tests <- function(name, counts_filename, norm_filename, select, model, m
     }
 
     good <- row.apply(dgelist$counts, max) >= MIN_READS
+
     png(sprintf("%s/%s-voom.png",DIR,name))
     if (WEIGHT && METHOD == "limma")
         voomed <- voomWithQualityWeights(dgelist[good,], noise.model, plot=T)    
@@ -290,23 +317,27 @@ perform_tests <- function(name, counts_filename, norm_filename, select, model, m
             sep=''), 
         sum(good),length(good),MIN_READS)
     
-    if (METHOD == "fitnoise2") {    
-        perform_test_fitnoise2(fitnoise2_voom_model, fitnoise2_controls_voom_model, sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')        
-    } else if (METHOD == "fitnoise1") {
-        perform_test_fitnoise1(fitnoise1_voom_model, fitnoise1_controls_voom_model, sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')
-    } else {
-        perform_test(sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')
+    if (DO_EXPRESSION) {
+        if (METHOD == "fitnoise2") {    
+            perform_test_fitnoise2(fitnoise2_voom_model, fitnoise2_controls_voom_model, sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')        
+        } else if (METHOD == "fitnoise1") {
+            perform_test_fitnoise1(fitnoise1_voom_model, fitnoise1_controls_voom_model, sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')
+        } else {
+            perform_test(sprintf("%s-voom",name), voomed, model, model_columns, n_alt, 'avg.expression')
+        }
     }
 
-    if (METHOD == "fitnoise2") {    
-        tail.elist <- elist.tails.for.fitnoise(tails, tail.counts, model, genes, MIN_READS)
-        perform_test_fitnoise2(fitnoise2_patseq_model, fitnoise2_controls_patseq_model, sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')    
-    } else if (METHOD == "fitnoise1") {
-        tail.elist <- elist.tails.for.fitnoise(tails, tail.counts, model, genes, MIN_READS)
-        perform_test_fitnoise1(fitnoise1_patseq_model, fitnoise1_controls_patseq_model, sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')    
-    } else {
-        tail.elist <- elist.tails(tails, tail.counts, model, genes, MIN_READS)
-        perform_test(sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')
+    if (DO_TAIL_LENGTH) {
+        if (METHOD == "fitnoise2") {    
+            tail.elist <- elist.tails.for.fitnoise(tails, tail.counts, model, genes, MIN_READS)
+            perform_test_fitnoise2(fitnoise2_patseq_model, fitnoise2_controls_patseq_model, sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')    
+        } else if (METHOD == "fitnoise1") {
+            tail.elist <- elist.tails.for.fitnoise(tails, tail.counts, model, genes, MIN_READS)
+            perform_test_fitnoise1(fitnoise1_patseq_model, fitnoise1_controls_patseq_model, sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')    
+        } else {
+            tail.elist <- elist.tails(tails, tail.counts, model, genes, MIN_READS)
+            perform_test(sprintf("%s-tail",name), tail.elist, model, model_columns, n_alt, 'avg.tail')
+        }
     }
 }
 
@@ -349,6 +380,11 @@ perform_tests('pairwise', PAIRWISE_FILENAME, PAIRWISE_NORM_FILENAME, PAIRS_SELEC
     'For tail length testing, sufficient samples must have this many reads to fit the linear model.'
     )
 @config.Bool_flag('dedup', 'Use deduplicated counts')
+@config.String_flag('biotype', 'Comma separated list of biotypes. Only use these biotypes.')
+@config.String_flag('relation', 'Comma separated list of relation types. Only use peaks with these relations.')
+@config.Bool_flag('quantile_tail', 'Quantile normalize tail lengths between samples.')
+@config.Bool_flag('do_expression', 'Perform tests on expression levels.')
+@config.Bool_flag('do_tail_length', 'Perform tests on tail lengths.')
 @config.Bool_flag('verbose', 'Extra verbosity when fitting with fitnoise2.')
 @config.Positional('analysis', 'Output directory of "analyse-polya-batch:".')
 @config.Section('null', 'Terms in null hypothesis (H0).')
@@ -362,6 +398,13 @@ class Test(config.Action_with_output_dir):
    dedup = False
    title = ''
    verbose = False
+   
+   biotype = ''
+   relation = ''
+   
+   quantile_tail = False
+   do_expression = True
+   do_tail_length = True
    
    analysis = None
    null = [ ]
@@ -462,6 +505,11 @@ class Test(config.Action_with_output_dir):
            WEIGHT = self.weight,
            EMPIRICAL_CONTROLS = self.empirical_controls,
            MIN_READS = self.min_reads,
+           BIOTYPE = self.biotype,
+           RELATION = self.relation,
+           QUANTILE_TAIL = self.quantile_tail,
+           DO_EXPRESSION = self.do_expression,
+           DO_TAIL_LENGTH = self.do_tail_length,
            VERBOSE = self.verbose,
            
            GENEWISE_FILENAME = genewise_filename,
@@ -490,15 +538,15 @@ class Test(config.Action_with_output_dir):
            reporter.p('Read deduplication was used.')
        
        reporter.write('<table>\n')
-       for entities, result, aveexpr, subtitle, terms in [
-           ('genes', 'genewise-voom', 'avg.expression', 'Genewise expression level', model_columns[:n_alt]),
-           ('genes', 'genewise-tail', 'avg.tail', 'Genewise tail length', model_columns[:n_alt]),
-           ('primary peaks', 'primarypeakwise-voom', 'avg.expression', 'Primary-peakwise expression level', model_columns[:n_alt]),
-           ('primary peaks', 'primarypeakwise-tail', 'avg.tail', 'Primary-peakwise tail length', model_columns[:n_alt]),
-           ('peaks', 'peakwise-voom', 'avg.expression', 'Peakwise expression level', model_columns[:n_alt]),
-           ('peaks', 'peakwise-tail', 'avg.tail', 'Peakwise tail length', model_columns[:n_alt]),
-           ('peak pairs', 'pairwise-voom', 'avg.expression', 'Peak-pair expression shift', pairs_model_columns[:n_alt]),
-           ('peak pairs', 'pairwise-tail', 'avg.tail', 'Peak-pair tail length shift', pairs_model_columns[:n_alt]),
+       for is_expression, entities, result, aveexpr, subtitle, terms in [
+           (True, 'genes', 'genewise-voom', 'avg.expression', 'Genewise expression level', model_columns[:n_alt]),
+           (False, 'genes', 'genewise-tail', 'avg.tail', 'Genewise tail length', model_columns[:n_alt]),
+           (True, 'primary peaks', 'primarypeakwise-voom', 'avg.expression', 'Primary-peakwise expression level', model_columns[:n_alt]),
+           (False, 'primary peaks', 'primarypeakwise-tail', 'avg.tail', 'Primary-peakwise tail length', model_columns[:n_alt]),
+           (True, 'peaks', 'peakwise-voom', 'avg.expression', 'Peakwise expression level', model_columns[:n_alt]),
+           (False, 'peaks', 'peakwise-tail', 'avg.tail', 'Peakwise tail length', model_columns[:n_alt]),
+           (True, 'peak pairs', 'pairwise-voom', 'avg.expression', 'Peak-pair expression shift', pairs_model_columns[:n_alt]),
+           (False, 'peak pairs', 'pairwise-tail', 'avg.tail', 'Peak-pair tail length shift', pairs_model_columns[:n_alt]),
            ]:
            #data = io.read_grouped_table(workspace/(result+'-toptable.csv'))['All']
            #n = 0
@@ -509,6 +557,9 @@ class Test(config.Action_with_output_dir):
            #    if fdr <= 0.01: n_01 += 1
            #    if fdr <= 0.05: n_05 += 1
            #    n += 1
+           
+           if is_expression and not self.do_expression: continue
+           if not is_expression and not self.do_tail_length: continue
            
            io.execute([
                'degust.py',
