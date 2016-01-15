@@ -83,7 +83,7 @@ class Make_tt_reference(config.Action_with_output_dir):
             if gene.type != 'gene': continue
 
             mrnas = [ item for item in gene.children if item.type == 'mRNA' ]
-            assert mrnas, "Gene without any mRNAs"
+            assert mrnas, "Gene without any mRNAs: "+gene.get_id()
 
             gene.attr['color'] = '#880088'
             gene.start = min(item.start for item in mrnas)
