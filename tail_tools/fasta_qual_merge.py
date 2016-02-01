@@ -1,5 +1,5 @@
 
-from nesoni import config
+from nesoni import config, io
 
 import sys, itertools
 
@@ -13,8 +13,8 @@ class Fasta_qual_merge(config.Action_with_optional_output):
     qual_file = None
 
     def run(self):
-        fa = open(self.fasta_file, 'rb')
-        fq = open(self.qual_file, 'rb')
+        fa = io.open_possibly_compressed_file(self.fasta_file)
+        fq = io.open_possibly_compressed_file(self.qual_file)
 
         out_file = self.begin_output()
         
