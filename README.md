@@ -68,7 +68,7 @@ Easy way:
 
     pip install --upgrade tail-tools
 
-Bleeding edge github version with git:
+Bleeding edge github version with pip:
 
     pip install --upgrade 'git+https://github.com/Victorian-Bioinformatics-Consortium/tail-tools.git#egg=tail-tools'
 
