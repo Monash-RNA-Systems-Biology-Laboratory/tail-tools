@@ -37,7 +37,7 @@ Use of PyPy is recommened for speed.
 
     pip install nesoni
 
-  You don't need to install all of nesoni's dependencies, just Python 2.7 or later or PyPy.
+  You don't need to install all of nesoni's dependencies, just Python 2.7 or later or PyPy. Do be sure to install the R component of nesoni.
 
 - bowtie2 for Illumina reads or SHRiMP for SOLiD reads
 
@@ -79,13 +79,14 @@ From source:
 For PyPy it seems to be currently easiest to set up in a virtualenv:
 
     virtualenv -p pypy myenv
-    myenv/bin/pip install tail-tools
+    pip install --upgrade 'git+https://github.com/Victorian-Bioinformatics-Consortium/tail-tools.git#egg=tail-tools'
+
+Tail Tools includes an R package with various Shiny reports. This isn't essential to run the pipeline, but contains functions to produce various Shiny reports. It can be installed from R with:
+
+    devtools::install_github("Victorian-Bioinformatics-Consortium/tail-tools", subdir="tail_tools")
 
 
 
-Tail Tools includes an R package with various Shiny reports, which can be installed in R with:
-
-    
 
 Usage
 -----
