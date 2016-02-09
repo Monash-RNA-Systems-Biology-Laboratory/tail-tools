@@ -82,6 +82,11 @@ For PyPy it seems to be currently easiest to set up in a virtualenv:
     myenv/bin/pip install tail-tools
 
 
+
+Tail Tools includes an R package with various Shiny reports, which can be installed in R with:
+
+    
+
 Usage
 -----
 

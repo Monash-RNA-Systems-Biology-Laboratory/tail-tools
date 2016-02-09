@@ -3,7 +3,7 @@
 # Shiny report for REPAT results
 #
 
-shiny_repat <- function(filename, normalizing_gene=NULL, title="REPAT results") {
+shiny_repat <- function(filename, normalizing_gene=NULL, title="3'TAP results") {
     library(shiny)
     library(nesoni)
     library(reshape2)
@@ -21,11 +21,12 @@ shiny_repat <- function(filename, normalizing_gene=NULL, title="REPAT results") 
     overview <- shiny_plot(prefix="overview", dlname="overview", width=800, function(env) {
         m <- subset(env$normed()$melted, sample %in% env$input$samples)
         m$sample <- factor(m$sample, levels = env$input$samples)
+        m$gene <- factor(m$gene, levels = sort(unique(as.character(m$gene))))
         
         print( 
             ggplot(m,aes(x=sample,y=log2_norm_count)) + 
             geom_point() + 
-            facet_wrap(~ gene) + 
+            facet_wrap(~ gene, drop=F) + 
             ylab("log2 normalized count") +
             xlab("") +
             theme_bw() +
@@ -36,11 +37,12 @@ shiny_repat <- function(filename, normalizing_gene=NULL, title="REPAT results") 
     overview_tail <- shiny_plot(prefix="overview_tail", dlname="overview_tail", width=800, function(env) {
         m <- subset(env$normed()$melted, sample %in% env$input$samples)
         m$sample <- factor(m$sample, levels = env$input$samples)
+        m$gene <- factor(m$gene, levels = sort(unique(as.character(m$gene))))
         m <- subset(m, tail_count>0)
         print(
             ggplot(m,aes(x=sample,y=tail_mean)) + 
             geom_point() + geom_point(data=subset(m,tail_count<env$input$highlight_low),color="red") +
-            facet_wrap(~ gene) +
+            facet_wrap(~ gene, drop=F) +
             ylab("poly(A) tail length") +
             xlab("") + 
             theme_bw() +
@@ -85,7 +87,7 @@ shiny_repat <- function(filename, normalizing_gene=NULL, title="REPAT results") 
             widths=c(2,10),
             well=FALSE,
             tabPanel("Select",
-                selectInput("normalizing_gene","Normalizing gene",choices=genes,selected=normalizing_gene),
+                selectInput("normalizing_gene","Normalizing gene",choices=sort(genes),selected=normalizing_gene),
                 selectInput("samples","Select samples to work with",choices=samples,selected=samples,multiple=TRUE,width="100%"),
                 numericInput("highlight_low", "Highlight in red tail lengths based on less than this many reads", 50),
                 h1("Normalization"),
@@ -101,7 +103,7 @@ shiny_repat <- function(filename, normalizing_gene=NULL, title="REPAT results") 
                 overview_tail$component_ui
             ),
             tabPanel("Individual genes",
-                selectInput("individual_gene", "Gene", choices=genes),
+                selectInput("individual_gene", "Gene", choices=sort(genes)),
                 p("Note expression levels are *not* log transformed in this plot."),
                 individual$component_ui
             )
