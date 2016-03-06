@@ -17,7 +17,6 @@ Imports:
     assertthat,
     ggplot2,
     seriation,
-    gsubfn,
     shiny,
     shinyURL,
     DT,

@@ -1,21 +1,5 @@
 
-library(knitr)
-library(dplyr)
-library(readr)
-library(purrr)
-library(tidyr)
-library(assertthat)
-library(ggplot2)
-library(nesoni)
-library(edgeR)
-library(limma)
-library(seriation)
-library(gsubfn)
-library(xtable)
 
-library(shiny)
-library(DT) # github version devtools::install_github("rstudio/DT")
-library(dplyr)
 
 # function to build results table
 
