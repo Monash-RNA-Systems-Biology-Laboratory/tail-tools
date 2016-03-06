@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+( cd tail_tools ; R -q -e "devtools::document()" )
+

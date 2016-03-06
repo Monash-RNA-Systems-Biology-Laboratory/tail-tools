@@ -220,9 +220,9 @@ perform_tests <- function(name, counts_filename, norm_filename, select, model, m
         # fitnoise2 actually requires zero count tails to be NA
 
     dgelist <- read.counts(counts_filename, norm.file=norm_filename, quiet=TRUE)
+    if (ncol(dgelist) != length(select))
+        stop("Unexpected number of samples in count file.")
     dgelist <- dgelist[,select]
-
-
 
     row_select <- rep(TRUE, nrow(counts))
     

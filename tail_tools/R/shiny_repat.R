@@ -1,8 +1,8 @@
 
-#
-# Shiny report for REPAT results
-#
-
+#'
+#' Shiny report for REPAT results
+#'
+#' @export
 shiny_repat <- function(filename, normalizing_gene=NULL, title="3'TAP results") {
     library(shiny)
     library(nesoni)

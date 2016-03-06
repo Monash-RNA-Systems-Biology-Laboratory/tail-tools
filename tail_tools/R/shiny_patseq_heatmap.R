@@ -20,9 +20,6 @@
 #' @return 
 #' Returns a composable shiny app object
 #' 
-#' @import shiny
-#' @import varistran
-#' @import shinyURL
 #' @export
 
 shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL, feature_labels=NULL, prefix="", gotable=NULL, species=NULL) {

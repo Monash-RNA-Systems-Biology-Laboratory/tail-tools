@@ -14,14 +14,6 @@
 #' @param spp Species of the data (Hs, Sc, Ce, Mm)
 #' @param goenabl Whether GO Term analysis is enabled. TRUE by default. This might need changing in future
 #' 
-#' @import gridBase
-#' @import shinyURL
-#' @import DT
-#' @import org.Sc.sgd.db
-#' @import org.Hs.eg.db
-#' @import org.Ce.eg.db
-#' @import org.Mm.eg.db
-#' @import GOstats
 #' @export
 
 shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="plot", prefix="", selin, rorder,spp, hgc=0.05, otype=1, goenabl=TRUE) {
