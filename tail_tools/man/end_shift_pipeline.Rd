@@ -5,7 +5,7 @@
 \title{End shift statistics from tail-tools pipeline output.}
 \usage{
 end_shift_pipeline(path, condition, group = NULL, ci = 0.95, fdr = T,
-  antisense = T, non_utr = T)
+  edger = T, limma = T, antisense = T, non_utr = T)
 }
 \arguments{
 \item{fdr}{Produce permutation based q values, can be very slow.}

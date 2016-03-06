@@ -93,17 +93,89 @@ grouped_permutations <- function(condition, group) {
 #grouped_permutations(c(T,F,T,T,F),c(1,1,1,2,2))
 
 
+#
+# peak_info should contain: id, parent
+#
+edger_end_shift <- function(counts, peak_info, condition, group) {
+    group <- as.factor(group)    
+    if (length(unique(group)) <= 1)
+        design <- model.matrix(~ condition)
+    else
+        design <- model.matrix(~ condition + group)
+    
+    # Terms are: intercept, condition, group terms (other than first level)
+    # Second term is to be tested.    
+    
+    dge <- 
+      DGEList(counts, genes=peak_info) %>%
+      calcNormFactors() %>%
+      estimateDisp(design) #Maybe use robust=T
+    
+    #dge$prior.df
+    #dge$common.disp    
+    #plotBCV(dge)
+    
+    fit <- glmQLFit(dge, design) #Maybe use robust=T
+    
+    # A normal edgeR analysis would then go on to:
+    # qlf <- glmQLFTest(fit, coef=2)
+    # topTags(qlf)
+    # summary(decideTestsDGE(qlf, p.value=0.01))
+    
+    sp <- diffSpliceDGE(fit, coef=2, geneid="parent", exonid="id")
+    top <- topSpliceDGE(sp, test="gene", n=Inf)
+    
+    list(
+       top = top,
+       dge = dge,
+       design = design
+    )
+}
+
+
+#
+# peak_info should contain: id, parent
+#
+limma_end_shift <- function(counts, peak_info, condition, group) {
+    group <- as.factor(group)    
+    if (length(unique(group)) <= 1)
+        design <- model.matrix(~ condition)
+    else
+        design <- model.matrix(~ condition + group)
+    
+    # Terms are: intercept, condition, group terms (other than first level)
+    # Second term is to be tested.    
+    
+    dge <- 
+      DGEList(counts, genes=peak_info) %>%
+      calcNormFactors()
+
+    fit <-
+        voom(dge, design) %>% 
+        lmFit(design) %>% 
+        eBayes
+
+    lsp <- diffSplice(fit, geneid="parent")
+    top <- topSplice(lsp, coef=2, test="F", n=Inf)
+
+    list(
+        top = top,
+        fit = fit,
+        design = design
+    )
+}
+
 
 #'
 #' End shift statistics, generic function
 #'
-#' peak_info should contain columns: start, end, strand (+/-1), parent
+#' peak_info should contain columns: id, start, end, strand (+/-1), parent
 #' strand should be the strand of the *gene*, if including antisense features
 #'
 #' @export
 end_shift <- function(counts, peak_info, condition, group=NULL, 
                       gene_info_columns=c("gene","product","biotype"), 
-                      ci=0.95, fdr=T) {
+                      ci=0.95, fdr=T, edger=T, limma=T) {
     counts <- as.matrix(counts)    
     if (is.null(group)) group <- rep(1,length(condition))
     
@@ -118,17 +190,39 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
     
     ci_sds <- qnorm((1+ci)/2)    
     
-    cat("split\n")
+    cat("Split\n")
     splitter <- 
         split(seq_len(nrow(counts)), peak_info$parent) %>%
         keep(~ length(.) > 1) %>%
         map(~ .[ order(peak_info$start[.] * peak_info$strand[.]) ])
     
-    cat("score\n")
+    keep_peaks <- peak_info$parent %in% names(splitter)
+    
+    if (edger) {
+        cat("Run edgeR\n")
+        edger_result <- edger_end_shift(
+            counts[keep_peaks,,drop=F], 
+            peak_info[keep_peaks,], 
+            condition, group)
+    } else {
+        edger_result <- NULL
+    }
+
+    if (limma) {
+        cat("Run limma\n")
+        limma_result <- limma_end_shift(
+            counts[keep_peaks,,drop=F], 
+            peak_info[keep_peaks,], 
+            condition, group)
+    } else {
+        limma_result <- NULL
+    }
+        
+    cat("Score\n")
     scores <- map(splitter, ~ combined_r(counts[.,,drop=F],condition,group) )
     
     if (fdr) {
-        cat("permute\n")
+        cat("Permute\n")
         # Get the null distribution of "interest"
         null_interest <-
             grouped_permutations(condition, group) %>%
@@ -146,7 +240,7 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
             sort(decreasing=T)
     }
         
-    cat("annotate\n")
+    cat("Annotate\n")
     gene_info <- peak_info %>% 
         { .[,c("parent",gene_info_columns)] } %>%
         group_by(parent) %>%
@@ -165,7 +259,7 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
         select(rank, parent, r, r_low, r_high, interest)
         
     if (fdr) {
-        cat("fdr\n")
+        cat("FDR\n")
         fdr <- numeric(nrow(result))
         j <- 0
         for(i in seq_along(fdr)) {
@@ -179,6 +273,28 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
         result$fdr <- fdr
     }
     
+    if (edger) {
+        result <- left_join(
+            result,
+            edger_result$top %>% transmute(
+                parent=parent, 
+                edger_rank=seq_len(n()), 
+                edger_fdr=FDR
+            ),
+            "parent")
+    }
+    
+    if (limma) {
+        result <- left_join(
+            result,
+            limma_result$top %>% transmute(
+                parent=parent, 
+                limma_rank=seq_len(n()), 
+                limma_fdr=FDR
+            ),
+            "parent")
+    }
+    
     list(
         table = left_join(result, gene_info, "parent"),
         splitter = splitter,
@@ -186,7 +302,9 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
         counts = counts,
         condition = condition,
         group = group,
-        ci = ci
+        ci = ci,
+        edger = edger_result,
+        limma = limma_result
     )
 }
 
@@ -198,12 +316,12 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
 #'
 #' @param fdr Produce permutation based q values, can be very slow.
 #'
-end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, antisense=T, non_utr=T) {
+end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edger=T, limma=T, antisense=T, non_utr=T) {
     dat <- read.grouped.table(paste0(path,"/expression/peakwise/counts.csv"))
     
     counts <- as.matrix(dat$Count)
     peak_info <- dat$Annotation
-    peak_info$peak <- rownames(peak_info)
+    peak_info$id <- rownames(peak_info)
     peak_info$product <- str_match(peak_info$product, "^[^ ]+ (.*)$")[,2]
     
     anti <- peak_info$relation == "Antisense"
@@ -221,7 +339,7 @@ end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, anti
     counts <- counts[keep,,drop=F]
     peak_info <- peak_info[keep,,drop=F]
     
-    end_shift(counts, peak_info, condition, group, ci=ci, fdr=fdr)
+    end_shift(counts, peak_info, condition, group, ci=ci, fdr=fdr, edger=edger, limma=limma)
 }
 
 
