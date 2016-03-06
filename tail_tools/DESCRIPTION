@@ -6,7 +6,7 @@ Maintainer: Paul Harrison <paul.harrison@monash.edu>
 URL: https://github.com/Victorian-Bioinformatics-Consortium/tail-tools
 Version: 0.1
 License: LGPL-2.1
-Imports:
+Depends:
     edgeR,
     limma,
     gridBase,
