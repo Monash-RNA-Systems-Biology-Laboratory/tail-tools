@@ -6,7 +6,7 @@
 \usage{
 end_shift(counts, peak_info, condition, group = NULL,
   gene_info_columns = c("gene", "product", "biotype"), ci = 0.95, fdr = T,
-  edger = T, limma = T)
+  edger = T, limma = T, title = "End-shift test")
 }
 \description{
 peak_info should contain columns: id, start, end, strand (+/-1), parent

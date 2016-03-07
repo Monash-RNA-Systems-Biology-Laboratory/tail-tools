@@ -175,7 +175,7 @@ limma_end_shift <- function(counts, peak_info, condition, group) {
 #' @export
 end_shift <- function(counts, peak_info, condition, group=NULL, 
                       gene_info_columns=c("gene","product","biotype"), 
-                      ci=0.95, fdr=T, edger=T, limma=T) {
+                      ci=0.95, fdr=T, edger=T, limma=T, title="End-shift test") {
     counts <- as.matrix(counts)    
     if (is.null(group)) group <- rep(1,length(condition))
     
@@ -304,7 +304,8 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
         group = group,
         ci = ci,
         edger = edger_result,
-        limma = limma_result
+        limma = limma_result,
+        title = title
     )
 }
 
@@ -316,7 +317,9 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
 #'
 #' @param fdr Produce permutation based q values, can be very slow.
 #'
-end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edger=T, limma=T, antisense=T, non_utr=T) {
+#' Samples with NA in condition will be omitted.
+#'
+end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edger=T, limma=T, antisense=T, non_utr=T, title="End-shift test") {
     dat <- read.grouped.table(paste0(path,"/expression/peakwise/counts.csv"))
     
     counts <- as.matrix(dat$Count)
@@ -330,16 +333,19 @@ end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edge
     # Filter
     keep <- rep(T,nrow(peak_info))
     
+    sample_keep <- !is.na(condition)
+    
     if (!antisense)
         keep <- keep & peak_info$relation != "Antisense"
         
     if (!non_utr)
         keep <- keep & peak_info$relation == "3'UTR"
         
-    counts <- counts[keep,,drop=F]
+    counts <- counts[keep,sample_keep,drop=F]
     peak_info <- peak_info[keep,,drop=F]
     
-    end_shift(counts, peak_info, condition, group, ci=ci, fdr=fdr, edger=edger, limma=limma)
+    end_shift(counts, peak_info, condition[sample_keep], group[sample_keep], 
+              ci=ci, fdr=fdr, edger=edger, limma=limma, title=title)
 }
 
 

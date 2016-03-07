@@ -71,26 +71,9 @@ rank_coldef <- function(target, fdr) {
 }
 
 
-#'
-#' Show a report about an end shift analysis.
-#'
-#' @param result output from end_shift()
-#'
-#' @export
-shiny_end_shift <- function(result) {
-    have_fdr <- "fdr" %in% colnames(result$table)
-    
-    get_cols <- c("rank","r","r_low","r_high","fdr",
-                  "edger_rank","edger_fdr","limma_rank","limma_fdr",
-                  "gene","biotype","product","parent")
-    get_cols <- get_cols[ get_cols %in% colnames(result$table) ]
-    df <- result$table[,get_cols]
 
-    # column numbers as referred to by DT, counting from 0
-    cols <- as.list(seq_len(ncol(df))-1)
-    names(cols) <- colnames(df)
-    
-    ui <- fluidPage(
+composable_shiny_panels_app <- function(panels, server) {
+    ui <- div(
         HTML('
 <style>
 table.dataTable.display tbody td { 
@@ -104,101 +87,163 @@ table.dataTable.display tbody td {
 }
 </style>
 '),
-        navlistPanel(
-            widths=c(2,10),
-            well=FALSE,
-            tabPanel("Overview", 
-                uiOutput("overview")),
-            tabPanel("Results",
-                DT::dataTableOutput("table"),
-                downloadButton("table_download", "Download CSV file"),
-                uiOutput("blurb"),
-                DT::dataTableOutput("gene_table")
-            )
+        do.call(navlistPanel, c(list(widths=c(2,10),well=FALSE), panels))
+    )
+
+    app <- composable_shiny_app(ui, server)
+    app$component_panels <- panels
+    app
+}
+
+
+#'
+#' Show a report about an end shift analysis.
+#'
+#' @param result output from end_shift()
+#'
+#' @export
+shiny_end_shift <- function(result) {
+    result <- ensure_reactable(result)
+
+    panels <- list(
+        tabPanel("Overview", 
+            uiOutput("overview")),
+        tabPanel("Results",
+            DT::dataTableOutput("table"),
+            downloadButton("table_download", "Download CSV file"),
+            uiOutput("blurb"),
+            DT::dataTableOutput("gene_table")
         )
     )
+        
+    server <- function(env) {
+        output <- env$output
+        input <- env$input
+        session <- env$session
+        
+        env$vars <- reactive({
+            result_val <- result(env)
+            
+            have_fdr <- "fdr" %in% colnames(result_val$table)
+            
+            get_cols <- c("rank","r","r_low","r_high","fdr",
+                          "edger_rank","edger_fdr","limma_rank","limma_fdr",
+                          "gene","biotype","product","parent")
+            get_cols <- get_cols[ get_cols %in% colnames(result_val$table) ]
+            df <- result_val$table[,get_cols]
+            
+            # column numbers as referred to by DT, counting from 0
+            cols <- as.list(seq_len(ncol(df))-1)
+            names(cols) <- colnames(df)
+
+            list(result=result_val, df=df, have_fdr=have_fdr, cols=cols)
+        })
     
-    server <- function(input,output,session) {
         output$overview <- renderUI({
-            tags$div(
-                tags$h2("Overview"),
-                tags$p( nrow(df), "genes with multiple peaks." ),
-                tags$p( sprintf("%.1f",result$edger$dge$prior.df), "edgeR prior degrees of freedom." ),
-                tags$p( sprintf("%.1f",result$limma$fit$df.prior), "limma prior degrees of freedom." ),
-                tags$p("(More prior degrees of freedom indicates more consistent expression levels between genes, and generally leads to more significant results.)"),
-                
+            vars <- env$vars()
+            
+            items <- list(
+                tags$h2( vars$result$title ),
+                tags$p( nrow(vars$df), "genes with multiple peaks." )
+            )
+            
+            if (!is.null(vars$result$edger))
+                items <- c(items,list( 
+                    tags$p( sprintf("%.1f",vars$result$edger$dge$prior.df), "edgeR prior degrees of freedom." )
+                ))
+            
+            if (!is.null(vars$result$limma))
+                items <- c(items,list(
+                    tags$p( sprintf("%.1f",vars$result$limma$fit$df.prior), "limma prior degrees of freedom." )
+                ))
+            
+            items <- c(items,list(
                 tags$h2("Interpretation"),
                 
                 tags$p("r values lie between -1 and 1. Positive r values indicate a shift from proximal to distal peak usage, and negative vice versa."),
                 
-                tags$p( sprintf("%g%%",result$ci*100), "confidence intervals on r account only for technical variance estimating r (ie genes with few reads will have a wide interval). Genes are ranked by the end of the confidence interval closest to 0."),
+                tags$p( sprintf("%g%%",vars$result$ci*100), "confidence intervals on r account only for technical variance estimating r (ie genes with few reads will have a wide interval). Genes are ranked by the end of the confidence interval closest to 0."),
                 
                 tags$p("The FDR values associated with r are based on a permuation test, and are quite conservative, espcially if the number of possible permutations of samples (respecting grouping) is limited."),
                 
-                tags$p("EdgeR and limma rankings and FDR values are based on differential exon usage tests applied to this data. The edgeR \"gene\" and limma \"F\" methods were used. These will pick up a shift in peak usage, but if there are more than two peaks no attention is paid to the order of peaks (in contrast to the r statistic, where the order is important).")
-            )
+                tags$p("EdgeR and limma rankings and FDR values are based on differential exon usage tests applied to this data. The edgeR \"gene\" and limma \"F\" methods were used. These will pick up a shift in peak usage, but if there are more than two peaks no attention is paid to the order of peaks (in contrast to the r statistic, where the order is important)."),
+
+                tags$p("More prior degrees of freedom in edgeR and limma indicates more consistent expression levels between genes, and generally leads to more significant results.")                
+            ))
+            
+            do.call(tags$div, items)
         })
     
     
-        output$table <- DT::renderDataTable(
-            df, 
-            rownames=F, 
-            selection="single",
-            options=list(
-                pageLength=20,
-                columnDefs=c(
-                    list(list(
-                        targets=c(cols$r_low, cols$r_high, cols$fdr, cols$edger_fdr, cols$limma_fdr),
-                        visible=FALSE
-                    )),
-                    list(rank_coldef(cols$rank, cols$fdr)),
-                    list(r_coldef(cols$r, cols$r_low, cols$r_high)),
-                    { if (is.null(cols$edger_rank)) list()
-                      else list(rank_coldef(cols$edger_rank, cols$edger_fdr)) },
-                    { if (is.null(cols$limma_rank)) list()
-                      else list(rank_coldef(cols$limma_rank, cols$limma_fdr)) }
+        output$table <- reactive({
+            vars <- env$vars()
+            cols <- vars$cols
+        
+            DT::renderDataTable(
+                vars$df, 
+                rownames=F, 
+                selection="single",
+                options=list(
+                    pageLength=20,
+                    columnDefs=c(
+                        list(list(
+                            targets=c(cols$r_low, cols$r_high, cols$fdr, cols$edger_fdr, cols$limma_fdr),
+                            visible=FALSE
+                        )),
+                        list(rank_coldef(cols$rank, cols$fdr)),
+                        list(r_coldef(cols$r, cols$r_low, cols$r_high)),
+                        { if (is.null(cols$edger_rank)) list()
+                          else list(rank_coldef(cols$edger_rank, cols$edger_fdr)) },
+                        { if (is.null(cols$limma_rank)) list()
+                          else list(rank_coldef(cols$limma_rank, cols$limma_fdr)) }
+                    )
                 )
-            )
-        )
+            )(shinysession=session, name="table")
+        })
         
         
         output$table_download <- downloadHandler(
             filename="alternative-utrs.csv",
             content=function(file) {
-                write_csv(df, file)
+                vars <- env$vars()
+                write_csv(vars$df, file)
             }
         )
         
         
         output$blurb <- renderUI({
+            vars <- env$vars()
+            
             row <- input$table_row_last_clicked
             if (is.null(row)) {
                 return("")
             }
             
             row <- as.integer(row)
-            tags$h3(df$gene[row], df$parent[row])
+            tags$h3(vars$df$gene[row], vars$df$parent[row])
         })
         
         output$gene_table <- reactive({
+            vars <- env$vars()
+        
             row <- input$table_row_last_clicked
             if (is.null(row)) {
                 return(NULL)
             }
             
             row <- as.integer(row)
-            parent <- result$table$parent[row]
-            peaks <- result$splitter[[parent]]
+            parent <- vars$result$table$parent[row]
+            peaks <- vars$result$splitter[[parent]]
             n_peaks <- length(peaks)
             
-            out <- data_frame(sample=colnames(result$counts))
-            if (!is.null(result$group))
-                out$group <- result$group
-            out$condition <- ifelse(result$condition, "+","-")
+            out <- data_frame(sample=colnames(vars$result$counts))
+            if (!is.null(vars$result$group))
+                out$group <- vars$result$group
+            out$condition <- ifelse(vars$result$condition, "+","-")
             #escape <- ncol(out)
             
-            mat <- t(result$counts[peaks,,drop=F]) 
-            colnames(mat) <- paste(result$peak_info$id[peaks], result$peak_info$relation[peaks])
+            mat <- t(vars$result$counts[peaks,,drop=F]) 
+            colnames(mat) <- paste(vars$result$peak_info$id[peaks], vars$result$peak_info$relation[peaks])
             max_mat <- max(mat)
             mat <- mat %>% as.data.frame      
             
@@ -220,18 +265,94 @@ table.dataTable.display tbody td {
         })
     }
 
-    shinyApp(ui,server)
+    app <- composable_shiny_panels_app(panels,server)
 }
 
 
 #'
-#' Perform an end shift analysis and report results.
+#' Perform end shift analyses on pipeline output and report results.
 #'
-#' @param path Directory containing tail-tools pipeline output
+#' @param tests Named list of lists giving parameters to end_shift_pipeline. Each name should be unique.
 #'
 #' @export
-shiny_end_shift_pipeline <- function(path) {
-
+shiny_end_shift_pipeline <- function(tests, cache_prefix="cache_") {
+    get <- function(name, peak_set) {
+        param <- tests[[name]]        
+        param$antisense <- peak_set == "all"
+        param$non_utr <- peak_set != "utr"
+        
+        filename <- paste0(cache_prefix,name,"_",peak_set,".rds")
+        
+        cached_value <- NULL
+        if (file.exists(filename)) {
+            cached_value <- readRDS(filename)
+            if (identical(cached_value$param, param))
+                return(cached_value$result)
+        }
+        
+        result <- withProgress(
+            message=paste0("Computing ",name," ",peak_set),
+            do.call(end_shift_pipeline, param)
+        )
+        
+        saveRDS(list(param=param,result=result), filename)
+        
+        result
+    }
+    
+    assert_that(is.list(tests))
+    assert_that(!is.null(names(tests)))
+    assert_that(!any(duplicated(names(tests))))
+    
+    titles <- map2_chr(names(tests), tests, function(name,param) {
+        if (!is.null(param$title)) param$title 
+        else name
+    })
+    choices <- as.list(names(tests))
+    names(choices) <- titles
+    
+    peak_choices = list(
+        "All" = "all",
+        "Sense strand only" = "sense",
+        "3' UTR only" = "utr"
+    )
+        
+    subapp <- shiny_end_shift(function(env) env$test_result())
+    
+    panels <- list(
+        tabPanel("Select test",
+            h2("Select test"),
+            selectizeInput("test", "Test", choices=choices, selected=NULL, width="100%"),
+            selectizeInput("peak_set", "Peaks to use", choices=peak_choices, selected="sense"),
+            div(style="height: 4em"),
+            actionButton("cache_all", "Ensure all tests are cached") 
+        )
+    )
+    
+    panels <- c(panels, subapp$component_panels)
+        
+    server <- function(env) {
+        observe({
+            if (env$input$cache_all == 0) return()
+            
+            for(name in names(tests))
+                for(peak_set in unlist(peak_choices))
+                    get(name, peak_choices)
+        })
+    
+        env$test_result <- reactive({
+            get(env$input$test, env$input$peak_set)
+        })    
+    
+        subapp$component_server(env)
+    }
+    
+    composable_shiny_panels_app(panels, server)
 }
+
+
+
+
+
 
 

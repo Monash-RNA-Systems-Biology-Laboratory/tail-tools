@@ -2,14 +2,14 @@
 % Please edit documentation in R/shiny_end_shift.R
 \name{shiny_end_shift_pipeline}
 \alias{shiny_end_shift_pipeline}
-\title{Perform an end shift analysis and report results.}
+\title{Perform end shift analyses on pipeline output and report results.}
 \usage{
-shiny_end_shift_pipeline(path)
+shiny_end_shift_pipeline(tests, cache_prefix = "cache_")
 }
 \arguments{
-\item{path}{Directory containing tail-tools pipeline output}
+\item{tests}{Named list of lists giving parameters to end_shift_pipeline. Each name should be unique.}
 }
 \description{
-Perform an end shift analysis and report results.
+Perform end shift analyses on pipeline output and report results.
 }
 
