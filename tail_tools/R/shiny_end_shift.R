@@ -337,7 +337,7 @@ shiny_end_shift_pipeline <- function(tests, cache_prefix="cache_") {
             
             for(name in names(tests))
                 for(peak_set in unlist(peak_choices))
-                    get(name, peak_choices)
+                    get(name, peak_set)
         })
     
         env$test_result <- reactive({
