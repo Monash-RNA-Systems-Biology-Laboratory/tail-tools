@@ -173,10 +173,13 @@ limma_end_shift <- function(counts, peak_info, condition, group) {
 #' peak_info should contain columns: id, start, end, strand (+/-1), parent
 #' strand should be the strand of the *gene*, if including antisense features
 #'
+#' min_reads is minimum mean-reads-per-sample for each gene
+#'
 #' @export
 end_shift <- function(counts, peak_info, condition, group=NULL, 
                       gene_info_columns=c("gene","product","biotype"), 
-                      ci=0.95, fdr=T, edger=T, limma=T, title="End-shift test") {
+                      ci=0.95, fdr=T, edger=T, limma=T, min_reads=10,
+                      title="End-shift test") {
     counts <- as.matrix(counts)    
     if (is.null(group)) group <- rep(1,length(condition))
     
@@ -192,10 +195,16 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
     ci_sds <- qnorm((1+ci)/2)    
     
     cat("Split\n")
-    splitter <- 
-        split(seq_len(nrow(counts)), peak_info$parent) %>%
-        keep(~ length(.) > 1) %>%
-        map(~ .[ order(peak_info$start[.] * peak_info$strand[.]) ])
+    splitter <-
+        seq_len(nrow(counts)) %>% 
+        split(peak_info$parent) %>%
+        keep(function(item) {
+            length(item) > 1 &&
+            sum(counts[item,,drop=F])/ncol(counts) >= min_reads
+        }) %>%
+        lapply(function(item) {
+            item[ order(peak_info$start[item] * peak_info$strand[item]) ]
+        })
     
     keep_peaks <- peak_info$parent %in% names(splitter)
     
@@ -306,6 +315,7 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
         ci = ci,
         edger = edger_result,
         limma = limma_result,
+        min_reads = min_reads,
         title = title
     )
 }
@@ -320,7 +330,7 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
 #'
 #' Samples with NA in condition will be omitted.
 #'
-end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edger=T, limma=T, antisense=T, non_utr=T, title="End-shift test") {
+end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edger=T, limma=T, antisense=T, non_utr=T, min_reads=10, title="End-shift test") {
     dat <- read.grouped.table(paste0(path,"/expression/peakwise/counts.csv"))
     
     counts <- as.matrix(dat$Count)
@@ -346,7 +356,7 @@ end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edge
     peak_info <- peak_info[keep,,drop=F]
     
     end_shift(counts, peak_info, condition[sample_keep], group[sample_keep], 
-              ci=ci, fdr=fdr, edger=edger, limma=limma, title=title)
+              ci=ci, fdr=fdr, edger=edger, limma=limma, min_reads=min_reads, title=title)
 }
 
 

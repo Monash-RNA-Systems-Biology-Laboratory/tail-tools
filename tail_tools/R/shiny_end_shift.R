@@ -184,7 +184,7 @@ shiny_end_shift <- function(result) {
                 tags$h2( vars$result$title ),
                 mr_plot$component_ui,
                 HTML("<p>Genes significant by various methods with FDR &le; 0.05 are circled.</p>"),
-                tags$p( nrow(vars$df), "genes with multiple peaks." )
+                tags$p( nrow(vars$df), "genes with multiple peaks and averaging at least", vars$result$min_reads, "reads per sample.")
             )
             
             if (!is.null(vars$result$edger))
