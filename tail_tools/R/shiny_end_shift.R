@@ -105,6 +105,44 @@ table.dataTable.display tbody td {
 shiny_end_shift <- function(result) {
     result <- ensure_reactable(result)
 
+    mr_plot <- shiny_plot(function(env) {
+        df <- env$vars()$df
+        if (is.null(df)) return()
+        
+        plot <- ggplot(df,aes(x=mean_reads, y=r)) +
+            scale_x_log10() +
+            scale_color_discrete("Significant by") +
+            geom_segment(aes(xend=mean_reads, y=r_low, yend=r_high), color="#bbbbbb") +
+            geom_point() +
+            theme_bw() +
+            labs(x = "Mean reads per sample (log scale)",
+                 y = "r")
+        
+        size <- 3
+        if (!is.null(df$fdr) && any(df$fdr <= 0.05)) {
+            plot <- plot + geom_point(
+                data=filter(df, fdr <= 0.05),aes(color="r"),
+                shape=1,stroke=1.5,size=size)
+            size <- size + 2
+        }
+
+        if (!is.null(df$edger_fdr) && any(df$edger_fdr <= 0.05)) {
+            plot <- plot + geom_point(
+                data=filter(df, edger_fdr <= 0.05),aes(color="edgeR"),
+                shape=1,stroke=1.5,size=size)
+            size <- size + 2
+        }
+        
+        if (!is.null(df$limma_fdr) && any(df$limma_fdr <= 0.05)) {
+            plot <- plot + geom_point(
+                data=filter(df, limma_fdr <= 0.05),aes(color="limma"),
+                shape=1,stroke=1.5,size=size)
+            size <- size + 2
+        }
+        
+        plot
+    }, prefix="mr_plot_", width=800)
+
     panels <- list(
         tabPanel("Overview", 
             uiOutput("overview")),
@@ -120,7 +158,7 @@ shiny_end_shift <- function(result) {
         output <- env$output
         input <- env$input
         session <- env$session
-        
+                
         env$vars <- reactive({
             result_val <- result(env)
             
@@ -128,7 +166,7 @@ shiny_end_shift <- function(result) {
             
             get_cols <- c("rank","r","r_low","r_high","fdr",
                           "edger_rank","edger_fdr","limma_rank","limma_fdr",
-                          "gene","biotype","product","parent")
+                          "gene","biotype","product","parent","mean_reads")
             get_cols <- get_cols[ get_cols %in% colnames(result_val$table) ]
             df <- result_val$table[,get_cols]
             
@@ -144,6 +182,8 @@ shiny_end_shift <- function(result) {
             
             items <- list(
                 tags$h2( vars$result$title ),
+                mr_plot$component_ui,
+                HTML("<p>Genes significant by various methods with FDR &le; 0.05 are circled.</p>"),
                 tags$p( nrow(vars$df), "genes with multiple peaks." )
             )
             
@@ -263,6 +303,9 @@ shiny_end_shift <- function(result) {
                 df
             )(shinysession=session, name="gene_table") 
         })
+
+        
+        mr_plot$component_server(env)
     }
 
     app <- composable_shiny_panels_app(panels,server)

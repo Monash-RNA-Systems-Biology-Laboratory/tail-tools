@@ -58,7 +58,8 @@ combined_r <- function(mat, condition, group) {
     total_weight <- sum(group_result$weight)
     data_frame(
         r = sum(group_result$r*group_result$weight) / total_weight,
-        var = 1/total_weight
+        var = 1/total_weight,
+        mean_reads = sum(mat) / ncol(mat)
     )
 }
 
@@ -256,7 +257,7 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
         ) %>%
         arrange(desc(interest)) %>%
         mutate( rank=seq_len(n()) ) %>%
-        select(rank, parent, r, r_low, r_high, interest)
+        select(rank, parent, r, r_low, r_high, interest, mean_reads)
         
     if (fdr) {
         cat("FDR\n")
