@@ -72,7 +72,7 @@ rank_coldef <- function(target, fdr) {
 
 
 
-composable_shiny_panels_app <- function(panels, server) {
+composable_shiny_panels_app <- function(panels, server, prefix="") {
     ui <- div(
         HTML('
 <style>
@@ -87,7 +87,7 @@ table.dataTable.display tbody td {
 }
 </style>
 '),
-        do.call(navlistPanel, c(list(widths=c(2,10),well=FALSE), panels)),
+        do.call(navlistPanel, c(list(id=paste0(prefix, "tabset"), widths=c(2,10),well=FALSE), panels)),
         div(style="height: 4em")
     )
 
@@ -142,7 +142,7 @@ shiny_end_shift <- function(result) {
         }
         
         plot
-    }, prefix="mr_plot_", width=800)
+    }, prefix="mr_plot_", width=800, brush=brushOpts(id="mr_plot_brush", delay=600000))
 
     panels <- list(
         tabPanel("Overview", 
@@ -177,6 +177,23 @@ shiny_end_shift <- function(result) {
 
             list(result=result_val, df=df, have_fdr=have_fdr, cols=cols)
         })
+
+        env$selected_rows <- reactive({
+            df <- env$vars()$df
+            
+            if (!is.null(input$mr_plot_brush)) {
+                df <- df %>%
+                    filter(!is.na(r)) %>%
+                    brushedPoints(input$mr_plot_brush, "mean_reads", "r")
+            }
+            
+            df
+        })
+        
+        observe({
+            if (!is.null(input$mr_plot_brush))
+                updateTabsetPanel(session, "tabset", selected="Results")
+        })
     
         output$overview <- renderUI({
             vars <- env$vars()
@@ -184,6 +201,7 @@ shiny_end_shift <- function(result) {
             items <- list(
                 tags$h2( vars$result$title ),
                 mr_plot$component_ui,
+                tags$p("Drag to select a subset of genes."),
                 HTML("<p>Genes significant by various methods with FDR &le; 0.05 are circled.</p>"),
                 tags$p( nrow(vars$df), "genes with multiple peaks and averaging at least", vars$result$min_reads, "reads per sample.")
             )
@@ -228,12 +246,13 @@ shiny_end_shift <- function(result) {
     
         output$table <- reactive({
             vars <- env$vars()
-            cols <- vars$cols
-        
+            cols <- vars$cols            
+            df <- env$selected_rows()
+            
             DT::renderDataTable(
-                vars$df, 
+                df, 
                 rownames=F, 
-                selection=list(mode="single", selection=integer(0)),
+                selection=list(mode="single", selection=c(1)),
                 options=list(
                     pageLength=20,
                     columnDefs=c(
@@ -256,34 +275,38 @@ shiny_end_shift <- function(result) {
         output$table_download <- downloadHandler(
             filename="alternative-utrs.csv",
             content=function(file) {
-                vars <- env$vars()
-                write_csv(vars$df, file)
+                write_csv(env$selected_rows(), file)
             }
         )
         
         
         output$blurb <- renderUI({
             vars <- env$vars()
+            df <- env$selected_rows()
             
-            row <- input$table_row_last_clicked
-            if (is.null(row)) {
-                return("")
+            row <- as.integer(input$table_rows_selected)
+            if (length(row) != 1 || row > nrow(df)) {
+                return(tags$div(style="height:2em"))
             }
             
             row <- as.integer(row)
-            tags$h3(vars$df$gene[row], vars$df$parent[row])
+            tags$h3(df$gene[row], df$parent[row])
         })
         
         output$gene_table <- reactive({
             vars <- env$vars()
+            df <- env$selected_rows()
         
-            row <- input$table_row_last_clicked
-            if (is.null(row)) {
-                return(NULL)
+            row <- as.integer(input$table_rows_selected)
+            if (length(row) != 1 || row > nrow(df)) {
+                return(DT::renderDataTable(
+                    data_frame("Select a gene to view details"=character(0)),
+                    rownames=F,
+                    options=list(dom="")
+                )(shinysession=session, name="gene_table"))
             }
             
-            row <- as.integer(row)
-            parent <- vars$result$table$parent[row]
+            parent <- df$parent[row]
             peaks <- vars$result$splitter[[parent]]
             n_peaks <- length(peaks)
             
