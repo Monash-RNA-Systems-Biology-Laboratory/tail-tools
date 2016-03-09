@@ -58,13 +58,13 @@ rank_coldef <- function(target, fdr) {
             else
                 fdr_text = fdr.toPrecision(1);
             if (fdr <= 0.01)
-                color = "#0c0"
+                color = "#0a0"
             else if (fdr <= 0.05)
                 color = "#cc0"
             else 
                 color = "#888"
             return "<span style=\\"color:" + color + "\\">" + data + " " +
-                "<div title=FDR style=\\"display: inline-block; font-size: 66%; width: 3em;\\">(" + 
+                "<div title=FDR style=\\"display: inline-block; font-size: 80%; width: 4em;\\">(" + 
                 fdr_text + ")</div></span>";
         }')
     )
@@ -87,7 +87,8 @@ table.dataTable.display tbody td {
 }
 </style>
 '),
-        do.call(navlistPanel, c(list(widths=c(2,10),well=FALSE), panels))
+        do.call(navlistPanel, c(list(widths=c(2,10),well=FALSE), panels)),
+        div(style="height: 4em")
     )
 
     app <- composable_shiny_app(ui, server)
@@ -204,11 +205,21 @@ shiny_end_shift <- function(result) {
                 
                 tags$p( sprintf("%g%%",vars$result$ci*100), "confidence intervals on r account only for technical variance estimating r (ie genes with few reads will have a wide interval). Genes are ranked by the end of the confidence interval closest to 0."),
                 
+                tags$p("FDR values are shown in brackets next to rankings."),
+                
                 tags$p("The FDR values associated with r are based on a permuation test, and are quite conservative, espcially if the number of possible permutations of samples (respecting grouping) is limited."),
                 
                 tags$p("EdgeR and limma rankings and FDR values are based on differential exon usage tests applied to this data. The edgeR \"gene\" and limma \"F\" methods were used. These will pick up a shift in peak usage, but if there are more than two peaks no attention is paid to the order of peaks (in contrast to the r statistic, where the order is important)."),
 
-                tags$p("More prior degrees of freedom in edgeR and limma indicates more consistent expression levels between genes, and generally leads to more significant results.")                
+                tags$p("More prior degrees of freedom in edgeR and limma indicates more consistent expression levels between genes, and generally leads to more significant results."),
+                
+                tags$h2("Details"), 
+
+                tags$p("r definition: Consider each pairing of reads with one read from condition - and one read from condition +. Assign the value 1 if the + read is further 3' than the - read, -1 if the opposite, and 0 if they are from the same peak. r is then the average of all these values."),
+                
+                tags$p("r can be viewed as a rescaled Mann-Whitney-Wilcoxon U statistic. This has an associated normal approximation to the error distribution, so we can give an accuracy to which r has been estimated, at least in terms of technical variation."),
+                
+                tags$p("When there are multiple groups, r is estimated for each of the groups and then these r values are averaged weighted by their precision (1/variance).")
             ))
             
             do.call(tags$div, items)
@@ -222,7 +233,7 @@ shiny_end_shift <- function(result) {
             DT::renderDataTable(
                 vars$df, 
                 rownames=F, 
-                selection="single",
+                selection=list(mode="single", selection=integer(0)),
                 options=list(
                     pageLength=20,
                     columnDefs=c(
@@ -300,6 +311,7 @@ shiny_end_shift <- function(result) {
                     )
                 ), 
                 rownames=F,
+                selection=list(mode="single",selection=integer(0)),
                 df
             )(shinysession=session, name="gene_table") 
         })
