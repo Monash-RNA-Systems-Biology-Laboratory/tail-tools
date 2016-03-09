@@ -6,10 +6,13 @@
 \usage{
 end_shift(counts, peak_info, condition, group = NULL,
   gene_info_columns = c("gene", "product", "biotype"), ci = 0.95, fdr = T,
-  edger = T, limma = T, title = "End-shift test")
+  edger = T, limma = T, min_reads = 10, title = "End-shift test")
 }
 \description{
 peak_info should contain columns: id, start, end, strand (+/-1), parent
 strand should be the strand of the *gene*, if including antisense features
+}
+\details{
+min_reads is minimum mean-reads-per-sample for each gene
 }
 

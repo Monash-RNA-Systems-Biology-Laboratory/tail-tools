@@ -567,6 +567,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
 
         self._extract_raw()
+        
+        tail_tools.Shiny(workspace/"shiny", self.output_dir).make()
 
         #===============================================
         #                   Report        

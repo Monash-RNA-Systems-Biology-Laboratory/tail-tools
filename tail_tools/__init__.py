@@ -16,6 +16,7 @@ from .workflows import Call_peaks, Analyse_polya, Analyse_polya_batch
 from .reference_directory import Make_tt_reference, Make_ucsc_reference
 from .reference_directory_ensembl import Make_ensembl_reference
 from .primer_gff import Primer_gff
+from .shiny import Shiny
 
 def main():
     nesoni.run_toolbox([
@@ -37,6 +38,7 @@ def main():
             Call_utrs,
             Test,
             Geneview_webapp,
+            Shiny,
             
             'Component workflows:',
             Call_peaks,
