@@ -124,7 +124,7 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
                             DT::dataTableOutput(p("gotab")))
                             #shiny::tableOutput("tabout"))
         ),
-        parenthetically("This plot is produced by a modified varistran::plot_heatmap.")
+        parenthetically("This plot is produced by tailtools::shiny_patseq_heatmap.")
         
     )
     

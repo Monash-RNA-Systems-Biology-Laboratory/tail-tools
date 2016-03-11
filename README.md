@@ -82,10 +82,19 @@ For PyPy it seems to be currently easiest to set up in a virtualenv:
     pip install --upgrade 'git+https://github.com/Victorian-Bioinformatics-Consortium/tail-tools.git#egg=tail-tools'
 
 
+### R library
+
 Tail Tools includes an R package. This isn't essential to run the pipeline, but contains functions to produce various Shiny reports. It can be installed from R with:
 
+Easy way:
+
+    R
     devtools::install_github("Victorian-Bioinformatics-Consortium/tail-tools", subdir="tail_tools")
 
+From source:
+
+    R
+    devtools::install("tail_tools")
 
 
 Usage
@@ -101,9 +110,19 @@ The package can be used directly from the source directory with:
     python -m tail_tools
 
 
-These tools may also be used as part of a nesoni-style workflow python script.
+These tools may also be used from a python script (using the same system as my older genomics python package "nesoni"). A typical example of invoking the pipeline from python can be found below.
 
-Typical usage of the pipeline is described below.
+
+R library
+---------
+
+The tailtools R library can then be loaded in R with:
+
+    library(tailtools)
+
+* [Manual (pdf)](http://rnasystems.erc.monash.edu/doc/tailtools.pdf)
+
+The pipeline also includes a Shiny app as part of its output (in subdirectory "shiny"). This can be served with ShinyServer or viewed from within R with `shiny::runApp("pipelineoutputdir/shiny")`.
 
 
 Reference format
@@ -111,11 +130,15 @@ Reference format
 
 Before processing any reads, you need to create a "tail-tools reference directory".
 
-References are most easily downloaed from the UCSC browser using:
+References are most easily downloaed from the UCSC browser or the Ensembl genome browser.
+
+References can be downloaded from the UCSC browser using:
 
     tail-tools make-ucsc-reference: \
         <output_dir> \
         <ucsc_reference_name>
+
+References can also be downloaded from the Ensembl genome browser using "tail-tools make-ensembl-reference". The Ensembl genome annotations are more comprehensive, but using them requires specifying more parameters. Type "tail-tools make-ensembl-reference" for more instructions, or email Paul.
 
 If creating your own reference, it needs to consist of:
 
@@ -135,6 +158,7 @@ gene
 * ID - unique identifier
 * Name (optional) - nomenclature name
 * Product (optional) - short description
+* Biotype (optional) - what type of gene it is (protein_coding, rRNA, etc)
 
 mRNA
 * ID      - unique identifier
@@ -145,6 +169,9 @@ CDS
 
 exon
 * Parent  - mRNA ID
+
+
+The pipeline assumes that genes do not have overlapping exons on the same strand. Is this too much to ask for in a reasonable genome annotation? Apparently the answer is yes. The UCSC and Ensemble genome downloaders merge genes with overlapping exons -- ids and names are concatenated with "/" as a separator. This can complicate downstream analysis, and Paul apologises for the pain this causes.
 
 
 

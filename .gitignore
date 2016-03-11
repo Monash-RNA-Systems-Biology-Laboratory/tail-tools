@@ -1,5 +1,6 @@
 *.pyc
 MANIFEST
+tailtools.pdf
 build/
 dist/
 tail_tools.egg-info/
