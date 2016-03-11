@@ -3,6 +3,7 @@
        least 20. Poly(A) tails are only called within this region, this
        means we see less long poly(A) tails, so this changes the tail length statistics 
        quite a lot.
+       Add shiny reports, end shift test in R.
 
 0.42 - When extended, don't extend over another exon on the same strand 
        (previously: another CDS on the same strand).

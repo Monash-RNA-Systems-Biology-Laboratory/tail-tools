@@ -22,7 +22,7 @@
 #' 
 #' @export
 
-shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL, feature_labels=NULL, prefix="", gotable=NULL, species=NULL) {
+shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL, feature_labels=NULL, prefix="", species=NULL) {
     if(!("Annotation" %in% names(datfr)) || !("Count" %in% names(datfr)) || !("Tail_count" %in% names(datfr)) || !("Tail" %in% names(datfr))){
         cat("This a summary of your dataframe: \n")
         print(summary(datfr))
@@ -48,7 +48,6 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
     sample_labels <- ensure_reactable(sample_labels)
     sample_labels2 <- ensure_reactable(sample_labels2)
     feature_labels <- ensure_reactable(feature_labels)
-    gotable <- ensure_reactable(gotable)
     
     plot <- shiny_patseq_heatmap_inner(
         callback = function(env) {
@@ -76,7 +75,7 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
     
     # Shiny's UI layout 
     ui <- shiny::tags$div(
-        shiny::titlePanel("Heatmap"),
+        shiny::titlePanel("Tail heatmap"),
         shiny::tabsetPanel(
             shiny::tabPanel("Options",
                             shiny::fluidRow(
@@ -105,8 +104,8 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
                                                                   inline=TRUE)
                                 ),
                                 shiny::column(3,
-                                              shiny::uiOutput(p("selCol")),
-                                              shinyURL::shinyURL.ui()
+                                              shiny::uiOutput(p("selCol"))
+                                              #shinyURL::shinyURL.ui()
                                 )
                                 
                             )),
@@ -131,7 +130,9 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
     
     # Shiny's server
     server <- function(env) {
-        shinyURL::shinyURL.server(env$session)
+        # Nice idea, doesn't work well with DT or brushes
+        #shinyURL::shinyURL.server(env$session)
+        
         # Processes the input from datfr into the correct length and returns a list of 4 data frames
         wproc <- reactive({
             
@@ -191,12 +192,12 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
             datfr3$Count <- datfr3$Count[cvec,]
             
             #Truncate names for neatness
-            rownames(datfr3$Count) <- substr(rownames(datfr3$Count), 1, 17)
-            rownames(datfr3$Tail) <- substr(rownames(datfr3$Tail), 1, 17)
-            rownames(datfr3$Tail_count) <- substr(rownames(datfr3$Tail_count), 1, 17)
-            rownames(datfr3$annotate) <- substr(rownames(datfr3$annotate), 1, 17)
-            datfr3$annotate$product <- substr(datfr3$annotate$product , 1, 76)
-            datfr3$annotate$gene <- substr(datfr3$annotate$gene, 1, 11)
+           # rownames(datfr3$Count) <- substr(rownames(datfr3$Count), 1, 17)
+           # rownames(datfr3$Tail) <- substr(rownames(datfr3$Tail), 1, 17)
+           # rownames(datfr3$Tail_count) <- substr(rownames(datfr3$Tail_count), 1, 17)
+           # rownames(datfr3$annotate) <- substr(rownames(datfr3$annotate), 1, 17)
+           # datfr3$annotate$product <- substr(datfr3$annotate$product , 1, 76)
+           # datfr3$annotate$gene <- substr(datfr3$annotate$gene, 1, 11)
             
             return(datfr3)
         })

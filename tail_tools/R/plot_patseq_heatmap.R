@@ -183,14 +183,16 @@ plot_patseq_heatmap <- function(
         x=rep(0,nrow(y)),
         y=seq_len(nrow(y))-0.5,
         just=c(0,0.5),
-        vp=viewport(xscale=c(0,1),yscale=c(0,nrow(y)))
+        vp=viewport(clip="on",xscale=c(0,1),yscale=c(0,nrow(y))),
+        max_width=10
     )
     gene_label_grob <- shrinktext_grob(
         gene_labels[row_order$order],
         x=rep(0,nrow(y)),
         y=seq_len(nrow(y))-0.5,
         just=c(0,0.5),
-        vp=viewport(xscale=c(0,1),yscale=c(0,nrow(y)))
+        vp=viewport(clip="on",xscale=c(0,1),yscale=c(0,nrow(y))),
+        max_width=10
     )
     
     product_label_grob <- shrinktext_grob(
@@ -198,7 +200,8 @@ plot_patseq_heatmap <- function(
         x=rep(0,nrow(y)),
         y=seq_len(nrow(y))-0.5,
         just=c(0,0.5),
-        vp=viewport(xscale=c(0,1),yscale=c(0,nrow(y)), name="prodVP")
+        vp=viewport(clip="on",xscale=c(0,1),yscale=c(0,nrow(y)), name="prodVP"),
+        max_width=20
     )
     
     chrom_label_grob <- shrinktext_grob(
@@ -206,7 +209,8 @@ plot_patseq_heatmap <- function(
         x=rep(0,nrow(y)),
         y=seq_len(nrow(y))-0.5,
         just=c(0,0.5),
-        vp=viewport(xscale=c(0,1),yscale=c(0,nrow(y)))
+        vp=viewport(clip="on",xscale=c(0,1),yscale=c(0,nrow(y))),
+        max_width=10
     )
     
     

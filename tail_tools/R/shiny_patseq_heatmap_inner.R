@@ -63,6 +63,8 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
         })
         
         gosrch <- reactive({
+            library(GOstats)
+        
             selrows <- calcdt()
             allrows <- selin(env)
             if(nrow(selrows)==nrow(allrows) || nrow(selrows)==0)

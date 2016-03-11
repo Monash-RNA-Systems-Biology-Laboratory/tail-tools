@@ -19,7 +19,6 @@ Depends:
     ggplot2,
     seriation,
     shiny,
-    shinyURL,
     DT,
     nesoni,
     varistran

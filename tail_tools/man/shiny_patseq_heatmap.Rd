@@ -5,7 +5,7 @@
 \title{Produces detailed heatmap}
 \usage{
 shiny_patseq_heatmap(datfr, sample_labels = NULL, sample_labels2 = NULL,
-  feature_labels = NULL, prefix = "", gotable = NULL, species = NULL)
+  feature_labels = NULL, prefix = "", species = NULL)
 }
 \arguments{
 \item{datfr}{List of dataframes 
