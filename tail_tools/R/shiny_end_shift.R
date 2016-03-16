@@ -164,8 +164,8 @@ shiny_end_shift <- function(result) {
             tags$div("Normalization", tags$div(style="display:inline-block; margin-left: 2em", radioButtons("normalize", label=NULL,
                 choices=list(
                     "none" = "none",
-                    "library size" = "library",
-                    "gene" = "gene"
+                    "to equalize library sizes" = "library",
+                    "to gene" = "gene"
                 ),
                 selected="none",
                 inline=T
