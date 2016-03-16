@@ -82,7 +82,7 @@ For PyPy it seems to be currently easiest to set up in a virtualenv:
     pip install --upgrade 'git+https://github.com/Victorian-Bioinformatics-Consortium/tail-tools.git#egg=tail-tools'
 
 
-### R library
+### R library installation
 
 Tail Tools includes an R package. This isn't essential to run the pipeline, but contains functions to produce various Shiny reports. It can be installed from R with:
 
@@ -113,8 +113,7 @@ The package can be used directly from the source directory with:
 These tools may also be used from a python script (using the same system as my older genomics python package "nesoni"). A typical example of invoking the pipeline from python can be found below.
 
 
-R library
----------
+### R library usage
 
 The tailtools R library can then be loaded in R with:
 

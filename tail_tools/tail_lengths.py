@@ -360,6 +360,7 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
         have_biotype = any("Biotype" in item.attr for item in annotations)
         have_parent = any("Parent" in item.attr for item in annotations)
         have_relation = any("Relation" in item.attr for item in annotations)
+        have_antisense = any("Antisense_parent" in item.attr for item in annotations)
 
         def counts_iter():
             for i in xrange(n_features):
@@ -377,6 +378,12 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
                     row[('Annotation','parent')] = annotations[i].attr.get('Parent','')
                 if have_relation:
                     row[('Annotation','relation')] = annotations[i].attr.get('Relation','')
+                
+                if have_antisense:
+                    row[('Annotation','antisense_gene')] = annotations[i].attr.get('Antisense_name','')
+                    row[('Annotation','antisense_product')] = annotations[i].attr.get('Antisense_product','')
+                    row[('Annotation','antisense_biotype')] = annotations[i].attr.get('Antisense_biotype','')
+                    row[('Annotation','antisense_parent')] = annotations[i].attr.get('Antisense_parent','')
                 
                 row[('Annotation','chromosome')] = str(annotations[i].seqid)
                 row[('Annotation','strand')] = str(annotations[i].strand)

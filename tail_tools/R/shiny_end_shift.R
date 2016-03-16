@@ -16,26 +16,27 @@ r_coldef <- function(target, r_low, r_high) {
                 "," + (" "+r_high.toFixed(2)).slice(-5) + "]</span>" +
                 "</tt> " +
                 "<svg width=203 height=21 style=\\"vertical-align: middle\\">" +
-                "<line x1="+tr(-1)+" y1=0 x2="+tr(-1)+" y2=21 stroke=#888 stroke-width=1 />" +
-                "<line x1="+tr( 0)+" y1=0 x2="+tr( 0)+" y2=21 stroke=#888 stroke-width=1 />" +
-                "<line x1="+tr( 1)+" y1=0 x2="+tr( 1)+" y2=21 stroke=#888 stroke-width=1 />" +
-                "<line x1="+tr(r_low)+" y1=10 x2="+tr(r_high)+" y2=10 stroke=#000 stroke-width=2 />" +
+                "<line x1="+tr(-1)+" y1=0 x2="+tr(-1)+" y2=21 stroke=#000 stroke-width=1 />" +
+                "<line x1="+tr( 0)+" y1=0 x2="+tr( 0)+" y2=21 stroke=#bbb stroke-width=1 />" +
+                "<line x1="+tr( 1)+" y1=0 x2="+tr( 1)+" y2=21 stroke=#000 stroke-width=1 />" +
+                "<line x1="+tr(r_low)+" y1=10 x2="+tr(r_high)+" y2=10 stroke=#000 stroke-width=2 stroke-linecap=butt />" +
                 "<circle cx="+tr(r)+" cy=10 r=4 fill=#000 />" +
                 "</svg>"
         }')
     )
 }
 
-n_coldef <- function(targets, maximum) {
+n_coldef <- function(targets, maximum, digits=0) {
     list(
         targets=targets,
         render=JS('
         function(data,type,row,meta) {
             var max = ',maximum,';
+            var digits = ',digits,';
             var val = parseFloat(data);
             var size = 21*Math.sqrt(val/max);
             var pos = (21-size)/2;
-            return "<tt>" + data + "</tt> " +
+            return "<tt>" + val.toFixed(digits) + "</tt> " +
                 "<svg width=21 height=21 style=\\"vertical-align: middle\\">" +
                 "<rect x="+pos+" y="+pos+" width="+size+" height="+size+" style=\\"fill: #88f;\\" />"+
                 "</svg>";
@@ -110,36 +111,45 @@ shiny_end_shift <- function(result) {
         df <- env$vars()$df
         if (is.null(df)) return()
         
+        cutoff <- env$input$fdr
+        
         plot <- ggplot(df,aes(x=mean_reads, y=r)) +
             scale_x_log10() +
-            scale_color_discrete("Significant by") +
             geom_segment(aes(xend=mean_reads, y=r_low, yend=r_high), color="#bbbbbb") +
             geom_point() +
             theme_bw() +
             labs(x = "Mean reads per sample (log scale)",
                  y = "r")
         
+        colors <- character(0)
+        
         size <- 3
-        if (!is.null(df$fdr) && any(df$fdr <= 0.05)) {
+        if (!is.null(df$fdr) && any(df$fdr <= cutoff)) {
             plot <- plot + geom_point(
-                data=filter(df, fdr <= 0.05),aes(color="r"),
+                data=filter(df, fdr <= cutoff),aes(color="r"),
                 shape=1,stroke=1.5,size=size)
+            colors <- c(colors,"r"="#ff6666")
             size <- size + 2
         }
 
-        if (!is.null(df$edger_fdr) && any(df$edger_fdr <= 0.05)) {
+        if (!is.null(df$edger_fdr) && any(df$edger_fdr <= cutoff)) {
             plot <- plot + geom_point(
-                data=filter(df, edger_fdr <= 0.05),aes(color="edgeR"),
+                data=filter(df, edger_fdr <= cutoff),aes(color="edgeR"),
                 shape=1,stroke=1.5,size=size)
+            colors <- c(colors,"edgeR"="#66ff66")
             size <- size + 2
         }
         
-        if (!is.null(df$limma_fdr) && any(df$limma_fdr <= 0.05)) {
+        if (!is.null(df$limma_fdr) && any(df$limma_fdr <= cutoff)) {
             plot <- plot + geom_point(
-                data=filter(df, limma_fdr <= 0.05),aes(color="limma"),
+                data=filter(df, limma_fdr <= cutoff),aes(color="limma"),
                 shape=1,stroke=1.5,size=size)
+            colors <- c(colors,"limma"="#6666ff")
             size <- size + 2
         }
+        
+        if (length(colors) > 0)
+            plot <- plot + scale_color_manual("Significant by", values=colors)
         
         plot
     }, prefix="mr_plot_", width=800, brush=brushOpts(id="mr_plot_brush", delay=600000))
@@ -151,6 +161,15 @@ shiny_end_shift <- function(result) {
             DT::dataTableOutput("table"),
             downloadButton("table_download", "Download CSV file"),
             uiOutput("blurb"),
+            tags$div("Normalization", tags$div(style="display:inline-block; margin-left: 2em", radioButtons("normalize", label=NULL,
+                choices=list(
+                    "none" = "none",
+                    "library size" = "library",
+                    "gene" = "gene"
+                ),
+                selected="none",
+                inline=T
+            ))),
             DT::dataTableOutput("gene_table")
         )
     )
@@ -200,6 +219,7 @@ shiny_end_shift <- function(result) {
             
             items <- list(
                 tags$h2( vars$result$title ),
+                numericInput("fdr", "Circle genes significant at FDR", 0.05),
                 mr_plot$component_ui,
                 tags$p("Drag to select a subset of genes."),
                 HTML("<p>Genes significant by various methods with FDR &le; 0.05 are circled.</p>"),
@@ -230,6 +250,8 @@ shiny_end_shift <- function(result) {
                 tags$p("EdgeR and limma rankings and FDR values are based on differential exon usage tests applied to this data. The edgeR \"gene\" and limma \"F\" methods were used. These will pick up a shift in peak usage, but if there are more than two peaks no attention is paid to the order of peaks (in contrast to the r statistic, where the order is important)."),
 
                 tags$p("More prior degrees of freedom in edgeR and limma indicates more consistent expression levels between genes, and generally leads to more significant results."),
+                
+                tags$p("Peaks labelled \"-collider\" are antisense to the present gene but sense to some other gene."),
                 
                 tags$h2("Details"), 
 
@@ -296,6 +318,7 @@ shiny_end_shift <- function(result) {
         output$gene_table <- reactive({
             vars <- env$vars()
             df <- env$selected_rows()
+            normalize <- env$input$normalize
         
             row <- as.integer(input$table_rows_selected)
             if (length(row) != 1 || row > nrow(df)) {
@@ -318,6 +341,17 @@ shiny_end_shift <- function(result) {
             
             mat <- t(vars$result$counts[peaks,,drop=F]) 
             colnames(mat) <- paste(vars$result$peak_info$id[peaks], vars$result$peak_info$relation[peaks])
+            
+            digits <- 0
+            if (normalize == "library") {
+                mat <- mat / (vars$result$lib_size / mean(vars$result$lib_size))
+                digits <- 1
+            } else if (normalize == "gene") {
+                mat <- mat / rowSums(mat)
+                digits <- 3
+            }
+            
+            
             max_mat <- max(mat)
             mat <- mat %>% as.data.frame      
             
@@ -330,7 +364,7 @@ shiny_end_shift <- function(result) {
                     pageLength=100,
                     dom="t",
                     columnDefs=list(
-                        n_coldef( seq_len(n_peaks)+(ncol(df)-n_peaks-1), max_mat)
+                        n_coldef(seq_len(n_peaks)+(ncol(df)-n_peaks-1), max_mat, digits)
                     )
                 ), 
                 rownames=F,
@@ -356,7 +390,8 @@ shiny_end_shift <- function(result) {
 shiny_end_shift_pipeline <- function(tests, cache_prefix="cache_") {
     get <- function(name, peak_set) {
         param <- tests[[name]]        
-        param$antisense <- peak_set == "all"
+        param$antisense <- peak_set %in% c("all","noncollider")
+        param$colliders <- peak_set == "all"
         param$non_utr <- peak_set != "utr"
         
         filename <- paste0(cache_prefix,name,"_",peak_set,".rds")
@@ -391,8 +426,9 @@ shiny_end_shift_pipeline <- function(tests, cache_prefix="cache_") {
     
     peak_choices = list(
         "All" = "all",
+        "Sense strand and non-collider antisense strand" = "noncollider",
         "Sense strand only" = "sense",
-        "3' UTR only" = "utr"
+        "3' UTR sense strand only" = "utr"
     )
         
     subapp <- shiny_end_shift(function(env) env$test_result())
@@ -401,7 +437,7 @@ shiny_end_shift_pipeline <- function(tests, cache_prefix="cache_") {
         tabPanel("Select test",
             h2("Select test"),
             selectizeInput("test", "Test", choices=choices, selected=NULL, width="100%"),
-            selectizeInput("peak_set", "Peaks to use", choices=peak_choices, selected="sense"),
+            selectizeInput("peak_set", "Peaks to use", choices=peak_choices, selected="all", width="100%"),
             div(style="height: 4em"),
             actionButton("cache_all", "Ensure all tests are cached") 
         )

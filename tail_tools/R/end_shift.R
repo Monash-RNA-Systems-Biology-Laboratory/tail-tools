@@ -33,33 +33,32 @@ mann_whitney_r <- function(a,b) {
     r <- U2 / n
     var_r <- var_U2 / (n*n)
     
-    data_frame(
+    list(
         r = r,
-        var = var_r)
+        var = var_r
+    )
 }
 
 # mat - int matrix - read counts for peak x sample
 # condition - bool - division of samples into control and experimental
 # group - factor - grouping of samples (eg by patient or batch or time) if such groups exist
-combined_r <- function(mat, condition, group) {
-    n_samples <- ncol(mat)
+combined_r <- function(mat, condition, sample_splitter) {
+    total_r <- 0.0
+    total_weight <- 0.0
+    for(cols in sample_splitter) {
+        submat <- mat[,cols,drop=F]
+        subcondition <- condition[cols]
+        a <- rowSums(submat[,!subcondition,drop=F])
+        b <- rowSums(submat[,subcondition,drop=F])
+        result <- mann_whitney_r(a,b)
+        weight <- 1/result$var
+        total_weight <- total_weight + weight
+        total_r <- total_r + result$r * weight
+    }
     
-    group_result <-
-        split(seq_len(n_samples), group) %>%
-        map_df(function(cols) {
-            submat <- mat[,cols,drop=F]
-            subcondition <- condition[cols]
-            a <- rowSums(submat[,!subcondition,drop=F])
-            b <- rowSums(submat[,subcondition,drop=F])
-            mann_whitney_r(a,b)
-        }) %>%
-        mutate(weight = 1/var)
-    
-    total_weight <- sum(group_result$weight)
-    data_frame(
-        r = sum(group_result$r*group_result$weight) / total_weight,
-        var = 1/total_weight,
-        mean_reads = sum(mat) / ncol(mat)
+    list(
+        r = total_r / total_weight,
+        var = 1 / total_weight
     )
 }
 
@@ -95,9 +94,9 @@ grouped_permutations <- function(condition, group) {
 
 
 #
-# peak_info should contain: id, parent
+# gene information should contain: id, parent
 #
-edger_end_shift <- function(counts, peak_info, condition, group) {
+edger_end_shift <- function(dge, condition, group) {
     group <- as.factor(group)    
     if (length(unique(group)) <= 1)
         design <- model.matrix(~ condition)
@@ -107,10 +106,7 @@ edger_end_shift <- function(counts, peak_info, condition, group) {
     # Terms are: intercept, condition, group terms (other than first level)
     # Second term is to be tested.    
     
-    dge <- 
-      DGEList(counts, genes=peak_info) %>%
-      calcNormFactors() %>%
-      estimateDisp(design) #Maybe use robust=T
+    dge <- estimateDisp(dge, design) #Maybe use robust=T
     
     #dge$prior.df
     #dge$common.disp    
@@ -135,9 +131,9 @@ edger_end_shift <- function(counts, peak_info, condition, group) {
 
 
 #
-# peak_info should contain: id, parent
+# gene information should contain: id, parent
 #
-limma_end_shift <- function(counts, peak_info, condition, group) {
+limma_end_shift <- function(dge, condition, group) {
     group <- as.factor(group)    
     if (length(unique(group)) <= 1)
         design <- model.matrix(~ condition)
@@ -147,10 +143,6 @@ limma_end_shift <- function(counts, peak_info, condition, group) {
     # Terms are: intercept, condition, group terms (other than first level)
     # Second term is to be tested.    
     
-    dge <- 
-      DGEList(counts, genes=peak_info) %>%
-      calcNormFactors()
-
     fit <-
         voom(dge, design) %>% 
         lmFit(design) %>% 
@@ -170,7 +162,8 @@ limma_end_shift <- function(counts, peak_info, condition, group) {
 #'
 #' End shift statistics, generic function
 #'
-#' peak_info should contain columns: id, start, end, strand (+/-1), parent
+#' peak_info should contain columns: id, position, strand (+/-1), parent
+#' position is position in chromosome of transcription stop site
 #' strand should be the strand of the *gene*, if including antisense features
 #'
 #' min_reads is minimum mean-reads-per-sample for each gene
@@ -187,32 +180,45 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
     assert_that(ncol(counts) == length(condition))
     assert_that(ncol(counts) == length(group))
     
-    peak_info <- as_data_frame(peak_info) %>%
-        mutate(parent = as.character(parent)) %>%
-        mutate(parent = ifelse(parent == "", NA, parent))
+    peak_info <- dplyr::as_data_frame(peak_info) %>%
+        dplyr::mutate(parent = as.character(parent)) %>%
+        dplyr::mutate(parent = ifelse(parent == "", NA, parent))
     assert_that(nrow(peak_info) == nrow(counts))
     
     ci_sds <- qnorm((1+ci)/2)    
+
+
+    cat("Lib size\n")
+    
+    dge <- 
+      DGEList(counts, genes=peak_info) %>%
+      calcNormFactors()
+    
+    lib_size <- dge$samples$lib.size * dge$samples$norm.factors
+    
     
     cat("Split\n")
+
+    orderer <- peak_info$position * peak_info$strand 
+
     splitter <-
         seq_len(nrow(counts)) %>% 
         split(peak_info$parent) %>%
-        keep(function(item) {
+        purrr::keep(function(item) {
             length(item) > 1 &&
             sum(counts[item,,drop=F])/ncol(counts) >= min_reads
         }) %>%
         lapply(function(item) {
-            item[ order(peak_info$start[item] * peak_info$strand[item]) ]
+            item[ order(orderer[item]) ]
         })
     
     keep_peaks <- peak_info$parent %in% names(splitter)
+
     
     if (edger) {
         cat("Run edgeR\n")
         edger_result <- edger_end_shift(
-            counts[keep_peaks,,drop=F], 
-            peak_info[keep_peaks,], 
+            dge[keep_peaks,],
             condition, group)
     } else {
         edger_result <- NULL
@@ -221,27 +227,30 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
     if (limma) {
         cat("Run limma\n")
         limma_result <- limma_end_shift(
-            counts[keep_peaks,,drop=F], 
-            peak_info[keep_peaks,], 
+            dge[keep_peaks,], 
             condition, group)
     } else {
         limma_result <- NULL
     }
         
     cat("Score\n")
-    scores <- map(splitter, ~ combined_r(counts[.,,drop=F],condition,group) )
+    sample_splitter <- split(seq_along(group), group)
+    
+    scores <- splitter %>% 
+        lapply(function(item) {
+            combined_r(counts[item,,drop=F],condition,sample_splitter) 
+        })
     
     if (fdr) {
         cat("Permute\n")
         # Get the null distribution of "interest"
         null_interest <-
             grouped_permutations(condition, group) %>%
-            map(function(condition_perm) {
+            lapply(function(condition_perm) {
                 cat(paste0(ifelse(condition_perm,"+","-")),"\n")
                 
-                splitter %>%
-                map_dbl(function(peaks) {
-                    item <- combined_r(counts[peaks,,drop=F], condition_perm, group)
+                map_dbl(splitter, function(peaks) {
+                    item <- combined_r(counts[peaks,,drop=F], condition_perm, sample_splitter)
                     abs(item$r) - sqrt(item$var)*ci_sds
                 })
             }) %>% 
@@ -251,22 +260,29 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
     }
         
     cat("Annotate\n")
-    gene_info <- peak_info %>% 
-        { .[,c("parent",gene_info_columns)] } %>%
-        group_by(parent) %>%
-        summarise_each(funs(paste(unique(as.character(.)),collapse="/") ))
+    gene_info <- peak_info[,c("parent",gene_info_columns)] %>%
+        dplyr::group_by(parent) %>%
+        dplyr::summarise_each(funs(paste(unique(as.character(.)),collapse="/") ))
 
     result <- 
-        data_frame(parent=names(scores), scores=scores) %>% unnest(scores) %>%
-        mutate(
+        dplyr::data_frame(parent=names(scores), score=scores) %>% 
+        dplyr::rowwise() %>%
+        dplyr::mutate(
+            r = score$"r",
+            var = score$"var",
+            score = NULL,
+            mean_reads = sum(counts[splitter[[parent]],,drop=F]) / ncol(counts)
+        ) %>%
+        dplyr::ungroup() %>%
+        dplyr::mutate(
             sd = sqrt(var),
             r_low = r - sd*ci_sds,
             r_high = r + sd*ci_sds,
             interest = ( abs(r) - sd*ci_sds ) %>% replace(.,is.na(.),-Inf)
         ) %>%
-        arrange(desc(interest)) %>%
-        mutate( rank=seq_len(n()) ) %>%
-        select(rank, parent, r, r_low, r_high, interest, mean_reads)
+        dplyr::arrange(desc(interest)) %>%
+        dplyr::mutate( rank=seq_len(n()) ) %>%
+        dplyr::select(rank, parent, r, r_low, r_high, interest, mean_reads)
         
     if (fdr) {
         cat("FDR\n")
@@ -310,6 +326,7 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
         splitter = splitter,
         peak_info = peak_info,
         counts = counts,
+        lib_size = lib_size,
         condition = condition,
         group = group,
         ci = ci,
@@ -330,14 +347,55 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
 #'
 #' Samples with NA in condition will be omitted.
 #'
-end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edger=T, limma=T, antisense=T, non_utr=T, min_reads=10, title="End-shift test") {
+end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edger=T, limma=T, antisense=T, colliders=T, non_utr=T, min_reads=10, title="End-shift test") {
     dat <- read.grouped.table(paste0(path,"/expression/peakwise/counts.csv"))
     
     counts <- as.matrix(dat$Count)
-    peak_info <- dat$Annotation
-    peak_info$id <- rownames(peak_info)
+    peak_info <- dplyr::as_data_frame(dat$Annotation)
+    peak_info$id <- rownames(counts)
+    
+    for(name in colnames(peak_info))
+        if (is.factor(peak_info[[name]]))
+            peak_info[[name]] <- as.character(peak_info[[name]])
+
+    # A peak may be sense to one gene and antisense to another.
+    #   ( Tail Tools does not consider situations any more complex than this. )
+    # Duplicate peaks antisense to a gene so they can be included in both genes
+    #   ( Peaks not assigned a sense gene may already be labelled antisense to another gene,
+    #     these don't need to be duplicated. )
+    if (antisense && colliders && "antisense_parent" %in% colnames(peak_info)) {
+        anti <- (peak_info$antisense_parent != "") & 
+                (peak_info$relation != "Antisense") &
+                (peak_info$antisense_parent != "")
+        anti_counts <- counts[anti,,drop=F]
+        anti_info <- peak_info[anti,,drop=F]
+        
+        # Incorporate antisense peaks
+        anti_info <- anti_info %>% 
+            dplyr::transmute(
+                id = paste0(id,"-collider"),
+                start = start,
+                end = end,
+                strand = strand,
+                relation = "Antisense",
+                gene = antisense_gene,
+                product = antisense_product,
+                biotype = antisense_biotype,
+                parent = antisense_parent
+            )
+        rownames(anti_counts) <- anti_info$id
+        
+        peak_info <- peak_info %>% 
+            dplyr::select(id,start,end,strand,relation,gene,product,biotype,parent)
+                
+        counts <- rbind(counts, anti_counts)
+        peak_info <- dplyr::bind_rows(peak_info, anti_info)
+    }
+
+
     peak_info$product <- str_match(peak_info$product, "^[^ ]+ (.*)$")[,2]
     
+    peak_info$position <- ifelse(peak_info$strand>0, peak_info$end, peak_info$start)
     anti <- peak_info$relation == "Antisense"
     peak_info$strand[anti] <- peak_info$strand[anti] * -1
     

@@ -79,9 +79,10 @@ class Relate_peaks_to_genes(config.Action_with_prefix):
                 hit_to = "Intron"
                 hits = gene_index.get(query, True)
 
+            antisense_hits = gene_index.get(query.reversed(), True)
             if not hits:
                 hit_to = "Antisense"
-                hits = gene_index.get(query.reversed(), True)
+                hits = antisense_hits
             
             if hits:
                 peak.attr["Parent"] = join_descriptions([ item.get_id() for item in hits ], ",")
@@ -89,6 +90,12 @@ class Relate_peaks_to_genes(config.Action_with_prefix):
                 peak.attr["Name"] = join_descriptions([ item.attr.get("Name","") for item in hits ])
                 peak.attr["Product"] = hit_to + " " + join_descriptions([ item.attr.get("Product","") for item in hits ])
                 peak.attr["Biotype"] = join_descriptions([ item.attr.get("Biotype","") for item in hits ])
+            
+            if antisense_hits:
+                peak.attr["Antisense_parent"] = join_descriptions([ item.get_id() for item in antisense_hits ], ",")
+                peak.attr["Antisense_name"] = join_descriptions([ item.attr.get("Name","") for item in antisense_hits ])
+                peak.attr["Antisense_product"] = "Antisense " + join_descriptions([ item.attr.get("Product","") for item in antisense_hits ])
+                peak.attr["Antisense_biotype"] = join_descriptions([ item.attr.get("Biotype","") for item in antisense_hits])
                 
         
         annotation.write_gff3(self.prefix+"-parent.gff", genes) #Hmm

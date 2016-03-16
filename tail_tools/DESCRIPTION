@@ -1,6 +1,6 @@
 Package: tailtools
 Title: Tail Tools R component
-Description: R component ot Tail Tools pipeline.
+Description: R component of the Tail Tools pipeline for analysing PAT-Seq datasets.
 Author: Paul Harrison [aut],
     Michael See [ctb]
 Maintainer: Paul Harrison <paul.harrison@monash.edu>
