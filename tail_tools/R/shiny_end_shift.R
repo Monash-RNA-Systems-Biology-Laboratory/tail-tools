@@ -171,7 +171,7 @@ shiny_end_shift <- function(result) {
                     "to equalize library sizes" = "library",
                     "to gene" = "gene"
                 ),
-                selected="none",
+                selected="library",
                 inline=T
             ))),
             DT::dataTableOutput("gene_table")
