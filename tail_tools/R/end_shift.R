@@ -73,7 +73,6 @@ random_permutations <- function(condition, group, n) {
     permutations <- list(condition)
     
     while(length(permutations) < n) {
-        print(length(permutations))
         permutation <- rep(F,length(group))
         for(group in groups)
             permutation[group] <- condition[group][sample(length(group))]
@@ -97,7 +96,6 @@ grouped_permutations <- function(condition, group, max_n=Inf) {
     n <- 1
     for(item in groups) {
         n <- n * choose(length(item), sum(condition[item]))
-        print(n)
         if (n > max_n)
             return(random_permutations(condition,group,max_n))
     }
