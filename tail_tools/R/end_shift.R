@@ -65,11 +65,42 @@ combined_r <- function(mat, condition, sample_splitter) {
 #
 # Permute condition, respecting group
 #
-grouped_permutations <- function(condition, group) {
+
+random_permutations <- function(condition, group, n) {
+    groups <- split(seq_along(group), group)
+    
+    #Definitely include true permutation
+    permutations <- list(condition)
+    
+    while(length(permutations) < n) {
+        print(length(permutations))
+        permutation <- rep(F,length(group))
+        for(group in groups)
+            permutation[group] <- condition[group][sample(length(group))]
+        
+        # Inefficient!
+        seen <- map_lgl(permutations, function(item) identical(permutation,item)) %>% any()
+        if (!seen) permutations[[length(permutations)+1]] <- permutation
+    }
+    
+    permutations
+}
+
+
+grouped_permutations <- function(condition, group, max_n=Inf) {
     assert_that(is.logical(condition))
     assert_that(length(group) == length(condition))
     
     groups <- split(seq_along(group), group)
+    
+    # Switch to random if too many.
+    n <- 1
+    for(item in groups) {
+        n <- n * choose(length(item), sum(condition[item]))
+        print(n)
+        if (n > max_n)
+            return(random_permutations(condition,group,max_n))
+    }
     
     permutations <- list( rep(F,length(group)) )
     for(group in groups) {
@@ -162,17 +193,30 @@ limma_end_shift <- function(dge, condition, group) {
 #'
 #' End shift statistics, generic function
 #'
-#' peak_info should contain columns: id, position, strand (+/-1), parent
-#' position is position in chromosome of transcription stop site
-#' strand should be the strand of the *gene*, if including antisense features
+#' @param peak_info should contain columns: id, position, strand (+/-1), parent. position is position in chromosome of transcription stop site. strand should be the strand of the *gene*, if including antisense features.
 #'
-#' min_reads is minimum mean-reads-per-sample for each gene
+#' @param gene_info_columns Columns of peak_info to retain in per-gene output.
+#'
+#' @param ci Confidence interval. A value closer to 1 will more heavily demote genes with low read counts.
+#'
+#' @param fdr Perform permutation based FDR?
+#'
+#' @param fdr_max_permute If there are more than this many possible permutations, just use this many randomly sampled distinct permutations (but certainly including the true permutation).
+#'
+#' @param edger Perform edgeR differential exon usage test. May need to disable if too few replicates.
+#'
+#' @param limma Perform limma differential exon usage test. May need to disable if no replicates.
+#'
+#' @param min_reads Discard genes with lower than this average number of reads per sample.
+#'
+#' 
 #'
 #' @export
 end_shift <- function(counts, peak_info, condition, group=NULL, 
                       gene_info_columns=c("gene","product","biotype"), 
                       ci=0.95, fdr=T, edger=T, limma=T, min_reads=10,
-                      title="End-shift test") {
+                      title="End-shift test",
+                      fdr_max_permute=1000) {
     counts <- as.matrix(counts)    
     if (is.null(group)) group <- rep(1,length(condition))
     
@@ -243,10 +287,12 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
     
     if (fdr) {
         cat("Permute\n")
+
         # Get the null distribution of "interest"
+        perms <- grouped_permutations(condition, group, fdr_max_permute)
+        cat(length(perms),"permutations\n")         
         null_interest <-
-            grouped_permutations(condition, group) %>%
-            lapply(function(condition_perm) {
+            lapply(perms, function(condition_perm) {
                 cat(paste0(ifelse(condition_perm,"+","-")),"\n")
                 
                 map_dbl(splitter, function(peaks) {
@@ -333,7 +379,9 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
         edger = edger_result,
         limma = limma_result,
         min_reads = min_reads,
-        title = title
+        title = title,
+        fdr_max_permute = fdr_max_permute,
+        fdr_actual_permute = length(perms)
     )
 }
 
@@ -347,7 +395,7 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
 #'
 #' Samples with NA in condition will be omitted.
 #'
-end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edger=T, limma=T, antisense=T, colliders=T, non_utr=T, min_reads=10, title="End-shift test") {
+end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edger=T, limma=T, antisense=T, colliders=T, non_utr=T, min_reads=10, title="End-shift test", fdr_max_permute=1000) {
     dat <- read.grouped.table(paste0(path,"/expression/peakwise/counts.csv"))
     
     counts <- as.matrix(dat$Count)
@@ -414,7 +462,7 @@ end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edge
     peak_info <- peak_info[keep,,drop=F]
     
     end_shift(counts, peak_info, condition[sample_keep], group[sample_keep], 
-              ci=ci, fdr=fdr, edger=edger, limma=limma, min_reads=min_reads, title=title)
+              ci=ci, fdr=fdr, edger=edger, limma=limma, min_reads=min_reads, title=title, fdr_max_permute=fdr_max_permute)
 }
 
 

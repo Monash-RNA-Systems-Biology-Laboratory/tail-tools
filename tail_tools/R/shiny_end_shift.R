@@ -86,6 +86,10 @@ table.dataTable.display tbody td {
     line-height: 1;
     white-space: nowrap;
 }
+
+.selectize-dropdown-content {
+    max-height: 50em;
+}
 </style>
 '),
         do.call(navlistPanel, c(list(id=paste0(prefix, "tabset"), widths=c(2,10),well=FALSE), panels)),
