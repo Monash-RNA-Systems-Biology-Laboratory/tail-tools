@@ -119,6 +119,7 @@ shiny_end_shift <- function(result) {
         
         plot <- ggplot(df,aes(x=mean_reads, y=r)) +
             scale_x_log10() +
+            coord_cartesian(ylim=c(-1,1)) +
             geom_segment(aes(xend=mean_reads, y=r_low, yend=r_high), color="#bbbbbb") +
             geom_point() +
             theme_bw() +
