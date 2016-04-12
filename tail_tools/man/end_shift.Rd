@@ -12,6 +12,10 @@ end_shift(counts, peak_info, condition, group = NULL,
 \arguments{
 \item{peak_info}{should contain columns: id, position, strand (+/-1), parent. position is position in chromosome of transcription stop site. strand should be the strand of the *gene*, if including antisense features.}
 
+\item{condition}{is a logical vector splitting samples into control and experimental groups.}
+
+\item{group}{if given is a factor splitting samples into batches, if there is a batch effect.}
+
 \item{gene_info_columns}{Columns of peak_info to retain in per-gene output.}
 
 \item{ci}{Confidence interval. A value closer to 1 will more heavily demote genes with low read counts.}
