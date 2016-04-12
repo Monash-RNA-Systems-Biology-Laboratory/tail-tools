@@ -6,13 +6,27 @@
 \usage{
 end_shift(counts, peak_info, condition, group = NULL,
   gene_info_columns = c("gene", "product", "biotype"), ci = 0.95, fdr = T,
-  edger = T, limma = T, min_reads = 10, title = "End-shift test")
+  edger = T, limma = T, min_reads = 10, title = "End-shift test",
+  fdr_max_permute = 1000)
+}
+\arguments{
+\item{peak_info}{should contain columns: id, position, strand (+/-1), parent. position is position in chromosome of transcription stop site. strand should be the strand of the *gene*, if including antisense features.}
+
+\item{gene_info_columns}{Columns of peak_info to retain in per-gene output.}
+
+\item{ci}{Confidence interval. A value closer to 1 will more heavily demote genes with low read counts.}
+
+\item{fdr}{Perform permutation based FDR?}
+
+\item{edger}{Perform edgeR differential exon usage test. May need to disable if too few replicates.}
+
+\item{limma}{Perform limma differential exon usage test. May need to disable if no replicates.}
+
+\item{min_reads}{Discard genes with lower than this average number of reads per sample.}
+
+\item{fdr_max_permute}{If there are more than this many possible permutations, just use this many randomly sampled distinct permutations (but certainly including the true permutation).}
 }
 \description{
-peak_info should contain columns: id, start, end, strand (+/-1), parent
-strand should be the strand of the *gene*, if including antisense features
-}
-\details{
-min_reads is minimum mean-reads-per-sample for each gene
+End shift statistics, generic function
 }
 
