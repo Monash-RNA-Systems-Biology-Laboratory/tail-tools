@@ -142,7 +142,7 @@ shiny_end_shift_rnaseq_server <- function(input, output, session, result, sample
 
     context <- reactive({
         row <- input$table_rows_selected
-        if (length(row) != 1)
+        if (length(row) != 1 || row > nrow(selected_df()))
             return()
         
         selected_df()[row,]
