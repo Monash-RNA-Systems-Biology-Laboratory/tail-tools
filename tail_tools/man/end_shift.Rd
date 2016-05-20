@@ -10,7 +10,7 @@ end_shift(counts, peak_info, condition, group = NULL,
   fdr_max_permute = 1000)
 }
 \arguments{
-\item{peak_info}{should contain columns: id, position, strand (+/-1), parent. position is position in chromosome of transcription stop site. strand should be the strand of the *gene*, if including antisense features.}
+\item{peak_info}{should be a data frame containing columns: id, position, strand (+/-1), parent. position is position in chromosome of transcription stop site. strand should be the strand of the *gene*, if including antisense features.}
 
 \item{condition}{is a logical vector splitting samples into control and experimental groups.}
 

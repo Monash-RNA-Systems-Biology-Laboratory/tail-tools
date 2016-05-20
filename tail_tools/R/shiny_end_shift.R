@@ -73,7 +73,7 @@ rank_coldef <- function(target, fdr) {
 
 
 
-composable_shiny_panels_app <- function(panels, server, prefix="") {
+composable_shiny_panels_app <- function(panels, server, prefix="", title=NULL) {
     ui <- div(
         HTML('
 <style>
@@ -96,7 +96,7 @@ table.dataTable.display tbody td {
         div(style="height: 4em")
     )
 
-    app <- composable_shiny_app(ui, server)
+    app <- composable_shiny_app(ui, server, title=title)
     app$component_panels <- panels
     app
 }

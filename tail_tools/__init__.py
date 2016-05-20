@@ -16,6 +16,8 @@ from .workflows import Call_peaks, Analyse_polya, Analyse_polya_batch
 from .reference_directory import Make_tt_reference, Make_ucsc_reference
 from .reference_directory_ensembl import Make_ensembl_reference
 from .primer_gff import Primer_gff
+from .rnaseq import Make_rnaseq_reference
+from .bigwig import Bam_to_bigwig
 from .shiny import Shiny
 
 def main():
@@ -52,6 +54,10 @@ def main():
             Make_tt_reference,
             Make_ucsc_reference,
             Make_ensembl_reference,
+
+            'RNA-Seq analysis:',
+            Make_rnaseq_reference,
+            Bam_to_bigwig,
 
             'Utilities:',
             Primer_gff,            

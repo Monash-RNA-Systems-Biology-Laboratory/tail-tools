@@ -191,7 +191,7 @@ limma_end_shift <- function(dge, condition, group) {
 #'
 #' End shift statistics, generic function
 #'
-#' @param peak_info should contain columns: id, position, strand (+/-1), parent. position is position in chromosome of transcription stop site. strand should be the strand of the *gene*, if including antisense features.
+#' @param peak_info should be a data frame containing columns: id, position, strand (+/-1), parent. position is position in chromosome of transcription stop site. strand should be the strand of the *gene*, if including antisense features.
 #'
 #' @param condition is a logical vector splitting samples into control and experimental groups.
 #'
