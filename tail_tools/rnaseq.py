@@ -66,7 +66,9 @@ class Make_rnaseq_reference(config.Action_with_output_dir):
         
         def well_supported(item):
             if self.support is None: return True
-            return int(item.attr.get("transcript_support_level","NA").split()[0]) <= self.support
+            level = item.attr.get("transcript_support_level","NA").split()[0]
+            if not level.isdigit(): return False
+            return int(level) <= self.support
         
         exons = [ item for item in items if item.type == "exon" and well_supported(item.parent) ]
         exon_index = span_index.index_annotations(exons)
