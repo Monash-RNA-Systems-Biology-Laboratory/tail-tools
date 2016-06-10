@@ -32,6 +32,14 @@ def pile(spanners, initial=0):
     
     return result
 
+
+def map_spanner(a_func, a_spanner):
+    result = [ ]
+    for length, value in a_spanner:
+        result.append((length, a_func(value)))
+    return result
+
+
 class Piler(object):
     def __init__(self, length):
         self.spanners = [[(length,0)]]
@@ -76,6 +84,9 @@ def bedgraph(filename, spanners):
 def iter_fragments(alf):
     pool = { }
     for item in alf:
+        if item.is_unmapped or item.is_secondary or item.is_supplementary:
+            continue
+    
         if not item.is_proper_pair or item.mate_is_unmapped:
             yield [item]
         
@@ -119,7 +130,7 @@ def make_bigwig(prefix, bam_filenames, make_spanner, fragments=False, stop_after
         
         if not fragments:
             for item in alf:
-                if item.is_secondary or item.is_unmapped:
+                if item.is_unmapped or item.is_secondary or item.is_supplementary:
                     continue
             
                 # Assume --> <-- oriented read pairs
@@ -132,9 +143,6 @@ def make_bigwig(prefix, bam_filenames, make_spanner, fragments=False, stop_after
         
         else:
             for item in iter_fragments(alf):
-                if item[0].is_secondary or item[0].is_unmapped:
-                    continue
-            
                 # Assume --> <-- oriented read pairs
                 which = forward if bool(item[0].is_reverse) == bool(item[0].is_read2) else reverse
                 which[item[0].reference_id].add( make_spanner(item) )
@@ -209,6 +217,63 @@ def fragment_coverage(items):
 
 
 
+def make_ambiguity_bigwig(prefix, bam_filenames, stop_after=None, subsample=1): 
+    import pysam
+    
+    alf = pysam.AlignmentFile(bam_filenames[0])
+    
+    with open(prefix+"-chrom.sizes","wb") as f:
+        for entry in alf.header["SQ"]:
+            f.write("{}\t{}\n".format(entry["SN"],entry["LN"]))
+    
+    chrom_names = [ entry["SN"] for entry in alf.header["SQ"] ]
+    chrom_sizes = [ entry["LN"] for entry in alf.header["SQ"] ]
+
+    alf.close()
+
+    unambiguous = [ Piler(i) for i in chrom_sizes ]
+    total = [ Piler(i) for i in chrom_sizes ]
+
+    for filename in bam_filenames:
+        alf = pysam.AlignmentFile(filename)
+        n = 0
+        
+        sub = subsample-1
+        for item in alf:
+            if item.is_unmapped or item.is_supplementary:
+                continue
+        
+            sub = (sub + 1) % subsample
+            if sub: continue
+        
+            spanner = fragment_split_coverage([item])
+            total[item.reference_id].add(spanner)
+            if item.get_tag("NH") == 1:
+                unambiguous[item.reference_id].add(spanner)
+                
+            n += 1
+            if stop_after is not None and n > stop_after: break
+            if n % 1000000 == 0: print prefix, filename, n
+        
+        alf.close()
+
+
+    ambiguities = [ ]
+    for i in xrange(len(total)):
+        u = unambiguous[i].get()
+        t = map_spanner(lambda x: x*1j, total[i].get())
+        c = pile([u,t],initial=0.0)
+        c = map_spanner(lambda x: (x.imag-x.real)/max(x.imag,1.0), c)
+        ambiguities.append(c)
+
+    bedgraph(prefix+".bedgraph", zip(chrom_names, [ item for item in ambiguities ]))
+    subprocess.check_call([
+        "wigToBigWig",prefix+".bedgraph",prefix+"-chrom.sizes",prefix+".bw"])
+    os.unlink(prefix+".bedgraph")
+    os.unlink(prefix+"-chrom.sizes")
+
+
+
 @config.help("Produce various bigwig depth of coverage files from a BAM file.", """\
 This tool uses PySam, so can not currently be used with PyPy.
 
@@ -218,22 +283,37 @@ cover - Depth of coverage by actually sequenced bases.
 span - Depth of coverage of region spanned by reads or fragments.
 start - Fragment start locations.
 end - Fragment end locations.
+ambiguity - What proportion of reads are multi-mappers at each base.
 
 """)
 @config.Main_section("bam_files")
+@config.String_flag("what", "What bigwig files to actually produce. Comma separated list.")
+@config.Int_flag("subsample", "(currently for ambiguity plots only) Subsample alignments by this factor.")
 class Bam_to_bigwig(config.Action_with_prefix):
+    what = "cover,span,start,end,ambiguity"
+    subsample = 1
     bam_files = [ ]
     
     def run(self):
         with nesoni.Stage() as stage:
-            stage.process(make_bigwig,
-                self.prefix + "-cover", self.bam_files, fragment_split_coverage, True)
-            stage.process(make_bigwig,
-                self.prefix + "-span", self.bam_files, fragment_coverage, True)
-            stage.process(make_bigwig,
-                self.prefix + "-start", self.bam_files, read1_starts, False)
-            stage.process(make_bigwig,
-                self.prefix + "-end", self.bam_files, read2_starts, False)
+            for item in self.what.split(","):
+                if item == "cover":
+                    stage.process(make_bigwig,
+                        self.prefix + "-cover", self.bam_files, fragment_split_coverage, True)
+                elif item == "span":
+                    stage.process(make_bigwig,
+                        self.prefix + "-span", self.bam_files, fragment_coverage, True)
+                elif item == "start":
+                    stage.process(make_bigwig,
+                        self.prefix + "-start", self.bam_files, read1_starts, False)
+                elif item == "end":
+                    stage.process(make_bigwig,
+                        self.prefix + "-end", self.bam_files, read2_starts, False)
+                elif item == "ambiguity":
+                    stage.process(make_ambiguity_bigwig,
+                        self.prefix + "-ambiguity", self.bam_files, subsample=self.subsample)
+                else:
+                    raise config.Error("Don't know how to make: "+item)
 
 
 
