@@ -129,7 +129,7 @@ shiny_end_shift <- function(result) {
         colors <- character(0)
         
         size <- 3
-        if (!is.null(df$fdr) && any(df$fdr <= cutoff)) {
+        if ("fdr" %in% names(df) && any(df$fdr <= cutoff)) {
             plot <- plot + geom_point(
                 data=filter(df, fdr <= cutoff),aes(color="r"),
                 shape=1,stroke=1.5,size=size)
@@ -137,7 +137,7 @@ shiny_end_shift <- function(result) {
             size <- size + 2
         }
 
-        if (!is.null(df$edger_fdr) && any(df$edger_fdr <= cutoff)) {
+        if ("edger_fdr" %in% names(df) && any(df$edger_fdr <= cutoff)) {
             plot <- plot + geom_point(
                 data=filter(df, edger_fdr <= cutoff),aes(color="edgeR"),
                 shape=1,stroke=1.5,size=size)
@@ -145,7 +145,7 @@ shiny_end_shift <- function(result) {
             size <- size + 2
         }
         
-        if (!is.null(df$limma_fdr) && any(df$limma_fdr <= cutoff)) {
+        if ("limma_fdr" %in% names(df) && any(df$limma_fdr <= cutoff)) {
             plot <- plot + geom_point(
                 data=filter(df, limma_fdr <= cutoff),aes(color="limma"),
                 shape=1,stroke=1.5,size=size)
