@@ -602,7 +602,7 @@ class Plot_pooled(config.Action_with_prefix, runr.R_action):
     # Omit columns for tail length 0,1,2,3    
     skip <- 4
 
-    norm.pooled <- pooled[,(skip+1):maxtail,drop=FALSE]
+    norm.pooled <- pooled[,skip+seq_len(maxtail-skip),drop=FALSE]
     for(i in basic.seq(ncol(norm.pooled)))
         if (i%%10 != 1)
             colnames(norm.pooled)[i] <- ''
@@ -735,8 +735,8 @@ class Plot_comparison(config.Action_with_prefix, runr.R_action):
     
     # Omit columns for tail length 0,1,2,3    
     skip <- 4
-    good.cols <- cols[,(skip+1):n.lengths,drop=FALSE]
-    good.lengths <- lengths[(skip+1):n.lengths]
+    good.cols <- cols[,skip+seq_len(n.lengths-skip),drop=FALSE]
+    good.lengths <- lengths[skip+seq_len(n.lengths-skip)]
     
     totals <- matrix(nrow=n.genes,ncol=n.samples) 
     means <- matrix(nrow=n.genes,ncol=n.samples)
