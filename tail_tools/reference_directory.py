@@ -93,8 +93,8 @@ class Make_tt_reference(config.Action_with_output_dir):
             gene_utr_5primes = [ ]
             
             for mrna in mrnas:
-                assert mrna.strand == gene.strand
-                assert mrna.seqid == gene.seqid
+                assert mrna.strand == gene.strand, mrna
+                assert mrna.seqid == gene.seqid, mrna
                 
                 mrna.attr["max_extension"] = str(_max_extension(mrna, exon_index, mrna_end_index))
             

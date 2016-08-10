@@ -114,17 +114,34 @@ class Union_find(object):
 
 
 def merge(genes, log):
+    good_genes = [ ]
     exons = [ ]
     gene_exons = { }
     exon_gene = { }
     for gene in genes:
-        gene_exons[gene] = [ item for item in all_within(gene) if item.type == "exon" ]
-        for exon in gene_exons[gene]:
+        this_all = all_within(gene)
+        seqid = gene.seqid
+        strand = gene.strand
+        sane = True
+        for item in this_all:
+            sane = sane and item.seqid == seqid
+            sane = sane and item.strand == strand
+        
+        if not sane:
+            log.log("Skipping gene "+str(gene)+" due to inconsistent chromosome or strand.\n")
+            continue
+        
+        this_exons = [ item for item in this_all if item.type == "exon" ]
+
+        good_genes.append(gene)
+        gene_exons[gene] = this_exons 
+        for exon in this_exons:
             exon_gene[exon] = gene
-        exons.extend(gene_exons[gene])
+        exons.extend(this_exons)
+        
         
     index = span_index.index_annotations(exons)
-    union = Union_find(genes)
+    union = Union_find(good_genes)
     for exon in exons:
         gene1 = exon_gene[exon]
         for hit in index.get(exon, same_strand=True):
