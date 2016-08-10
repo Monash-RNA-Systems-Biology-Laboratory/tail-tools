@@ -1,34 +1,46 @@
 
+
+meltdown <- function(mat, rows, columns, values) {
+    result <- reshape2::melt(t(as.matrix(mat)))
+    colnames(result) <- c(rows,columns,values)
+    result
+}
+
 #'
-#' Shiny report for REPAT results
+#' Shiny report for mPAT results
 #'
 #' @export
-shiny_repat <- function(filename, normalizing_gene=NULL, title="3'TAP results") {
+shiny_mpat <- function(filename, normalizing_gene=NULL, title="mPAT results") {
     library(shiny)
     library(nesoni)
     library(reshape2)
     library(varistran)
     library(ggplot2)
     library(gridExtra)
+    library(dplyr)
 
     tables <- read.grouped.table(filename)
-    counts <- as.matrix(tables$Count)
-    genes <- rownames(counts)
-    samples <- colnames(counts)
+    genes <- rownames(tables$Count)
+    samples <- colnames(tables$Count)
+    
+    raw_data <-
+        meltdown(tables$Count, "sample","gene","count") %>%
+        left_join(meltdown(tables$Tail, "sample","gene","tail"), 
+                  c("sample","gene")) %>%
+        left_join(meltdown(tables$Tail_count, "sample", "gene", "tail_count"), 
+                  c("sample","gene"))
+    
 
     # Plots
 
     overview <- shiny_plot(prefix="overview", dlname="overview", width=800,height=800, function(env) {
         normed <- env$normed()
-        m <- subset(normed$melted, sample %in% env$input$samples)
-        m$sample <- factor(m$sample, levels = env$input$samples)
-        m$gene <- factor(m$gene, levels = sort(unique(as.character(m$gene))))
         
         print( 
-            ggplot(m,aes(x=sample,y=log2_fold_norm_count)) + 
+            ggplot(normed$norm_data,aes(x=sample,y=log2_fold_norm_count)) + 
             geom_point() + 
             facet_wrap(~ gene, drop=F) + 
-            ylab(ifelse(normed$normalized_by_sample,"log2 fold change","log2 normalized count")) +
+            ylab(ifelse(normed$is_differential,"log2 fold change","log2 normalized count")) +
             xlab("") +
             theme_bw() +
             theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5))
@@ -37,15 +49,14 @@ shiny_repat <- function(filename, normalizing_gene=NULL, title="3'TAP results") 
     
     overview_tail <- shiny_plot(prefix="overview_tail", dlname="overview_tail", width=800,height=800, function(env) {
         normed <- env$normed()
-        m <- subset(normed$melted, sample %in% env$input$samples)
-        m$sample <- factor(m$sample, levels = env$input$samples)
-        m$gene <- factor(m$gene, levels = sort(unique(as.character(m$gene))))
-        m <- subset(m, tail_count>0)
+        df <- filter_(normed$norm_data, ~tail_count > 0)
+        df_bad <- filter_(df, ~is_low_tail_count)
         print(
-            ggplot(m,aes(x=sample,y=relative_tail_mean)) + 
-            geom_point() + geom_point(data=subset(m,tail_count<env$input$highlight_low),color="red") +
+            ggplot(df,aes(x=sample,y=relative_tail)) + 
+            geom_point() + 
+            geom_point(data=df_bad,color="red") +
             facet_wrap(~ gene, drop=F) +
-            ylab(ifelse(normed$normalized_by_sample,"change in poly(A) tail length","poly(A) tail length")) +
+            ylab(ifelse(normed$is_differential,"change in poly(A) tail length","poly(A) tail length")) +
             xlab("") + 
             theme_bw() +
             theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5))
@@ -53,12 +64,14 @@ shiny_repat <- function(filename, normalizing_gene=NULL, title="3'TAP results") 
     })
     
     individual <- shiny_plot(prefix="individual", dlname="individual", width=800, function(env) {
-        m <- subset(env$normed()$melted, (sample %in% env$input$samples) & (gene == env$input$individual_gene))
-        m$sample <- factor(m$sample, levels = env$input$samples)
+        normed <- env$normed()
+        individual_gene <- env$input$individual_gene
+        df <- filter_(normed$norm_data, ~gene == individual_gene)
+        df_bad <- filter_(df, ~is_low_tail_count)
         
         plot.new()
         grid.arrange(
-            ggplot(m, aes(x=sample, y=norm_count)) +
+            ggplot(df, aes(x=sample, y=norm_count)) +
             geom_bar(stat="identity", color="#000000", fill="#cccccc") +
             ylab("Normlized count") +
             xlab("") +
@@ -66,9 +79,9 @@ shiny_repat <- function(filename, normalizing_gene=NULL, title="3'TAP results") 
             theme_bw() +
             theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5)),
             
-            ggplot(m, aes(x=sample, y=tail_mean)) +
+            ggplot(df, aes(x=sample, y=tail)) +
             geom_bar(stat="identity", color="#000000", fill="#ccffcc") +
-            geom_bar(data=subset(m, tail_count<env$input$highlight_low), 
+            geom_bar(data=df_bad, 
                      stat="identity", color="#000000", fill="#ff0000") +
             ylab("poly(A) tail length") +
             xlab("") +
@@ -90,6 +103,9 @@ shiny_repat <- function(filename, normalizing_gene=NULL, title="3'TAP results") 
             well=FALSE,
             tabPanel("Select",
                 selectInput("normalizing_gene","Normalizing gene",choices=sort(genes),selected=normalizing_gene),
+                br(),
+                
+                selectInput("genes","Genes to display",choices=genes,selected=genes,multiple=TRUE,width="100%"),
                 br(),
                 
                 selectInput("samples","Samples to display",choices=samples,selected=samples,multiple=TRUE,width="100%"),
@@ -148,45 +164,65 @@ shiny_repat <- function(filename, normalizing_gene=NULL, title="3'TAP results") 
     
         env$normed <- reactive({
              normalizing_gene <- input$normalizing_gene
-
-             normalizer <- counts[normalizing_gene,]
-             normalizer <- normalizer / mean(normalizer)
+             selected_samples <- input$samples
+             selected_genes <- input$genes
+             highlight_low <- input$highlight_low
              
-             norm_counts <- t(t(counts)/normalizer)             
-             log2_fold_norm_counts <- log2(norm_counts + 0.5)
+             normalizer <- raw_data %>%
+                 filter_(~ gene == normalizing_gene) %>%
+                 mutate_(normalizer =~ count / mean(count)) %>%
+                 select_(~sample, ~normalizer)
              
-             tail_mean <- as.matrix(tables$Tail)
-             relative_tail_mean <- tail_mean
+             norm_data <- raw_data %>%
+                 left_join(normalizer, "sample") %>%
+                 mutate_(
+                     norm_count =~ count / normalizer,
+                     log2_norm_count =~ log2(norm_count + 0.5),
+                     log2_fold_norm_count =~ log2_norm_count,
+                     relative_tail =~ tail,
+                     is_low_tail_count =~ tail_count < highlight_low
+                 )
              
-             normalized_by_sample <- length(env$input$normalizing_samples) > 0
+             is_differential <- length(env$input$normalizing_samples) > 0
              
-             if (normalized_by_sample) {
-                 sample_normalizer <- rowMeans(log2_fold_norm_counts[,env$input$normalizing_samples,drop=F])
-                 log2_fold_norm_counts <- log2_fold_norm_counts - sample_normalizer
+             if (is_differential) {
+                 baseline <- norm_counts %>%
+                     select_(~sample %in% env$input$normalizing_samples) %>%
+                     group_by_(~gene) %>%
+                     summarize_(
+                         baseline =~ mean(log2_fold_norm_count),
+                         baseline_tail =~ mean(tail, na.rm=TRUE)
+                     ) %>%
+                     select_(~gene, ~baseline, ~baseline_tail)
              
-                 sample_tail_normalizer <- rowMeans(tail_mean[,env$input$normalizing_samples,drop=F])
-                 relative_tail_mean <- relative_tail_mean - sample_tail_normalizer
-             }
+                 norm_data <- norm_data %>%
+                     left_join(baseline, "gene") %>%
+                     mutate_(
+                         log2_fold_norm_count =~ log2_fold_norm_count - baseline,
+                         relative_tail =~ tail - baseline_tail
+                     )
+             }     
              
-             melted <- melt(norm_counts)
-             colnames(melted) <- c("gene", "sample", "norm_count")
-             melted$log2_fold_norm_count <- melt(log2_fold_norm_counts)$value
-             melted$tail_count <- melt(as.matrix(tables$Tail_count))$value
-             melted$tail_mean <- melt(tail_mean)$value
-             melted$relative_tail_mean <- melt(relative_tail_mean)$value
-             melted$tail_median <- melt(as.matrix(tables$Tail_quantile_50))$value
-
+             norm_data <- norm_data %>%
+                 filter_(
+                     ~sample %in% selected_samples,
+                     ~gene %in% selected_genes
+                 ) %>%
+                 mutate_(
+                     sample =~ factor(sample, selected_samples),
+                     gene =~ factor(gene, selected_genes)
+                 )
+                 
+             
              list(
+                 norm_data=norm_data,
                  normalizer=normalizer, 
-                 counts=norm_counts, 
-                 melted=melted,
-                 normalized_by_sample=normalized_by_sample
+                 is_differential=is_differential
              )
         })
     
         output$normalizer_table <- renderTable({
-             v <- env$normed()$normalizer[input$samples]
-             data.frame(sample=names(v), normalizer=v, row.names=NULL)
+             env$normed()$normalizer
         }, digits=6)
         
         overview$component_server(env)
@@ -196,4 +232,9 @@ shiny_repat <- function(filename, normalizing_gene=NULL, title="3'TAP results") 
     
     composable_shiny_app(ui, server)
 }
+
+
+
+#' @export
+shiny_repat <- shiny_mpat
 
