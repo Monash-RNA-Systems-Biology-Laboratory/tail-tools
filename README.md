@@ -209,11 +209,20 @@ filename_pattern = 'mydata/Sample_scBY4741%s/*.fastq.gz'
 samples = [ ]
 for name, tags in tags:
     reads = sorted(glob.glob(filename_pattern % name))
+    
+    assert reads, 'No reads for '+name
+    
     samples.append(tail_tools.Analyse_polya(
         name,
         reads = reads,
-        tags = tags,            
+        tags = tags,
+        
+        #To adjust clipping prior to alignment, modify these defaults:
+        # clip_runs_basespace = tail_tools.Clip_runs_basespace(
+        #    adaptor='AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC', 
+        #    clip_quality=20, length=20),
         ))
+
 
 action = tail_tools.Analyse_polya_batch(
         # Output directory

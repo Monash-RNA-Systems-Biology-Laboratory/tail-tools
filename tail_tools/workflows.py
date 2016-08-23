@@ -194,16 +194,19 @@ imported into a nesoni working directory.
 Directories are created both using all reads and for reads with a poly-A tail.
 """)
 @config.Bool_flag('consensus', 'Look for SNPs and indels.')
+@config.Bool_flag('discard_multimappers', 'If "yes", multimapping reads are discarded. If "no", multimapping reads are assigned at random.')
 @config.Section('tags', 'Tags for this sample. (See "nesoni tag:".)')
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
 @config.Section('reads', 'Fastq files containing SOLiD reads.')
+@config.Configurable_section('clip_runs_colorspace', 'Configuration options for clip-runs-colorspace:. Will be used with colorspace reads.')
+@config.Configurable_section('clip_runs_basespace', 'Configuration options for clip-runs-basespace:. Will be used with basespace reads.')
 class Analyse_polya(config.Action_with_output_dir):
     reference = None
     tags = [ ]
     reads = [ ]    
     consensus = False
+    discard_multimappers = False
     
-    # Allow tweaking by subclassing
     clip_runs_colorspace = clip_runs.Clip_runs_colorspace()
     clip_runs_basespace = clip_runs.Clip_runs_basespace()
     
@@ -218,7 +221,7 @@ class Analyse_polya(config.Action_with_output_dir):
         else:
             filter_tool = nesoni.Filter
         return filter_tool(
-            monogamous=False,
+            monogamous=self.discard_multimappers,
             random=True,
             infidelity=0,
             userplots=False,

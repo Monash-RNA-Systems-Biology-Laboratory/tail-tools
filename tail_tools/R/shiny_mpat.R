@@ -10,7 +10,11 @@ meltdown <- function(mat, rows, columns, values) {
 #' Shiny report for mPAT results
 #'
 #' @export
-shiny_mpat <- function(filename, normalizing_gene=NULL, title="mPAT results") {
+shiny_mpat <- function(
+        filename, 
+        normalizing_gene=NULL, 
+        title="mPAT results",
+        pipeline_dir=NULL) {
     library(shiny)
     library(nesoni)
     library(reshape2)
@@ -30,6 +34,10 @@ shiny_mpat <- function(filename, normalizing_gene=NULL, title="mPAT results") {
         left_join(meltdown(tables$Tail_count, "sample", "gene", "tail_count"), 
                   c("sample","gene"))
     
+    have_pipeline <- !is.null(pipeline_dir)
+    if (have_pipeline) {
+    
+    }
 
     # Plots
 

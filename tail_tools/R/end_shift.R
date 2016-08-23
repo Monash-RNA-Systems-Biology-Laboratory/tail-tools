@@ -214,7 +214,7 @@ limma_end_shift <- function(dge, condition, group) {
 #' 
 #'
 #' @export
-end_shift <- function(counts, peak_info, condition, group=NULL, 
+end_shift <- function(counts, peak_info, condition, group=NULL,
                       gene_info_columns=c("gene","product","biotype"), 
                       ci=0.95, fdr=T, edger=T, limma=T, min_reads=10,
                       title="End-shift test",
@@ -396,8 +396,9 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
 #' @param fdr Produce permutation based q values, can be very slow.
 #'
 #' Samples with NA in condition will be omitted.
+#' Samples can also be selected using select=, which should contain a logical vector of samples to retain.
 #'
-end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edger=T, limma=T, antisense=T, colliders=T, non_utr=T, min_reads=10, title="End-shift test", fdr_max_permute=1000) {
+end_shift_pipeline <- function(path, condition, group=NULL, select=NULL, ci=0.95, fdr=T, edger=T, limma=T, antisense=T, colliders=T, non_utr=T, min_reads=10, title="End-shift test", fdr_max_permute=1000) {
     dat <- read.grouped.table(paste0(path,"/expression/peakwise/counts.csv"))
     
     counts <- as.matrix(dat$Count)
@@ -452,7 +453,9 @@ end_shift_pipeline <- function(path, condition, group=NULL, ci=0.95, fdr=T, edge
     # Filter
     keep <- rep(T,nrow(peak_info))
     
-    sample_keep <- !is.na(condition)
+    sample_keep <- !is.na(condition) 
+    if (!is.null(select))
+        sample_keep <- sample_keep & select
     
     if (!antisense)
         keep <- keep & peak_info$relation != "Antisense"
