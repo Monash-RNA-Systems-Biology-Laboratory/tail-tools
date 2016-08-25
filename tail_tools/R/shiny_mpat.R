@@ -17,7 +17,7 @@ tail_lengths <- function(bam_filename, query) {
     sbp <- Rsamtools::ScanBamParam(
         what=c("qname","pos","cigar","strand"),
         tag=c("AN"), 
-        flag=scanBamFlag(isMinusStrand=is_reverse(query)),
+        flag=Rsamtools::scanBamFlag(isMinusStrand=is_reverse(query)),
         which=query)
     
     result <- Rsamtools::scanBam(bam_filename, param=sbp)[[1]]
