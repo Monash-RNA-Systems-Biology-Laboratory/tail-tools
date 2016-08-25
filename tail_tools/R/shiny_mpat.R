@@ -1,4 +1,38 @@
 
+#'
+#' Get BAM filenames from a Tail Tools pipeline output directory
+#'
+#' @export
+pipeline_bams <- function(pipeline_dir) {
+    meta <- jsonlite::fromJSON(file.path(pipeline_dir,"plotter-config.json"))
+    bam_filenames <- meta$samples$bam
+    names(bam_filenames) <- meta$samples$name
+    bam_filenames
+}
+
+
+tail_lengths <- function(bam_filename, query) {
+    library(dplyr)
+
+    sbp <- Rsamtools::ScanBamParam(
+        what=c("qname","pos","cigar","strand"),
+        tag=c("AN"), 
+        flag=scanBamFlag(isMinusStrand=is_reverse(query)),
+        which=query)
+    
+    result <- Rsamtools::scanBam(bam_filename, param=sbp)[[1]]
+    if (is_reverse(query)) {
+        three_prime <- result$pos
+    } else {
+        three_prime <- result$pos + 
+            GenomicAlignments::cigarWidthAlongReferenceSpace(result$cigar) - 1L
+    }
+    good <- three_prime > query$three_prime_min & three_prime < query$three_prime_max
+    
+    tibble(length=na.omit(as.integer(result$tag$AN[good]))) %>% 
+        count(length)
+}
+
 
 meltdown <- function(mat, rows, columns, values) {
     result <- reshape2::melt(t(as.matrix(mat)))
@@ -14,14 +48,17 @@ shiny_mpat <- function(
         filename, 
         normalizing_gene=NULL, 
         title="mPAT results",
-        pipeline_dir=NULL) {
+        pipeline_dir=NULL,
+        max_tail=300) {
     library(shiny)
     library(nesoni)
     library(reshape2)
     library(varistran)
     library(ggplot2)
     library(gridExtra)
+    library(rtracklayer)
     library(dplyr)
+    library(tidyr)
 
     tables <- read.grouped.table(filename)
     genes <- rownames(tables$Count)
@@ -34,14 +71,46 @@ shiny_mpat <- function(
         left_join(meltdown(tables$Tail_count, "sample", "gene", "tail_count"), 
                   c("sample","gene"))
     
-    have_pipeline <- !is.null(pipeline_dir)
-    if (have_pipeline) {
     
+    possible_normalizers <- c("None", sort(genes))
+    if (is.null(normalizing_gene))
+        normalizing_gene <- "None"
+    
+    
+    have_bams <- !is.null(pipeline_dir)
+    if (have_bams) {
+        bam_filenames <- pipeline_bams(pipeline_dir)
+    
+        # Create relevant genomic ranges
+        ranges <- GRanges(
+            tables$Annotation$chromosome, 
+            IRanges(tables$Annotation$start, tables$Annotation$end),
+            ifelse(tables$Annotation$strand < 0, "-","+"))
+        names(ranges) <- rownames(tables$Annotation)
+        
+        ranges$three_prime <- ifelse(strand(ranges) == "+", end(ranges), start(ranges))
+        
+        bounds <- ranges %>% as.data.frame
+        bounds$name <- names(ranges)
+        bounds <- bounds %>% 
+            arrange(seqnames,strand,three_prime) %>% 
+            group_by(seqnames,strand) %>%
+            mutate(
+                three_prime_min = pmax(-Inf, (three_prime + lag(three_prime))*0.5, na.rm=T),
+                three_prime_max = pmin(Inf, (three_prime + lead(three_prime))*0.5, na.rm=T)
+            ) %>%
+            ungroup()
+        matching <- match(names(ranges), bounds$name)
+        ranges$three_prime_min <- bounds$three_prime_min[matching]
+        ranges$three_prime_max <- bounds$three_prime_max[matching]        
     }
+
+
+
 
     # Plots
 
-    overview <- shiny_plot(prefix="overview", dlname="overview", width=800,height=800, function(env) {
+    overview <- shiny_plot(prefix="overview", dlname="overview", width=800,height=800, function(env) withProgress(message="Plotting overview", {
         normed <- env$normed()
         
         print( 
@@ -53,9 +122,9 @@ shiny_mpat <- function(
             theme_bw() +
             theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5))
         )        
-    })
+    }))
     
-    overview_tail <- shiny_plot(prefix="overview_tail", dlname="overview_tail", width=800,height=800, function(env) {
+    overview_tail <- shiny_plot(prefix="overview_tail", dlname="overview_tail", width=800,height=800, function(env) withProgress(message="Plotting overview", {
         normed <- env$normed()
         df <- filter_(normed$norm_data, ~tail_count > 0)
         df_bad <- filter_(df, ~is_low_tail_count)
@@ -69,7 +138,7 @@ shiny_mpat <- function(
             theme_bw() +
             theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5))
         )
-    })
+    }))
     
     individual <- shiny_plot(prefix="individual", dlname="individual", width=800, function(env) {
         normed <- env$normed()
@@ -100,6 +169,42 @@ shiny_mpat <- function(
             ncol=2, newpage=F
         )    
     })
+    
+    if (have_bams)
+        tail_distribution <- shiny_plot(
+            prefix="distribution", dlname="distribution", width=800, 
+            function(env) withProgress(message="Plotting tail distribution", {
+                this_samples <- env$input$samples
+                query <- ranges[ env$input$individual_gene ]
+                
+                tail_lengths <- tibble(
+                       sample=factor(this_samples, this_samples),
+                       lengths=lapply(bam_filenames[this_samples], tail_lengths, query)
+                    ) %>%
+                    unnest(lengths)
+                
+                print(
+                    tail_lengths %>% 
+                    arrange(sample, desc(length)) %>% 
+                    group_by(sample) %>%
+                    mutate(
+                        n = n/sum(n),
+                        cumn = cumsum(n),
+                        cumn_lag = dplyr::lag(cumn,1,0),
+                        length_lead = dplyr::lead(length,1,0)
+                    ) %>%
+                    ungroup() %>%
+                    ggplot(aes(color=sample)) +
+                    #geom_point(aes(x=length,y=cumn_lag)) +
+                    ggplot2::geom_segment(aes(x=length,xend=length,y=cumn,yend=cumn_lag)) +
+                    ggplot2::geom_segment(aes(x=length_lead,xend=length,y=cumn,yend=cumn)) +
+                    scale_x_continuous(lim=c(0,max_tail), oob=function(a,b)a) +
+                    labs(x="poly(A) tail length", y="Cumulative distribution", color="Sample") +
+                    theme_bw()
+                )
+                #ggplot(tail_lengths, aes(x=length,y=n,color=sample)) +
+                #    geom_point()            
+        }))
 
 
     # App
@@ -110,7 +215,7 @@ shiny_mpat <- function(
             widths=c(2,10),
             well=FALSE,
             tabPanel("Select",
-                selectInput("normalizing_gene","Normalizing gene",choices=sort(genes),selected=normalizing_gene),
+                selectInput("normalizing_gene","Normalizing gene",choices=possible_normalizers,selected=normalizing_gene),
                 br(),
                 
                 selectInput("genes","Genes to display",choices=genes,selected=genes,multiple=TRUE,width="100%"),
@@ -149,7 +254,9 @@ shiny_mpat <- function(
             tabPanel("Individual genes",
                 selectInput("individual_gene", "Gene", choices=sort(genes)),
                 p("Note expression levels are *not* log transformed in this plot."),
-                individual$component_ui
+                individual$component_ui,
+                if (have_bams) h2("Tail length distribution"),
+                if (have_bams) tail_distribution$component_ui
             )
         )
     )
@@ -176,10 +283,14 @@ shiny_mpat <- function(
              selected_genes <- input$genes
              highlight_low <- input$highlight_low
              
-             normalizer <- raw_data %>%
-                 filter_(~ gene == normalizing_gene) %>%
-                 mutate_(normalizer =~ count / mean(count)) %>%
-                 select_(~sample, ~normalizer)
+             if (normalizing_gene == "None") {
+                 normalizer <- tibble(sample=samples, normalizer=1)
+             } else {
+                 normalizer <- raw_data %>%
+                     filter_(~ gene == normalizing_gene) %>%
+                     mutate_(normalizer =~ count / mean(count)) %>%
+                     select_(~sample, ~normalizer)
+             }
              
              norm_data <- raw_data %>%
                  left_join(normalizer, "sample") %>%
@@ -236,6 +347,7 @@ shiny_mpat <- function(
         overview$component_server(env)
         overview_tail$component_server(env)
         individual$component_server(env)
+        if (have_bams) tail_distribution$component_server(env)
     }
     
     composable_shiny_app(ui, server)
