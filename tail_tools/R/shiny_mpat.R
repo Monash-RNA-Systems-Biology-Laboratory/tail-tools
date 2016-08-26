@@ -59,6 +59,7 @@ shiny_mpat <- function(
     library(rtracklayer)
     library(dplyr)
     library(tidyr)
+    library(viridis)
 
     tables <- read.grouped.table(filename)
     genes <- rownames(tables$Count)
@@ -144,13 +145,13 @@ shiny_mpat <- function(
         normed <- env$normed()
         individual_gene <- env$input$individual_gene
         df <- filter_(normed$norm_data, ~gene == individual_gene)
-        df_bad <- filter_(df, ~is_low_tail_count)
+        df_bad <- filter_(df, ~is_low_tail_count)        
         
         plot.new()
         grid.arrange(
             ggplot(df, aes(x=sample, y=norm_count)) +
             geom_bar(stat="identity", color="#000000", fill="#cccccc") +
-            ylab("Normlized count") +
+            ylab(if (env$input$normalizing_gene == "None") "Count" else "Normalized count") +
             xlab("") +
             title(paste(env$input$individual_gene,"expression")) +
             theme_bw() +
@@ -183,27 +184,59 @@ shiny_mpat <- function(
                     ) %>%
                     unnest(lengths)
                 
-                print(
-                    tail_lengths %>% 
-                    arrange(sample, desc(length)) %>% 
+                tail_lengths <- tail_lengths %>%
                     group_by(sample) %>%
-                    mutate(
-                        n = n/sum(n),
-                        cumn = cumsum(n),
-                        cumn_lag = dplyr::lag(cumn,1,0),
-                        length_lead = dplyr::lead(length,1,0)
-                    ) %>%
-                    ungroup() %>%
-                    ggplot(aes(color=sample)) +
-                    #geom_point(aes(x=length,y=cumn_lag)) +
-                    ggplot2::geom_segment(aes(x=length,xend=length,y=cumn,yend=cumn_lag)) +
-                    ggplot2::geom_segment(aes(x=length_lead,xend=length,y=cumn,yend=cumn)) +
-                    scale_x_continuous(lim=c(0,max_tail), oob=function(a,b)a) +
-                    labs(x="poly(A) tail length", y="Cumulative distribution", color="Sample") +
-                    theme_bw()
-                )
-                #ggplot(tail_lengths, aes(x=length,y=n,color=sample)) +
-                #    geom_point()            
+                    mutate(n = n/sum(n)) %>%
+                    ungroup()
+                
+                if (env$input$tail_style == "Cumulative") {
+                    print(
+                        tail_lengths %>% 
+                        arrange(sample, desc(length)) %>% 
+                        group_by(sample) %>%
+                        mutate(
+                            cumn = cumsum(n),
+                            cumn_lag = dplyr::lag(cumn,1,0),
+                            length_lead = dplyr::lead(length,1,0)
+                        ) %>%
+                        ungroup() %>%
+                        ggplot(aes(color=sample)) +
+                        #geom_point(aes(x=length,y=cumn_lag)) +
+                        ggplot2::geom_segment(aes(x=length,xend=length,y=cumn,yend=cumn_lag)) +
+                        ggplot2::geom_segment(aes(x=length_lead,xend=length,y=cumn,yend=cumn)) +
+                        scale_x_continuous(lim=c(0,max_tail), oob=function(a,b)a) +
+                        scale_y_continuous(labels = scales::percent) +
+                        labs(x="poly(A) tail length", y="Cumulative distribution", color="Sample") +
+                        theme_bw()
+                    )
+                } else if (env$input$tail_style == "Density") {
+                    print(
+                        tail_lengths %>%
+                        complete(sample=factor(this_samples,this_samples), length=seq(0,max_tail), fill=list(n=0)) %>%
+                        ggplot(aes(color=sample,group=sample,x=length,y=n)) + 
+                        geom_line() +
+                        scale_x_continuous(lim=c(0,max_tail), oob=function(a,b)a) +
+                        scale_y_continuous(labels = scales::percent) +
+                        labs(x="poly(A) tail length", y="Percent reads", color="Sample") +
+                        theme_bw()   
+                    )
+                } else {
+                    print(
+                        tail_lengths %>%
+                        #group_by(sample) %>%
+                        #mutate(n = n/max(n)) %>%
+                        #ungroup() %>%
+                        complete(sample=factor(this_samples,this_samples), length=seq(0,max_tail), fill=list(n=0)) %>%
+                        ggplot(aes(x=sample,y=length,fill=n)) + 
+                        geom_tile() +
+                        scale_y_continuous(lim=c(0,max_tail), oob=function(a,b)a) +
+                        scale_fill_viridis(guide=FALSE) +
+                        labs(x="", y="poly(A) tail length") +
+                        theme_minimal() +
+                        theme(panel.grid=element_blank(), 
+                              axis.text.x=element_text(angle=90, hjust=1, vjust=0.5))
+                    )
+                }
         }))
 
 
@@ -256,6 +289,7 @@ shiny_mpat <- function(
                 p("Note expression levels are *not* log transformed in this plot."),
                 individual$component_ui,
                 if (have_bams) h2("Tail length distribution"),
+                if (have_bams) selectInput("tail_style", "Display", choices=c("Cumulative","Density","Heatmap"), selected="Cumulative"),
                 if (have_bams) tail_distribution$component_ui
             )
         )
@@ -284,7 +318,7 @@ shiny_mpat <- function(
              highlight_low <- input$highlight_low
              
              if (normalizing_gene == "None") {
-                 normalizer <- tibble(sample=samples, normalizer=1)
+                 normalizer <- tibble(sample=factor(samples,samples), normalizer=1)
              } else {
                  normalizer <- raw_data %>%
                      filter_(~ gene == normalizing_gene) %>%
