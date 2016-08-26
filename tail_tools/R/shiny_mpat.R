@@ -49,7 +49,8 @@ shiny_mpat <- function(
         normalizing_gene=NULL, 
         title="mPAT results",
         pipeline_dir=NULL,
-        max_tail=300) {
+        max_tail=300,
+        grouping=NULL) {
     library(shiny)
     library(nesoni)
     library(reshape2)
@@ -77,6 +78,7 @@ shiny_mpat <- function(
     if (is.null(normalizing_gene))
         normalizing_gene <- "None"
     
+    have_grouping <- !is.null(grouping)
     
     have_bams <- !is.null(pipeline_dir)
     if (have_bams) {
@@ -184,10 +186,48 @@ shiny_mpat <- function(
                     ) %>%
                     unnest(lengths)
                 
+                if (env$input$tail_percent) {
+                    normalizer <- tail_lengths %>% group_by(sample) %>% summarize(normalizer=sum(n))
+                    describer <- "Percent reads"
+                    labeller <- scales::percent
+                } else {
+                    normalizer <- env$normed()$normalizer
+                    describer <- if (env$input$normalizing_gene == "None") "Count" else "Normalized count"
+                    labeller <- waiver()
+                }
+                
+                samples_called <- "Sample"
+                if (have_grouping && env$input$group_samples) {
+                    samples_called <- "Group"
+                    respectful_grouping <- env$normed()$grouping
+                    this_samples <- levels(respectful_grouping$group)                    
+                    tail_lengths <- tail_lengths %>%
+                        left_join(respectful_grouping, "sample") %>%
+                        group_by(group, length) %>%
+                        summarize(n=sum(n)) %>%
+                        ungroup() %>%
+                        select(sample=group, length, n)
+                }
+
+                if (have_grouping && env$input$group_samples) {
+                    normalizer <- normalizer %>%
+                        left_join(respectful_grouping, "sample") %>%
+                        group_by(group) %>%
+                        summarize(normalizer = sum(normalizer)) %>%
+                        select(sample=group, normalizer)
+                }
+                
                 tail_lengths <- tail_lengths %>%
-                    group_by(sample) %>%
-                    mutate(n = n/sum(n)) %>%
-                    ungroup()
+                    left_join(normalizer, "sample") %>%
+                    mutate(n = n / normalizer)
+                
+                transformer <- identity
+                if (env$input$tail_log) {
+                    transformer <- log2
+                    if (env$input$tail_percent) describer <- "Proportion of reads"
+                    describer <- paste("log2", describer)
+                    labeller <- waiver()
+                }
                 
                 if (env$input$tail_style == "Cumulative") {
                     print(
@@ -202,22 +242,22 @@ shiny_mpat <- function(
                         ungroup() %>%
                         ggplot(aes(color=sample)) +
                         #geom_point(aes(x=length,y=cumn_lag)) +
-                        ggplot2::geom_segment(aes(x=length,xend=length,y=cumn,yend=cumn_lag)) +
-                        ggplot2::geom_segment(aes(x=length_lead,xend=length,y=cumn,yend=cumn)) +
+                        ggplot2::geom_segment(aes(x=length,xend=length,y=transformer(cumn),yend=transformer(cumn_lag))) +
+                        ggplot2::geom_segment(aes(x=length_lead,xend=length,y=transformer(cumn),yend=transformer(cumn))) +
                         scale_x_continuous(lim=c(0,max_tail), oob=function(a,b)a) +
-                        scale_y_continuous(labels = scales::percent) +
-                        labs(x="poly(A) tail length", y="Cumulative distribution", color="Sample") +
+                        scale_y_continuous(labels = labeller) +
+                        labs(x="poly(A) tail length", y=describer, color=samples_called) +
                         theme_bw()
                     )
                 } else if (env$input$tail_style == "Density") {
                     print(
                         tail_lengths %>%
                         complete(sample=factor(this_samples,this_samples), length=seq(0,max_tail), fill=list(n=0)) %>%
-                        ggplot(aes(color=sample,group=sample,x=length,y=n)) + 
+                        ggplot(aes(color=sample,group=sample,x=length,y=transformer(n))) + 
                         geom_line() +
                         scale_x_continuous(lim=c(0,max_tail), oob=function(a,b)a) +
-                        scale_y_continuous(labels = scales::percent) +
-                        labs(x="poly(A) tail length", y="Percent reads", color="Sample") +
+                        scale_y_continuous(labels = labeller) +
+                        labs(x="poly(A) tail length", y=describer, color=samples_called) +
                         theme_bw()   
                     )
                 } else {
@@ -227,7 +267,7 @@ shiny_mpat <- function(
                         #mutate(n = n/max(n)) %>%
                         #ungroup() %>%
                         complete(sample=factor(this_samples,this_samples), length=seq(0,max_tail), fill=list(n=0)) %>%
-                        ggplot(aes(x=sample,y=length,fill=n)) + 
+                        ggplot(aes(x=sample,y=length,fill=transformer(n))) + 
                         geom_tile() +
                         scale_y_continuous(lim=c(0,max_tail), oob=function(a,b)a) +
                         scale_fill_viridis(guide=FALSE) +
@@ -252,11 +292,15 @@ shiny_mpat <- function(
                 br(),
                 
                 selectInput("genes","Genes to display",choices=genes,selected=genes,multiple=TRUE,width="100%"),
+                p(
+                    actionButton("genes_all", "All")
+                ),
                 br(),
                 
                 selectInput("samples","Samples to display",choices=samples,selected=samples,multiple=TRUE,width="100%"),
                 p(
-                    actionButton("samples_all", "All")
+                    actionButton("samples_all", "All"),
+                    if (have_grouping) checkboxInput("group_samples", "Group samples", value=FALSE)
                 ),
                 br(),
                 
@@ -289,7 +333,13 @@ shiny_mpat <- function(
                 p("Note expression levels are *not* log transformed in this plot."),
                 individual$component_ui,
                 if (have_bams) h2("Tail length distribution"),
-                if (have_bams) selectInput("tail_style", "Display", choices=c("Cumulative","Density","Heatmap"), selected="Cumulative"),
+                if (have_bams) fluidRow(
+                    column(4, radioButtons("tail_style", "Display", choices=c("Cumulative","Density","Heatmap"), selected="Cumulative", inline=TRUE)),
+                    column(8, 
+                        checkboxInput("tail_percent", "Show as percent within each sample", value=TRUE),
+                        checkboxInput("tail_log", "log2 transform", value=FALSE)
+                    )
+                ),
                 if (have_bams) tail_distribution$component_ui
             )
         )
@@ -299,6 +349,10 @@ shiny_mpat <- function(
         input <- env$input
         output <- env$output
         
+        observeEvent(input$genes_all, {
+            updateSelectInput(env$session, "genes", selected=genes)
+        })
+    
         observeEvent(input$samples_all, {
             updateSelectInput(env$session, "samples", selected=samples)
         })
@@ -365,12 +419,36 @@ shiny_mpat <- function(
                      sample =~ factor(sample, selected_samples),
                      gene =~ factor(gene, selected_genes)
                  )
+             
+             respectful_grouping <- NULL
+             if (have_grouping && env$input$group_samples) {
+                 respectful_grouping <- grouping %>% 
+                      filter_(~sample %in% selected_samples) %>%
+                      mutate_(sample =~ factor(sample, selected_samples)) %>%
+                      arrange_(~sample) %>%
+                      mutate_(group =~ factor(group, unique(group)))
                  
+                 norm_data <- norm_data %>%
+                      left_join(respectful_grouping, "sample") %>%
+                      group_by_(~group, ~gene) %>%
+                      summarize_(
+                          norm_count =~ mean(norm_count),
+                          log2_norm_count =~ mean(log2_norm_count), #Hmm
+                          log2_fold_norm_count =~ mean(log2_fold_norm_count),
+                          tail =~ mean(tail, na.rm=TRUE),
+                          tail_count =~ mean(tail_count),
+                          relative_tail =~ mean(relative_tail, na.rm=TRUE),
+                          is_low_tail_count =~ any(is_low_tail_count)
+                      ) %>%
+                      ungroup() %>%
+                      select_(sample=~group, ~gene, ~norm_count, ~log2_norm_count, ~log2_fold_norm_count, ~tail, ~tail_count, ~relative_tail, ~is_low_tail_count) 
+             }
              
              list(
                  norm_data=norm_data,
-                 normalizer=normalizer, 
-                 is_differential=is_differential
+                 normalizer=normalizer,
+                 is_differential=is_differential,
+                 grouping=respectful_grouping
              )
         })
     
