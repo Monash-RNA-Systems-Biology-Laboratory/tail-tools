@@ -40,6 +40,20 @@ meltdown <- function(mat, rows, columns, values) {
     result
 }
 
+
+# sum n, binned by length, respecting existing group_by
+bin_lengths <- function(df, stride) {
+    df %>%
+        mutate(bin = floor((length+0.5)/stride)) %>%
+        group_by(bin, add=TRUE) %>%
+        summarize(n = sum(n)) %>%
+        mutate(
+            length_low = bin*stride-0.5,
+            length_mid = (bin+0.5)*stride-0.5,
+            length_high = (bin+1)*stride-0.5
+        )
+}
+
 #'
 #' Shiny report for mPAT results
 #'
@@ -176,15 +190,11 @@ shiny_mpat <- function(
     if (have_bams)
         tail_distribution <- shiny_plot(
             prefix="distribution", dlname="distribution", width=800, 
-            function(env) withProgress(message="Plotting tail distribution", {
+            function(env) withProgress(message="Plotting tail distribution", {                
+                tail_bin <- max(1,env$input$tail_bin)
+                tail_max <- max(1,env$input$tail_max)
                 this_samples <- env$input$samples
-                query <- ranges[ env$input$individual_gene ]
-                
-                tail_lengths <- tibble(
-                       sample=factor(this_samples, this_samples),
-                       lengths=lapply(bam_filenames[this_samples], tail_lengths, query)
-                    ) %>%
-                    unnest(lengths)
+                tail_lengths <- env$tail_lengths()
                 
                 if (env$input$tail_percent) {
                     normalizer <- tail_lengths %>% group_by(sample) %>% summarize(normalizer=sum(n))
@@ -244,7 +254,7 @@ shiny_mpat <- function(
                         #geom_point(aes(x=length,y=cumn_lag)) +
                         ggplot2::geom_segment(aes(x=length,xend=length,y=transformer(cumn),yend=transformer(cumn_lag))) +
                         ggplot2::geom_segment(aes(x=length_lead,xend=length,y=transformer(cumn),yend=transformer(cumn))) +
-                        scale_x_continuous(lim=c(0,max_tail), oob=function(a,b)a) +
+                        scale_x_continuous(lim=c(0,tail_max), oob=function(a,b)a) +
                         scale_y_continuous(labels = labeller) +
                         labs(x="poly(A) tail length", y=describer, color=samples_called) +
                         theme_bw()
@@ -252,10 +262,11 @@ shiny_mpat <- function(
                 } else if (env$input$tail_style == "Density") {
                     print(
                         tail_lengths %>%
-                        complete(sample=factor(this_samples,this_samples), length=seq(0,max_tail), fill=list(n=0)) %>%
-                        ggplot(aes(color=sample,group=sample,x=length,y=transformer(n))) + 
+                        complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
+                        group_by(sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
+                        ggplot(aes(color=sample,group=sample,x=length_mid,y=transformer(n))) + 
                         geom_line() +
-                        scale_x_continuous(lim=c(0,max_tail), oob=function(a,b)a) +
+                        scale_x_continuous(lim=c(0,tail_max), oob=function(a,b)a) +
                         scale_y_continuous(labels = labeller) +
                         labs(x="poly(A) tail length", y=describer, color=samples_called) +
                         theme_bw()   
@@ -266,10 +277,11 @@ shiny_mpat <- function(
                         #group_by(sample) %>%
                         #mutate(n = n/max(n)) %>%
                         #ungroup() %>%
-                        complete(sample=factor(this_samples,this_samples), length=seq(0,max_tail), fill=list(n=0)) %>%
-                        ggplot(aes(x=sample,y=length,fill=transformer(n))) + 
-                        geom_tile() +
-                        scale_y_continuous(lim=c(0,max_tail), oob=function(a,b)a) +
+                        complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
+                        group_by(sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
+                        ggplot(aes(x=sample,y=length_mid,fill=transformer(n))) + 
+                        geom_tile(height=tail_bin) +
+                        scale_y_continuous(lim=c(0,tail_max), oob=function(a,b)a) +
                         scale_fill_viridis(guide=FALSE) +
                         labs(x="", y="poly(A) tail length") +
                         theme_minimal() +
@@ -334,8 +346,12 @@ shiny_mpat <- function(
                 individual$component_ui,
                 if (have_bams) h2("Tail length distribution"),
                 if (have_bams) fluidRow(
-                    column(4, radioButtons("tail_style", "Display", choices=c("Cumulative","Density","Heatmap"), selected="Cumulative", inline=TRUE)),
-                    column(8, 
+                    column(2, radioButtons("tail_style", "Display", choices=c("Cumulative","Density","Heatmap"), selected="Cumulative")),
+                    column(3,
+                        numericInput("tail_max", "Maximum tail length", max_tail, min=1),
+                        conditionalPanel("input.tail_style != 'Cumulative'", numericInput("tail_bin", "Tail length bin size", 1, min=1))
+                    ), 
+                    column(7, 
                         checkboxInput("tail_percent", "Show as percent within each sample", value=TRUE),
                         checkboxInput("tail_log", "log2 transform", value=FALSE)
                     )
@@ -455,7 +471,20 @@ shiny_mpat <- function(
         output$normalizer_table <- renderTable({
              env$normed()$normalizer
         }, digits=6)
-        
+
+
+        if (have_bams)
+            env$tail_lengths <- reactive(withProgress(message="Reading tail lengths", {
+                this_samples <- env$input$samples
+                query <- ranges[ env$input$individual_gene ]
+                
+                tibble(
+                   sample=factor(this_samples, this_samples),
+                   lengths=lapply(bam_filenames[this_samples], tail_lengths, query)
+                ) %>%
+                unnest(lengths)
+            }))
+            
         overview$component_server(env)
         overview_tail$component_server(env)
         individual$component_server(env)
