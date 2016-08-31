@@ -11,7 +11,7 @@ pipeline_bams <- function(pipeline_dir) {
 }
 
 
-tail_lengths <- function(bam_filename, query) {
+read_info <- function(bam_filename, query) {
     library(dplyr)
 
     sbp <- Rsamtools::ScanBamParam(
@@ -21,16 +21,24 @@ tail_lengths <- function(bam_filename, query) {
         which=query)
     
     result <- Rsamtools::scanBam(bam_filename, param=sbp)[[1]]
+    AN <- as.integer(result$tag$AN) # Convert NULL to integer(0)
+    AN[is.na(AN)] <- 0L
+    
     if (is_reverse(query)) {
         three_prime <- result$pos
+        width <- end(query) - three_prime + 1L
     } else {
         three_prime <- result$pos + 
             GenomicAlignments::cigarWidthAlongReferenceSpace(result$cigar) - 1L
+        width <- three_prime - start(query) + 1L
     }
     good <- three_prime > query$three_prime_min & three_prime < query$three_prime_max
     
-    tibble(length=na.omit(as.integer(result$tag$AN[good]))) %>% 
-        count(length)
+    tibble(
+        length=AN[good],
+        width=width[good]
+    ) %>% 
+    count(length, width)
 }
 
 
@@ -187,57 +195,26 @@ shiny_mpat <- function(
         )    
     })
     
-    if (have_bams)
+    if (have_bams) {
+        # Tail lengths
         tail_distribution <- shiny_plot(
-            prefix="distribution", dlname="distribution", width=800, 
+            prefix="tail_distribution", dlname="tail-distribution", width=800, 
             function(env) withProgress(message="Plotting tail distribution", {                
                 tail_bin <- max(1,env$input$tail_bin)
                 tail_max <- max(1,env$input$tail_max)
-                this_samples <- env$input$samples
-                tail_lengths <- env$tail_lengths()
                 
-                if (env$input$tail_percent) {
-                    normalizer <- tail_lengths %>% group_by(sample) %>% summarize(normalizer=sum(n))
-                    describer <- "Percent reads"
-                    labeller <- scales::percent
-                } else {
-                    normalizer <- env$normed()$normalizer
-                    describer <- if (env$input$normalizing_gene == "None") "Count" else "Normalized count"
-                    labeller <- waiver()
-                }
-                
-                samples_called <- "Sample"
-                if (have_grouping && env$input$group_samples) {
-                    samples_called <- "Group"
-                    respectful_grouping <- env$normed()$grouping
-                    this_samples <- levels(respectful_grouping$group)                    
-                    tail_lengths <- tail_lengths %>%
-                        left_join(respectful_grouping, "sample") %>%
-                        group_by(group, length) %>%
-                        summarize(n=sum(n)) %>%
-                        ungroup() %>%
-                        select(sample=group, length, n)
-                }
-
-                if (have_grouping && env$input$group_samples) {
-                    normalizer <- normalizer %>%
-                        left_join(respectful_grouping, "sample") %>%
-                        group_by(group) %>%
-                        summarize(normalizer = sum(normalizer)) %>%
-                        select(sample=group, normalizer)
-                }
+                this_samples <- env$read_info()$this_samples
+                samples_called <- env$read_info()$samples_called
+                normalizer <- env$read_info()$normalizer
+                describer <- env$read_info()$describer
+                labeller <- env$read_info()$labeller
+                transformer <- env$read_info()$transformer
+                tail_lengths <- env$read_info()$read_info %>% 
+                    group_by(sample, length) %>% summarize(n=sum(n)) %>% ungroup()
                 
                 tail_lengths <- tail_lengths %>%
                     left_join(normalizer, "sample") %>%
                     mutate(n = n / normalizer)
-                
-                transformer <- identity
-                if (env$input$tail_log) {
-                    transformer <- log2
-                    if (env$input$tail_percent) describer <- "Proportion of reads"
-                    describer <- paste("log2", describer)
-                    labeller <- waiver()
-                }
                 
                 if (env$input$tail_style == "Cumulative") {
                     print(
@@ -289,8 +266,49 @@ shiny_mpat <- function(
                               axis.text.x=element_text(angle=90, hjust=1, vjust=0.5))
                     )
                 }
-        }))
-
+            }))
+        
+        
+        # 3' end positions
+        end_distribution <- shiny_plot(
+            prefix="end_distribution", dlname="end-distribution", width=800, 
+            function(env) withProgress(message="Plotting 3' end distribution", {                
+                this_samples <- env$read_info()$this_samples
+                samples_called <- env$read_info()$samples_called
+                normalizer <- env$read_info()$normalizer
+                describer <- env$read_info()$describer
+                labeller <- env$read_info()$labeller
+                transformer <- env$read_info()$transformer
+                widths <- env$read_info()$read_info %>% 
+                    group_by(sample, width) %>% summarize(n=sum(n)) %>% ungroup()
+                
+                widths <- widths %>%
+                    left_join(normalizer, "sample") %>%
+                    mutate(n = n / normalizer)
+                
+                print(
+                        widths %>%
+                        arrange(sample, desc(width)) %>% 
+                        group_by(sample) %>%
+                        mutate(
+                            cumn = cumsum(n),
+                            cumn_lag = dplyr::lag(cumn,1,0),
+                            width_lead = dplyr::lead(width,1,0)
+                        ) %>%
+                        ungroup() %>%
+                        ggplot(aes(color=sample)) +
+                        #geom_point(aes(x=length,y=cumn_lag)) +
+                        ggplot2::geom_segment(aes(x=width,xend=width,y=transformer(cumn),yend=transformer(cumn_lag))) +
+                        ggplot2::geom_segment(aes(x=width_lead,xend=width,y=transformer(cumn),yend=transformer(cumn))) +
+                        #scale_x_continuous(lim=c(0,tail_max), oob=function(a,b)a) +
+                        scale_y_continuous(labels = labeller) +
+                        labs(x="Position relative to primer start", y=describer, color=samples_called) +
+                        theme_bw()
+                )
+            }))
+    }
+    
+    
 
     # App
 
@@ -344,19 +362,29 @@ shiny_mpat <- function(
                 selectInput("individual_gene", "Gene", choices=sort(genes)),
                 p("Note expression levels are *not* log transformed in this plot."),
                 individual$component_ui,
-                if (have_bams) h2("Tail length distribution"),
+                br(),
+                br(),
+                if (have_bams) h2("Detail"),
                 if (have_bams) fluidRow(
-                    column(2, radioButtons("tail_style", "Display", choices=c("Cumulative","Density","Heatmap"), selected="Cumulative")),
-                    column(3,
-                        numericInput("tail_max", "Maximum tail length", max_tail, min=1),
-                        conditionalPanel("input.tail_style != 'Cumulative'", numericInput("tail_bin", "Tail length bin size", 1, min=1))
-                    ), 
-                    column(7, 
+                    column(6,
+                        checkboxInput("tail_tail", "Only show reads with poly(A) tail", value=TRUE),
                         checkboxInput("tail_percent", "Show as percent within each sample", value=TRUE),
-                        checkboxInput("tail_log", "log2 transform", value=FALSE)
-                    )
-                ),
-                if (have_bams) tail_distribution$component_ui
+                        checkboxInput("tail_log", "log2 transform", value=FALSE)),
+                    column(6, conditionalPanel("input.tail_tail",
+                        numericInput("tail_min", "Minimum tail length to include in plots", 4)))),
+                if (have_bams) br(),
+                if (have_bams) h3("Tail length distribution"),
+                if (have_bams) fluidRow(
+                    column(2, radioButtons(
+                        "tail_style", "Display", 
+                        choices=c("Cumulative","Density","Heatmap"), selected="Cumulative")),
+                    column(3, numericInput("tail_max", "Maximum tail length", max_tail, min=1)),
+                    column(3, conditionalPanel("input.tail_style != 'Cumulative'", 
+                        numericInput("tail_bin", "Tail length bin size", 1, min=1)))),
+                if (have_bams) tail_distribution$component_ui,                
+                if (have_bams) br(),
+                if (have_bams) h3("Templated sequence"),
+                if (have_bams) end_distribution$component_ui
             )
         )
     )
@@ -473,22 +501,82 @@ shiny_mpat <- function(
         }, digits=6)
 
 
-        if (have_bams)
-            env$tail_lengths <- reactive(withProgress(message="Reading tail lengths", {
+        if (have_bams) {
+            env$read_info_basic <- reactive(withProgress(message="Reading tail lengths", {
                 this_samples <- env$input$samples
                 query <- ranges[ env$input$individual_gene ]
                 
                 tibble(
-                   sample=factor(this_samples, this_samples),
-                   lengths=lapply(bam_filenames[this_samples], tail_lengths, query)
+                    sample=factor(this_samples, this_samples),
+                    info=lapply(bam_filenames[this_samples], read_info, query)
                 ) %>%
-                unnest(lengths)
+                unnest(info)
             }))
+
+            env$read_info <- reactive({
+                this_samples <- env$input$samples
+                read_info <- env$read_info_basic()
+                
+                if (env$input$tail_tail)
+                    read_info <- read_info %>%
+                        filter(length >= env$input$tail_min)
+                
+                if (env$input$tail_percent) {
+                    normalizer <- read_info %>% group_by(sample) %>% summarize(normalizer=sum(n))
+                    describer <- "Percent reads"
+                    labeller <- scales::percent
+                } else {
+                    normalizer <- env$normed()$normalizer
+                    describer <- if (env$input$normalizing_gene == "None") "Count" else "Normalized count"
+                    labeller <- waiver()
+                }
+                
+                samples_called <- "Sample"
+                if (have_grouping && env$input$group_samples) {
+                    samples_called <- "Group"
+                    respectful_grouping <- env$normed()$grouping
+                    this_samples <- levels(respectful_grouping$group)                    
+                    read_info <- read_info %>%
+                        left_join(respectful_grouping, "sample") %>%
+                        group_by(group, length, width) %>%
+                        summarize(n=sum(n)) %>%
+                        ungroup() %>%
+                        select(sample=group, length, width, n)
+                }
+
+                if (have_grouping && env$input$group_samples) {
+                    normalizer <- normalizer %>%
+                        left_join(respectful_grouping, "sample") %>%
+                        group_by(group) %>%
+                        summarize(normalizer = sum(normalizer)) %>%
+                        select(sample=group, normalizer)
+                }
+                
+                transformer <- identity
+                if (env$input$tail_log) {
+                    transformer <- log2
+                    if (env$input$tail_percent) describer <- "Proportion of reads"
+                    describer <- paste("log2", describer)
+                    labeller <- waiver()
+                }
+                
+                list(
+                    read_info = read_info,
+                    normalizer = normalizer,
+                    describer = describer,
+                    labeller = labeller,
+                    transformer = transformer,
+                    this_samples = this_samples,
+                    samples_called = samples_called
+                )            
+            })
+        }
             
         overview$component_server(env)
         overview_tail$component_server(env)
         individual$component_server(env)
         if (have_bams) tail_distribution$component_server(env)
+        if (have_bams) end_distribution$component_server(env)
     }
     
     composable_shiny_app(ui, server)
