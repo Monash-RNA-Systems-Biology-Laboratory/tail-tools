@@ -62,8 +62,49 @@ bin_lengths <- function(df, stride) {
         )
 }
 
-#'
+            
+default_plot_count <- function(df, is_grouped, norm_count_name, ...) { 
+    print(
+        ggplot(df, aes(x=sample, y=norm_count)) +
+        geom_bar(stat="identity", color="#000000", fill="#cccccc") +
+        ylab(norm_count_name) +
+        xlab("") +
+        theme_bw() +
+        theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5))
+    )
+}
+
+
+default_plot_tail <- function(df, is_grouped, ...) {
+    df_bad <- filter_(df, ~is_low_tail_count)
+    
+    print(
+        ggplot(df, aes(x=sample, y=tail)) +
+        geom_bar(stat="identity", color="#000000", fill="#ccffcc") +
+        geom_bar(data=df_bad, 
+                 stat="identity", color="#000000", fill="#ff0000") +
+        ylab("poly(A) tail length") +
+        xlab("") +
+        theme_bw() +
+        theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5))
+    )
+}
+
 #' Shiny report for mPAT results
+#'
+#' @param filename A counts.csv file as produced by "tail-tools analyse-tail-lengths:".
+#'
+#' @param normalizing_gene ID of housekeeping gene to normalize to.
+#'
+#' @param title Title of Shiny report.
+#'
+#' @param pipeline_dir Pipeline output directory, if you want to view detailed poly(A) tail length distributions extracted from BAM files.
+#'
+#' @param max_tail Default limit on tail length for tail length distribution plot.
+#'
+#' @grouping If you want to be able to group samples, a data frame with a "group" and a "sample" column.
+#'
+#' @return A shiny appobj. Printing it runs the app.
 #'
 #' @export
 shiny_mpat <- function(
@@ -72,7 +113,10 @@ shiny_mpat <- function(
         title="mPAT results",
         pipeline_dir=NULL,
         max_tail=300,
-        grouping=NULL) {
+        grouping=NULL,
+        
+        plot_count=NULL,
+        plot_tail=NULL) {
     library(shiny)
     library(nesoni)
     library(reshape2)
@@ -99,6 +143,10 @@ shiny_mpat <- function(
     possible_normalizers <- c("None", sort(genes))
     if (is.null(normalizing_gene))
         normalizing_gene <- "None"
+    
+    have_plotters <- !is.null(plot_count) | !is.null(plot_tail)
+    if (is.null(plot_count)) plot_count <- default_plot_count
+    if (is.null(plot_tail)) plot_tail <- default_plot_tail
     
     have_grouping <- !is.null(grouping)
     
@@ -129,8 +177,6 @@ shiny_mpat <- function(
         ranges$three_prime_min <- bounds$three_prime_min[matching]
         ranges$three_prime_max <- bounds$three_prime_max[matching]        
     }
-
-
 
 
     # Plots
@@ -165,34 +211,30 @@ shiny_mpat <- function(
         )
     }))
     
-    individual <- shiny_plot(prefix="individual", dlname="individual", width=800, function(env) {
+    individual_count <- shiny_plot(prefix="individual_count", dlname="individual-count", width=400,height=400, function(env) {
         normed <- env$normed()
         individual_gene <- env$input$individual_gene
         df <- filter_(normed$norm_data, ~gene == individual_gene)
-        df_bad <- filter_(df, ~is_low_tail_count)        
         
-        plot.new()
-        grid.arrange(
-            ggplot(df, aes(x=sample, y=norm_count)) +
-            geom_bar(stat="identity", color="#000000", fill="#cccccc") +
-            ylab(if (env$input$normalizing_gene == "None") "Count" else "Normalized count") +
-            xlab("") +
-            title(paste(env$input$individual_gene,"expression")) +
-            theme_bw() +
-            theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5)),
-            
-            ggplot(df, aes(x=sample, y=tail)) +
-            geom_bar(stat="identity", color="#000000", fill="#ccffcc") +
-            geom_bar(data=df_bad, 
-                     stat="identity", color="#000000", fill="#ff0000") +
-            ylab("poly(A) tail length") +
-            xlab("") +
-            title(paste(env$input$individual_gene,"poly(A) tail"))+
-            theme_bw() +
-            theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5)),
-            
-            ncol=2, newpage=F
-        )    
+        if (have_plotters && env$input$plotter_custom)
+           plotter <- plot_count
+        else
+           plotter <- default_plot_count
+        
+        plotter(df=df, is_grouped=normed$is_grouped, norm_count_name=normed$norm_count_name)
+    })
+
+    individual_tail <- shiny_plot(prefix="individual_tail", dlname="individual-tail", width=400,height=400, function(env) {
+        normed <- env$normed()
+        individual_gene <- env$input$individual_gene
+        df <- filter_(normed$norm_data, ~gene == individual_gene)
+        
+        if (have_plotters && env$input$plotter_custom)
+           plotter <- plot_tail
+        else
+           plotter <- default_plot_tail
+        
+        plotter(df, is_grouped=normed$is_grouped)        
     })
     
     if (have_bams) {
@@ -360,8 +402,11 @@ shiny_mpat <- function(
             ),
             tabPanel("Individual genes",
                 selectInput("individual_gene", "Gene", choices=sort(genes)),
+                if (have_plotters) checkboxInput("plotter_custom", "Use customized plots", value=TRUE),
                 p("Note expression levels are *not* log transformed in this plot."),
-                individual$component_ui,
+                fluidRow(
+                    column(6, individual_count$component_ui),
+                    column(6, individual_tail$component_ui)),
                 br(),
                 br(),
                 if (have_bams) h2("Detail"),
@@ -414,10 +459,12 @@ shiny_mpat <- function(
              selected_samples <- input$samples
              selected_genes <- input$genes
              highlight_low <- input$highlight_low
-             
+                          
              if (normalizing_gene == "None") {
+                 norm_count_name = "Count"
                  normalizer <- tibble(sample=factor(samples,samples), normalizer=1)
              } else {
+                 norm_count_name = "Normalized count"
                  normalizer <- raw_data %>%
                      filter_(~ gene == normalizing_gene) %>%
                      mutate_(normalizer =~ count / mean(count)) %>%
@@ -464,8 +511,9 @@ shiny_mpat <- function(
                      gene =~ factor(gene, selected_genes)
                  )
              
+             is_grouped <- have_grouping && env$input$group_samples
              respectful_grouping <- NULL
-             if (have_grouping && env$input$group_samples) {
+             if (is_grouped) {
                  respectful_grouping <- grouping %>% 
                       filter_(~sample %in% selected_samples) %>%
                       mutate_(sample =~ factor(sample, selected_samples)) %>%
@@ -491,7 +539,9 @@ shiny_mpat <- function(
              list(
                  norm_data=norm_data,
                  normalizer=normalizer,
+                 norm_count_name=norm_count_name,
                  is_differential=is_differential,
+                 is_grouped=is_grouped,
                  grouping=respectful_grouping
              )
         })
@@ -574,7 +624,8 @@ shiny_mpat <- function(
             
         overview$component_server(env)
         overview_tail$component_server(env)
-        individual$component_server(env)
+        individual_count$component_server(env)
+        individual_tail$component_server(env)
         if (have_bams) tail_distribution$component_server(env)
         if (have_bams) end_distribution$component_server(env)
     }
