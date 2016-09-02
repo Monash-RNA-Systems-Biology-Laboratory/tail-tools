@@ -94,7 +94,7 @@ default_plot_tail <- function(df, is_grouped, ...) {
 #'
 #' @param filename A counts.csv file as produced by "tail-tools analyse-tail-lengths:".
 #'
-#' @param normalizing_gene ID of housekeeping gene to normalize to.
+#' @param normalizing_gene ID of housekeeping gene to normalize to. A vector of IDs may be given. NULL means perform no normalization.
 #'
 #' @param title Title of Shiny report.
 #'
@@ -138,12 +138,7 @@ shiny_mpat <- function(
                   c("sample","gene")) %>%
         left_join(meltdown(tables$Tail_count, "sample", "gene", "tail_count"), 
                   c("sample","gene"))
-    
-    
-    possible_normalizers <- c("None", sort(genes))
-    if (is.null(normalizing_gene))
-        normalizing_gene <- "None"
-    
+        
     have_plotters <- !is.null(plot_count) | !is.null(plot_tail)
     if (is.null(plot_count)) plot_count <- default_plot_count
     if (is.null(plot_tail)) plot_tail <- default_plot_tail
@@ -188,7 +183,7 @@ shiny_mpat <- function(
             ggplot(normed$norm_data,aes(x=sample,y=log2_fold_norm_count)) + 
             geom_point() + 
             facet_wrap(~ gene, drop=F) + 
-            ylab(ifelse(normed$is_differential,"log2 fold change","log2 normalized count")) +
+            ylab(ifelse(normed$is_differential,"log2 fold change",paste0("log2 ",normed$norm_count_name))) +
             xlab("") +
             theme_bw() +
             theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5))
@@ -360,7 +355,8 @@ shiny_mpat <- function(
             widths=c(2,10),
             well=FALSE,
             tabPanel("Select",
-                selectInput("normalizing_gene","Normalizing gene",choices=possible_normalizers,selected=normalizing_gene),
+                selectInput("normalizing_gene","Normalizing gene(s)",choices=genes,selected=normalizing_gene,multiple=TRUE),
+                p("If multiple genes are selected, the geometric mean will be used."),
                 br(),
                 
                 selectInput("genes","Genes to display",choices=genes,selected=genes,multiple=TRUE,width="100%"),
@@ -460,13 +456,15 @@ shiny_mpat <- function(
              selected_genes <- input$genes
              highlight_low <- input$highlight_low
                           
-             if (normalizing_gene == "None") {
+             if (length(normalizing_gene) == 0) {
                  norm_count_name = "Count"
                  normalizer <- tibble(sample=factor(samples,samples), normalizer=1)
              } else {
                  norm_count_name = "Normalized count"
                  normalizer <- raw_data %>%
-                     filter_(~ gene == normalizing_gene) %>%
+                     filter_(~ gene %in% normalizing_gene) %>%
+                     group_by_(~ sample) %>%
+                     summarize_(count =~ exp(mean(log(count)))) %>%
                      mutate_(normalizer =~ count / mean(count)) %>%
                      select_(~sample, ~normalizer)
              }
