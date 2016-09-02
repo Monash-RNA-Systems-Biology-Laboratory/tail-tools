@@ -414,7 +414,7 @@ shiny_mpat <- function(
                     column(6,
                         checkboxInput("tail_tail", "Only show reads with poly(A) tail", value=TRUE),
                         checkboxInput("tail_percent", "Show as percent within each sample", value=TRUE),
-                        checkboxInput("tail_log", "log2 transform", value=FALSE)),
+                        checkboxInput("tail_log", "Log scale", value=FALSE)),
                     column(6, conditionalPanel("input.tail_tail",
                         numericInput("tail_min", "Minimum tail length to include in plots", 4)))),
                 if (have_bams) br(),
@@ -574,7 +574,7 @@ shiny_mpat <- function(
                 if (env$input$tail_percent) {
                     normalizer <- read_info %>% group_by(sample) %>% summarize(normalizer=sum(n))
                     describer <- "Percent reads"
-                    labeller <- scales::percent
+                    labeller <- function(x) paste0(sapply(x*100,scales::comma),"%")
                 } else {
                     normalizer <- env$normed()$normalizer
                     describer <- if (env$input$normalizing_gene == "None") "Count" else "Normalized count"
@@ -604,10 +604,13 @@ shiny_mpat <- function(
                 
                 transformer <- identity
                 if (env$input$tail_log) {
-                    transformer <- log2
-                    if (env$input$tail_percent) describer <- "Proportion of reads"
-                    describer <- paste("log2", describer)
-                    labeller <- waiver()
+                    #transformer <- log2
+                    #if (env$input$tail_percent) describer <- "Proportion of reads"
+                    #describer <- paste("log2", describer)
+                    #labeller <- waiver()
+                    transformer <- log10
+                    old_labeller <- labeller
+                    labeller <- function(x) old_labeller(10**x)
                 }
                 
                 list(
