@@ -575,7 +575,7 @@ shiny_mpat <- function(
                     labeller <- function(x) paste0(sapply(x*100,scales::comma),"%")
                 } else {
                     normalizer <- env$normed()$normalizer
-                    describer <- if (env$input$normalizing_gene == "None") "Count" else "Normalized count"
+                    describer <- if (length(env$input$normalizing_gene) == 0) "Count" else "Normalized count"
                     labeller <- waiver()
                 }
                 
