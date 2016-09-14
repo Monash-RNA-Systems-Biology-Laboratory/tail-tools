@@ -6,8 +6,10 @@
 #'
 #' @param species Species for tail heatmap. Currently supports Human ("Hs"), Saccharomyces cerevisiae ("Sc"), Caenorhabditis elegans ("Ce"), Mus musculus ("Mm")
 #'
+#' @param title Title for report.
+#'
 #' @export
-shiny_tailtools_report <- function(path, species=NULL) {
+shiny_tailtools_report <- function(path, species=NULL, title="Tail Tools report") {
     dat <- read.grouped.table(paste0(path,"/expression/genewise/counts.csv"))
 
     varistran_app <- shiny_report(
@@ -31,6 +33,6 @@ shiny_tailtools_report <- function(path, species=NULL) {
         heatmap_app$component_server(env)
     }
     
-    composable_shiny_panels_app(panels, server)
+    composable_shiny_panels_app(panels, server, title=title)
 }
 
