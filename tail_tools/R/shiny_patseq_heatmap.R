@@ -119,7 +119,7 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
             shiny::textOutput(p("goerror")),
             DT::dataTableOutput(p("gotab")),
             
-            shiny::p("Selected genes are compared to remaining gene in heatmap. Significance testing is by hypergeometric test (Fisher's Exact Test), no correction for multiple testing."),
+            shiny::p("Selected genes are compared to remaining gene in heatmap. Significance testing is by hypergeometric test (Fisher's Exact Test), no correction for multiple testing.")
             #shiny::tableOutput("tabout"))
         )
     )
