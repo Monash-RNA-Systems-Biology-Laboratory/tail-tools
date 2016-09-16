@@ -88,17 +88,17 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
                 lib <- org.Mm.eg.db
             }
             
-            colkp <- c("SYMBOL", "GENENAME", "ENTREZID")
+            colkp <- c("GENENAME", "ENTREZID")
             remrows <- rownames(allrows[-which(rownames(selrows) %in% rownames(allrows)),])
             selrowsname <- rownames(selrows)
             unisel <- select(lib, keys=remrows, columns=colkp, keytype="ENSEMBL")
             intsel <- select(lib, keys=selrowsname, columns=colkp, keytype="ENSEMBL")
             #Deduplicate rows
-            unisel <- unisel[-which(duplicated(unisel$ENTREZID)),]
-            intsel <- intsel[-which(duplicated(intsel$ENTREZID)),]
+            unisel <- unisel[!duplicated(unisel$ENTREZID),]
+            intsel <- intsel[!duplicated(intsel$ENTREZID),]
             #Remove rows where ETREZID is NA
-            unisel <- unisel[-which(is.na(unisel$ENTREZID)),]
-            intsel <- intsel[-which(is.na(intsel$ENTREZID)),]
+            unisel <- unisel[!is.na(unisel$ENTREZID),]
+            intsel <- intsel[!is.na(intsel$ENTREZID),]
             
             if(otype(env) == 1){
                 ot = "BP"
@@ -115,8 +115,8 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
             hg.pv <- pvalues(hg)
             hgadjpv <- p.adjust(hg.pv,'fdr')
             sigGOID <- names(hgadjpv[hgadjpv < gc])
-            df <- summary(hg)   
-            df <- summary(hg)
+            df <- GOstats::summary(hg)   
+            #df <- summary(hg)
             df[,3:4] <- format(signif(df[,3:4], digits=6), format="fg")
             df$Pvalue <- format(df$Pvalue, scientific=T)
             return(df)
@@ -145,16 +145,17 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
         })
         
         # Data table output with selected rows
-        output[[p("datab")]] <- DT::renderDataTable(calcdt(), 
-                                                    server=F,
-                                                    extensions = 'TableTools',
-                                                    options = list(searchHighlight = TRUE,
-                                                                   dom = 'T<"clear">lfrtip',
-                                                                       tableTools = list(
-                                                                           sSwfPath = DT::copySWF(),
-                                                                           aButtons = list('print'))
-                                                                   )
-                                                    
+        output[[p("datab")]] <- DT::renderDataTable(
+            calcdt(), 
+            server=F #,
+            #extensions = 'TableTools',
+            #options = list(searchHighlight = TRUE,
+            #               dom = 'T<"clear">lfrtip',
+            #                   tableTools = list(
+            #                       sSwfPath = DT::copySWF(),
+            #                       aButtons = list('print'))
+            #                                                       )
+            #                                        
         )
 
         # Produces plot output

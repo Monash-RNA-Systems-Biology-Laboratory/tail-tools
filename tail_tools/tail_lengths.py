@@ -2,7 +2,8 @@
 import itertools, collections, math, os.path
 
 import nesoni
-from nesoni import annotation, sam, span_index, config, working_directory, workspace, io, runr, reporting, selection, legion
+from nesoni import annotation, sam, span_index, config, grace, working_directory, workspace, io, runr, reporting, selection, legion
+from . import web
 
 import cPickle as pickle
 
@@ -192,14 +193,15 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
         names = [ ]
         sample_tags = [ ]
         
-        #TODO: store max_length separately, avoid loading twice
+        old = grace.status("Loading pickles")
         
         max_length = 1
         for i, item in enumerate(self.pickles):
+            grace.status("Loading "+os.path.basename(item))
             f = io.open_possibly_compressed_file(item)
             name, tags, datum = pickle.load(f)
             f.close()
-            #data.append(datum)
+            data.append(datum)
             names.append(name)
             sample_tags.append(tags)
             
@@ -214,24 +216,26 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
             
             if i == 0:
                annotations = datum
-               for item in annotations:
-                   del item.hits
+               #for item in annotations:
+               #    del item.hits
         
-        del datum
+            del datum
+        
+        grace.status(old)
         
         self.log.log("Maximum tail length %d\n" % max_length)
 
-        data = [ ]                    
-        for i, item in enumerate(self.pickles):
-            f = io.open_possibly_compressed_file(item)
-            name, tags, sample = pickle.load(f)
-            f.close()
-            data.append(sample)            
+        #data = [ ]                    
+        for i in xrange(len(names)): #, item in enumerate(self.pickles):
+            #f = io.open_possibly_compressed_file(item)
+            #name, tags, sample = pickle.load(f)
+            #f.close()
+            #data.append(sample)            
             
             n_alignments = 0
             n_duplicates = 0
             n_good = 0
-            for feature in sample:
+            for feature in data[i]:
                 feature.total_count = 0.0
                 feature.tail_counts = [ 0.0 ] * max_length
                 
@@ -1115,6 +1119,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         r = reporting.Reporter(work/'report', 
             self.title,
             file_prefix,
+            style=web.style(),
             )         
         
         saturation = self.saturation

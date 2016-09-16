@@ -241,9 +241,9 @@ plot_patseq_heatmap <- function(
     #Text Labels
     lab1 <- textGrob("Mean tail length")
     lab2 <- textGrob("Expression")
-    lab3 <- textGrob("Gene Name")
-    lab4 <- textGrob("Row Name")
-    lab5 <- textGrob("Product Name")
+    lab3 <- textGrob("Gene")
+    lab4 <- textGrob("ID")
+    lab5 <- textGrob("Product")
     lab6 <- textGrob("Chr")
     
     if(cluster_samples==FALSE){

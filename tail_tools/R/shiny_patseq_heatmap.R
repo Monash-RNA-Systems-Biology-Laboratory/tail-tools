@@ -56,8 +56,8 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
         rorder = function(env) {
             env[[p("grob")]]()$info$row_order$order
         },
-        width=1250,
-        height=900,
+        width=1000,
+        height=700,
         dlname="heatmap",
         prefix=p("plot_"),
         goenabl=GOenable,
@@ -74,58 +74,54 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
     )
     
     # Shiny's UI layout 
-    ui <- shiny::tags$div(
-        shiny::titlePanel("Tail heatmap"),
-        shiny::tabsetPanel(
-            shiny::tabPanel("Options",
-                            shiny::fluidRow(
-                                shiny::column(3,
-                                              shiny::p("Features are selected based on span of:"),
-                                              shiny::radioButtons(p("selFeat"), 
-                                                                  label="Select features by:", 
-                                                                  choices=list("Tail length"=1, "Expression"=2), 
-                                                                  selected=1,
-                                                                  inline=TRUE),
-                                              shiny::uiOutput(p("chrs"))
-                                ),
-                                shiny::column(3,
-                                              shiny::numericInput(p("n"), "Number of features to show", 50, min=10,max=2000,step=10),
-                                              shiny::numericInput(p("nmin"), "Trim Tail Counts below value to NA", 50, min=0,max=1000,step=1),
-                                              shiny::numericInput(p("expmin"), "Exclude genes with expression counts below: ", 0, min=0,max=1500,step=1),
-                                              shiny::radioButtons(p("roword"), 
-                                                                  label="Features ordered by: ", 
-                                                                  choices=list("Tail Length"=1, "Expression"=2, "Group by location"=3), 
-                                                                  selected=1,
-                                                                  inline=TRUE),
-                                              shiny::radioButtons(p("clusterby"), 
-                                                                  label="Order samples by: ", 
-                                                                  choices=list("Tail length" = 2, "Expression" = 3, "Manually order from select columns" = 1), 
-                                                                  selected = 1,
-                                                                  inline=TRUE)
-                                ),
-                                shiny::column(3,
-                                              shiny::uiOutput(p("selCol"))
-                                              #shinyURL::shinyURL.ui()
-                                )
-                                
-                            )),
-            shiny::tabPanel("Plot",plot$component_ui),
-            shiny::tabPanel("GO analysis of selection",
-                            shiny::fluidRow(
-                                shiny::column(3, shiny::numericInput(p("fdrcutoff"), "Hyper geometric test cutoff", 0.05, min=0.0001, max=1, step=0.01)),
-                                shiny::column(3, shiny::radioButtons(p("ontype"), label="Ontology search type",
-                                                                     choices=list("Biological Processes"=1, "Cellular Component"=2,"Molecular Function"=3),
-                                                                     selected=1,
-                                                                     inline=TRUE)),
-                                shiny::column(3, shiny::tags$label("Download analysis as .csv"), shiny::tags$br(),
-                                              shiny::downloadButton(p("dlanalysis"), ".csv"))
-                            ),
-                            shiny::textOutput(p("goerror")),
-                            DT::dataTableOutput(p("gotab")))
-                            #shiny::tableOutput("tabout"))
+    panels <- list(
+        shiny::tabPanel("Options",
+            shiny::h2("Features"),
+            shiny::radioButtons(p("selFeat"), 
+                                label="Show features with greatest span of:", 
+                                choices=list("Tail length"=1, "Expression"=2), 
+                                selected=1,
+                                inline=TRUE),
+            shiny::radioButtons(p("roword"), 
+                                label="Features ordered by: ", 
+                                choices=list("Tail Length"=1, "Expression"=2, "Chromosomal location"=3), 
+                                selected=1,
+                                inline=TRUE),
+            shiny::numericInput(p("n"), "Number of features to show", 50, min=10,max=2000,step=10),
+            shiny::br(),
+            
+            shiny::h2("Samples"),
+            shiny::uiOutput(p("selCol")),
+            shiny::radioButtons(p("clusterby"), 
+                                label="Order samples by: ", 
+                                choices=list("Tail length" = 2, "Expression" = 3, "Retain existing order" = 1), 
+                                selected = 1,
+                                inline=TRUE),
+            shiny::br(),
+            
+            shiny::h2("Options"),
+            shiny::numericInput(p("nmin"), "Trim Tail Counts below value to NA", 50, min=0,max=1000,step=1),
+            shiny::numericInput(p("expmin"), "Exclude genes with expression counts below: ", 0, min=0,max=1500,step=1),
+            shiny::uiOutput(p("chrs"))
+            #shinyURL::shinyURL.ui()
         ),
-        parenthetically("This plot is produced by tailtools::shiny_patseq_heatmap.")
-        
+        shiny::tabPanel("Plot",plot$component_ui),
+        shiny::tabPanel("GO analysis of selection",
+            shiny::fluidRow(
+                shiny::column(3, shiny::numericInput(p("fdrcutoff"), "p value cutoff", 0.05, min=0.0001, max=1, step=0.01)),
+                shiny::column(3, shiny::radioButtons(p("ontype"), label="Ontology search type",
+                                                     choices=list("Biological Processes"=1, "Cellular Component"=2,"Molecular Function"=3),
+                                                     selected=1,
+                                                     inline=FALSE)),
+                shiny::column(3, shiny::tags$label("Download analysis as .csv"), shiny::tags$br(),
+                              shiny::downloadButton(p("dlanalysis"), ".csv"))
+            ),
+            shiny::textOutput(p("goerror")),
+            DT::dataTableOutput(p("gotab")),
+            
+            shiny::p("Selected genes are compared to remaining gene in heatmap. Significance testing is by hypergeometric test (Fisher's Exact Test), no correction for multiple testing."),
+            #shiny::tableOutput("tabout"))
+        )
     )
     
     # Shiny's server
@@ -250,11 +246,11 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
         # RenderUI output for shiny, dynamically generate two selctize elements ---
         env$output[[p("chrs")]] <- shiny::renderUI({
             tmpvec <- levels(datfr$Annotation$chromosome)
-            selectizeInput("choosechr", "Choose chromosomes to display",multiple=T,tmpvec, selected=tmpvec)
+            selectizeInput("choosechr", "Choose chromosomes to display",multiple=T,tmpvec, selected=tmpvec, width="100%")
         })
         env$output[[p("selCol")]] <- shiny::renderUI({
             colvec <- names(datfr$Tail)
-            selectizeInput("choosecol", "Choose samples to display",multiple=T,colvec, selected=colvec)
+            selectizeInput("choosecol", "Choose samples to display",multiple=T,colvec, selected=colvec, width="100%")
         })
         #---
         
@@ -278,14 +274,14 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
         plot$component_server(env)
         if(GOenable == TRUE){
             env$output[[p("gotab")]] <- DT::renderDataTable(env$gotab(), 
-                                        server=F,
-                                        extensions = 'TableTools',
-                                        options = list(searchHighlight = TRUE,
-                                                       dom = 'T<"clear">lfrtip',
-                                                       tableTools = list(
-                                                           sSwfPath = DT::copySWF(),
-                                                           aButtons = list('print'))
-                                        )
+                server=F
+                #extensions = 'TableTools',
+                #options = list(searchHighlight = TRUE,
+                #               dom = 'T<"clear">lfrtip',
+                #               tableTools = list(
+                #                   sSwfPath = DT::copySWF(),
+                #                   aButtons = list('print'))
+                #)
             )
         } else {
             env$output[[p("goerror")]] <- shiny::renderText({
@@ -300,5 +296,9 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
             }
         )
     }
-    composable_shiny_app(ui, server)
+
+    composable_shiny_panels_app(panels, server, title="Tail heatmap")
 }
+
+
+

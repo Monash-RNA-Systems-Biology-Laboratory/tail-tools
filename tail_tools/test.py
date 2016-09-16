@@ -4,6 +4,7 @@ import os
 from os.path import join
 
 from nesoni import config, runr, io, selection, reporting
+from . import web
 
 
 TEST_R = r"""
@@ -532,7 +533,7 @@ class Test(config.Action_with_output_dir):
            )
        if self.tell: return
        
-       reporter = reporting.Reporter(workspace.working_dir, title)
+       reporter = reporting.Reporter(workspace.working_dir, title, style=web.style())
        
        if self.dedup:
            reporter.p('Read deduplication was used.')

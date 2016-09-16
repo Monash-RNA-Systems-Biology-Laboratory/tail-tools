@@ -187,29 +187,25 @@ to your data:
 import tail_tools, nesoni, glob
 
 tags = [
-    ('logRep1',         ['BY',   'rep1']),
-    ('logRep2',         ['BY',   'rep2']),
-    ('deltaccr4logRep1',['ccr4', 'rep1']),
-    ('deltaccr4logRep2',['ccr4', 'rep2']),
-    ('deltaccr4logRep3',['ccr4', 'rep3']),
-    ('YPEGRep1',        ['ypeg', 'rep1']),
-    ('YPEGRep2',        ['ypeg', 'rep2']),
-    ('GALRep1',         ['gal',  'rep1']),
-    ('GALRep2',         ['gal',  'rep2']),
-    ('GLU10Rep1',       ['glu10','rep1']),
-    ('GLU10Rep2',       ['glu10','rep2']),
-    ('GLU20Rep1',       ['glu20','rep1']),
-    ('GLU20Rep2',       ['glu20','rep2']),
+    ('wt1',   ['wt','rep1']),
+    ('wt2',   ['wt','rep2']),
+    ('wt3',   ['wt','rep3']),
+    ('mutA1', ['mutA','rep1']),
+    ('mutA2', ['mutA','rep2']),
+    ('mutA3', ['mutA','rep3']),
+    ('mutB1', ['mutB','rep1']),
+    ('mutB2', ['mutB','rep2']),
+    ('mutB3', ['mutB','rep3']),
 ]
 
-filename_pattern = 'mydata/Sample_scBY4741%s/*.fastq.gz'
+# Where to find FASTQ files. %s becomes the name of the sample. Wildcards * and ? may be used.
+filename_pattern = 'raw_data/%s.fastq.gz'
 
 # For each sample we create a tail_tools.Analyse_polya instance
 # Each sample is given a set of tags
 samples = [ ]
 for name, tags in tags:
-    reads = sorted(glob.glob(filename_pattern % name))
-    
+    reads = sorted(glob.glob(filename_pattern % name))    
     assert reads, 'No reads for '+name
     
     samples.append(tail_tools.Analyse_polya(
@@ -226,16 +222,13 @@ for name, tags in tags:
 
 action = tail_tools.Analyse_polya_batch(
         # Output directory
-        'yeast-june-2013',
+        'pipeline',
         
         # Title for report
-        title = 'Yeast June 2013',
-        
-        # Files in report will have this prefix
-        file_prefix = 'yeast-june-2013',
+        title = 'Pipeline output',
         
         # Reference directory you created earlier
-        reference = 'sacCer3',
+        reference = '/path/to/reference/directories/S_cerevisiae_82',
         
         # Allow reads/peaks this far downstrand of 
         # the annotated transcript end point
@@ -243,10 +236,8 @@ action = tail_tools.Analyse_polya_batch(
         # For sparser genomes than yeast, perhaps use 2000
         extension = 400,
         
-        # Whether to include .genome file for IGV in plots tarball
-        # Not necessary for model organisms where IGV 
-        # already provides the genome.
-        include_genome = False,
+        # Optional: Species to use in GO term analysis, choices are: Sc Ce Mm Hs
+        species="Sc",
                 
         # List of instances of tail_tools.Analyse_polya
         samples = samples,
@@ -258,16 +249,16 @@ action = tail_tools.Analyse_polya_batch(
         # See nesoni help for description of selection expressions,
         # this uses the tags given to each sample to concisely 
         # specify sets of samples.
-        groups = [ 'BY', 'ccr4', 'ypeg', 'gal', 'glu10' ],
+        groups = [ 'wt', 'mutA', 'mutB' ],
         
         # (Advanced)
         # Perform differential tests
         tests = [
             tail_tools.Test(
-                'BY-ccr4',
-                title='BY vs ccr4',
-                null=['BY/ccr4'],
-                alt=['ccr4'],
+                'mutA-wt',
+                title = 'Mutant A vs wildtype',
+                null  = ['wt/mutA'],
+                alt   = ['mutA'],
                 ),
             #etc
             ],

@@ -1,6 +1,16 @@
 
-body { font-family: sans-serif; }
+body { font-family: sans-serif; margin-left: 5em; margin-right: 5em; margin-bottom: 5em; }
 
-input { width: 30em; background: #eeffee; margin: 0.5em; }
+input[type=text] { width: 30em; background: #eeffee; margin: 0.5em; }
 
 div.result { margin: 0.5em; border: solid 1px black; padding: 0.5em; }
+
+img { vertical-align: middle; }
+
+a { text-decoration: none; }
+
+h1,h2,h3,h4,h5,h6 { margin-top: 1em; color: #aa0088; }
+
+td,th { padding: 0.5em; text-align: left; }
+
+th { vertical-align: bottom; }

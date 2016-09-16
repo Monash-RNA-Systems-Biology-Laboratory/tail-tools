@@ -21,11 +21,9 @@ shiny_tailtools_report <- function(path, species=NULL, title="Tail Tools report"
     
     panels <- c(
         list("Varistran"),
-        varistran_app$component_panels, 
-        list(
-            "Tail tools",
-            tabPanel("Tail heatmap", heatmap_app$component_ui)
-        )
+        varistran_app$component_panels,
+        list("Tail heatmap"),
+        heatmap_app$component_panels 
     )
     
     server <- function(env) {
