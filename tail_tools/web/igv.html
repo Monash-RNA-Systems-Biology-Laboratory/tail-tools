@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<style>
+INCLUDE style.css
+</style>
+
+<title>
+DATA TITLE
+</title>
+<h1>
+DATA TITLE
+</h1>
+
+<form>
+<table>
+  <tr>
+    <td valign="top" style="padding-right: 4em">
+      <h2>Which samples</h2>
+      <p>
+      <input type="checkbox" checked id="total"> Total
+      <p>
+      <button type="button" onclick="set_all(true)">All</button> 
+      <button type="button" onclick="set_all(false)">None</button>
+      <div id="samples">
+      </div>
+    </td>
+    <td valign="top">
+      <h2>What to show in IGV</h2>
+      
+      <p>
+      <input type="checkbox" id="peaks"> Peaks called by Tail Tools
+
+      <p>
+      <input type="checkbox" checked id="ambiguity"> Ambiguity due to multi-mapping reads
+      
+      <p>
+      <input type="checkbox" id="bam"> BAM files (all reads)
+      <br>
+      <input type="checkbox" checked id="all"> Plots using all reads
+      <br>
+      <input type="checkbox" id="polya"> Plots using reads with poly(A) tail
+      
+      <div id="plots_options">
+        <p>
+        <input type="checkbox" checked id="span"> Whole read
+        <br>
+        <input type="checkbox" id="3p"> 3' end
+        
+        <p id="norm_section">
+        <input type="checkbox" checked id="raw"> Raw depth
+        <br>
+        <input type="checkbox" id="norm"> Depth normalized between samples
+        
+        <p>
+        <input type="checkbox" checked id="fwd"> Forward strand
+        <br>
+        <input type="checkbox" checked id="rev"> Reverse strand
+        </div>
+        
+        <p>
+        <br>
+        <a id="igv_link" style="font-size: 200%" href="">&rarr; load into IGV</a>
+        
+        <p>
+        <b>Direct links to files to be loaded:</b>
+        <div id="file_links">
+      </div>
+    </td>
+  </tr>
+</table>
+
+</form>
+
+
+<p>
+Instructions:
+
+<ol>
+  <li>
+    Download and run the <a href="http://software.broadinstitute.org/software/igv/download">Integrative Genomics Viewer</a>
+  </li>
+  <li>
+    In View/Preferences/Advanced, ensure "Enable port 60151" is ticked.
+  </li>
+  <li>
+    Load the correct genome for this data set.
+  </li>
+  <li>
+    Click the "load into IGV" link above.
+  </li>
+</ol>
+
+<p>
+IGV tips:
+
+<ul>
+  <li>In View/Preferences/Charts, enable "Continuous Autoscale" and "Show All Features".
+  <li>Track and chart names can be multi-selected using shift-click and ctrl-click.
+  <li>For quantitative comparisons between samples, right-click the chart name and "Set Data Range".
+  <li>Feature tracks are loaded "Collapsed", with features piled on top of each other. Right-click and select "Expanded" to see all features. This is especially important when viewing peaks called by Tail Tools.
+</ul>
+
+
+<script type="text/javascript">
+INCLUDE third_party/jquery.min.js
+
+function is_checked(id) { 
+    return $("#"+id).prop("checked"); 
+}
+
+function refresh() {
+    if (is_checked("all") || is_checked("polya"))
+        $("#plots_options").show();
+    else
+        $("#plots_options").hide();
+
+    var base = window.location.href.substring(0,window.location.href.lastIndexOf("/")+1);
+    
+    var files = [ ];
+    var names = [ ];
+
+    if (is_checked("peaks")) {
+        files.push(base+"peaks.gff")
+        names.push("peaks")
+    }
+    
+    if (is_checked("ambiguity")) {
+        files.push(base+"ambiguity.bw");
+        names.push("ambiguity");
+    }
+    
+    if (is_checked("bam")) {
+        $.each(samples, function(i,sample) {
+            if (!is_checked(i)) return;
+            
+            files.push(base+samples[i]+".bam")
+            names.push(samples[i]+".bam")
+        });
+    }
+    
+    ["span","3p"].forEach(function(region) {
+        if (!is_checked(region)) return;
+        var region_name = {"span" : "", "3p": " 3'"}[region];
+        
+        ["all","polya"].forEach(function(subset) {
+            if (!is_checked(subset)) return;
+            var subset_name = {"all":"", "polya":" poly(A)"}[subset];
+            
+            ["raw","norm"].forEach(function(normalization) {
+                if (!is_checked(normalization)) return;
+                var normalization_name = {"raw":"", "norm":" norm"}[normalization];
+                
+                ["fwd","rev"].forEach(function(direction) {
+                    if (!is_checked(direction)) return;                    
+                    if (!is_checked("total")) return;
+                    var direction_name = {"fwd":"->","rev":"<-"}[direction];
+                    
+                    files.push(base+"total-"+subset+"-"+region+"-"+direction+".bw")
+                    names.push(direction_name+" total"+subset_name+normalization_name+region_name)
+                });
+            
+                ["fwd","rev"].forEach(function(direction) {
+                    if (!is_checked(direction)) return;
+                    var direction_name = {"fwd":"->","rev":"<-"}[direction];
+                    
+                    $.each(samples, function(i,sample) {
+                        if (!is_checked(i)) return;
+                        
+                        files.push(base+samples[i]+"-"+subset+"-"+normalization+"-"+region+"-"+direction+".bw")
+                        names.push(direction_name+" "+samples[i]+subset_name+normalization_name+region_name)
+                    });
+                });    
+            });    
+        });
+    });
+    
+    var url = "http://localhost:60151/load?" + 
+        "file=" + encodeURIComponent(files.join(",")) +
+        "&name=" +  encodeURIComponent(names.join(","));
+
+    $("#igv_link").attr("href",url);
+    
+    var file_links = $("#file_links");
+    file_links.empty()
+    for(var i=0;i<files.length;i++) {
+        file_links.append($("<a>",{href:files[i],text:names[i]}));
+        file_links.append($("<br>"));
+    }
+}
+
+
+function set_all(state) {
+    $.each(samples, function(i, sample) {
+        $("#"+i).prop("checked",state);
+    });
+    refresh();
+}
+
+
+
+var samples =
+DATA SAMPLES
+;
+
+var have_norm =
+DATA HAVE_NORM
+;
+
+if (!have_norm) $("#norm_section").hide();
+
+var samples_div = $("#samples");
+
+$.each(samples, function(i,sample) {
+    var item = $("<div>");
+    item.append($("<input>",{type:"checkbox", id:i}));
+    item.append($("<span>",{text:" "+sample}));
+    samples_div.append(item);
+});
+
+$("input").each(function() {
+    $(this).attr("onchange", "refresh()");
+})
+
+
+refresh();
+
+</script>
