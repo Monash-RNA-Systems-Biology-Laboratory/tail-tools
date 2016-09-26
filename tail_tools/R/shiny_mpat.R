@@ -576,7 +576,7 @@ shiny_mpat <- function(
                 } else {
                     normalizer <- env$normed()$normalizer
                     describer <- if (length(env$input$normalizing_gene) == 0) "Count" else "Normalized count"
-                    labeller <- waiver()
+                    labeller <- function(x) sapply(x,scales::comma)
                 }
                 
                 samples_called <- "Sample"
