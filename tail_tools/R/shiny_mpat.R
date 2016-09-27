@@ -138,7 +138,11 @@ shiny_mpat <- function(
                   c("sample","gene")) %>%
         left_join(meltdown(tables$Tail_count, "sample", "gene", "tail_count"), 
                   c("sample","gene"))
-        
+    
+    
+    normalizers <- c("Reads Per Million", genes)    
+    
+    
     have_plotters <- !is.null(plot_count) | !is.null(plot_tail)
     if (is.null(plot_count)) plot_count <- default_plot_count
     if (is.null(plot_tail)) plot_tail <- default_plot_tail
@@ -355,7 +359,7 @@ shiny_mpat <- function(
             widths=c(2,10),
             well=FALSE,
             tabPanel("Select",
-                selectInput("normalizing_gene","Normalizing gene(s)",choices=genes,selected=normalizing_gene,multiple=TRUE),
+                selectInput("normalizing_gene","Normalize to",choices=normalizers,selected=normalizing_gene,multiple=TRUE),
                 p("If multiple genes are selected, the geometric mean will be used."),
                 br(),
                 
@@ -459,7 +463,17 @@ shiny_mpat <- function(
              if (length(normalizing_gene) == 0) {
                  norm_count_name = "Count"
                  normalizer <- tibble(sample=factor(samples,samples), normalizer=1)
+             
+             } else if (identical(normalizing_gene, "Reads Per Million")) {
+                 norm_count_name = "RPM"
+                 normalizer <- raw_data %>%
+                     group_by_(~sample) %>%
+                     summarize_(normalizer =~ sum(count)/1000000)
+                     
              } else {
+                 if ("Reads Per Million" %in% normalizing_gene)
+                     stop("Can't mix RPM and normalizing genes.")
+             
                  norm_count_name = "Normalized count"
                  normalizer <- raw_data %>%
                      filter_(~ gene %in% normalizing_gene) %>%
