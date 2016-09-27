@@ -496,8 +496,8 @@ shiny_mpat <- function(
              is_differential <- length(env$input$normalizing_samples) > 0
              
              if (is_differential) {
-                 baseline <- norm_counts %>%
-                     select_(~sample %in% env$input$normalizing_samples) %>%
+                 baseline <- norm_data %>%
+                     filter_(~sample %in% env$input$normalizing_samples) %>%
                      group_by_(~gene) %>%
                      summarize_(
                          baseline =~ mean(log2_fold_norm_count),
@@ -589,7 +589,7 @@ shiny_mpat <- function(
                     labeller <- function(x) paste0(sapply(x*100,scales::comma),"%")
                 } else {
                     normalizer <- env$normed()$normalizer
-                    describer <- if (length(env$input$normalizing_gene) == 0) "Count" else "Normalized count"
+                    describer <- if (length(env$input$normalizing_gene) == 0) "Count" else env$normed()$norm_count_name
                     labeller <- function(x) sapply(x,scales::comma)
                 }
                 
