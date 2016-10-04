@@ -381,6 +381,9 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.Int_flag('peak_min_depth', 
     'Number of poly(A) reads ending at nearly the same position required in order to call a peak.'
     )
+@config.Bool_flag('peak_polya', 
+    'Call peaks using poly(A) reads only.'
+    )
 @config.Int_flag('extension', 'How far downstrand of the given annotations a read or peak belonging to a gene might be. However tail-tools (with a recently created reference directory) will not extend over coding sequence.')
 @config.String_flag('types', 'Comma separated list of feature types to use as genes. Default is "gene".')
 @config.String_flag('parts', 'Comma separated list of feature types that make up features. Default is "exon". Alternatively you might use "three_prime_utr" for a stricter definition of where we expect reads or "gene" for a broad definition including introns.')
@@ -417,6 +420,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     extension = 1000
     
     peak_min_depth = 50
+    peak_polya = True
     
     types = "gene"
     parts = "exon"
@@ -522,8 +526,12 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         job_gene_counts = _call(_serial,analyse_gene_counts_0.make,analyse_gene_counts_1.make)
         
         job_peaks = _call(self._run_peaks, 
-            workspace=workspace, expressionspace=expressionspace, reference=reference, 
-            polya_dirs=polya_dirs, analyse_template=analyse_template, file_prefix=file_prefix,
+            workspace=workspace, 
+            expressionspace=expressionspace, 
+            reference=reference, 
+            dirs = polya_dirs if self.peak_polya else dirs,
+            analyse_template = analyse_template,
+            file_prefix=file_prefix,
             )
         
         job_norm = nesoni.Norm_from_samples(
@@ -802,7 +810,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.close()
 
 
-    def _run_peaks(self, workspace, expressionspace, reference, polya_dirs, analyse_template, file_prefix):
+    def _run_peaks(self, workspace, expressionspace, reference, dirs, analyse_template, file_prefix):
         shiftspace = io.Workspace(workspace/'peak-shift')
         shiftspace_dedup = io.Workspace(workspace/'peak-shift-dedup')
 
@@ -811,7 +819,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             annotations = reference/'reference.gff',
             extension = self.extension,
             min_depth = self.peak_min_depth,
-            polyas = polya_dirs,
+            polyas = dirs,
             ).make()
 
         peak_template = analyse_template(

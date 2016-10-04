@@ -7,6 +7,7 @@
        Bugfixes to plot-comparison, plot-pooled.
        make-ensembl-reference skips genes with transcripts on inconsistent strands.
        Control of clipping in pipeline.
+       peak-polya option in pipeline.
 
 0.42 - When extended, don't extend over another exon on the same strand 
        (previously: another CDS on the same strand).
