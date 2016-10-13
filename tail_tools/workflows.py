@@ -464,7 +464,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         workspace = io.Workspace(self.output_dir, must_exist=False)
         samplespace = io.Workspace(workspace/'samples', must_exist=False)
-        plotspace = io.Workspace(workspace/'plots', must_exist=False)
+        #plotspace = io.Workspace(workspace/'plots', must_exist=False)
         expressionspace = io.Workspace(workspace/'expression', must_exist=False)
         testspace = io.Workspace(workspace/'test', must_exist=False)
         testspace_dedup = io.Workspace(workspace/'test-dedup', must_exist=False)
