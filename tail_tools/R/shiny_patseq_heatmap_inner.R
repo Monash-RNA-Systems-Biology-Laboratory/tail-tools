@@ -23,10 +23,11 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
     otype <- ensure_reactable(otype)
     #gosrch <- ensure_reactable(gosrch)
     
-    p <- function(name) paste0(prefix,name)
+    p <- NS(prefix)
     
     # Shiny's UI layout
-    ui <- shiny::tags$div(
+    ui <- function(request)
+      shiny::tags$div(
         shiny::fluidRow(
             shiny::column(3, shiny::numericInput(p("width"), "Plot width", width, min=100, max=10000, step=50)),
             shiny::column(3, shiny::numericInput(p("height"), "Plot height", height, min=100, max=10000, step=50)),
@@ -38,7 +39,7 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
         ),
         shiny::uiOutput(p("plotui"), width="auto", height="auto"),
         DT::dataTableOutput(p('datab'))
-    )
+      )
     
     # Shiny's server 
     server <- function(env) { 
@@ -49,10 +50,9 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
         
         # Renders plot and enables a brush object
         output[[p("plotui")]] <- shiny::renderUI({
-            
             shiny::plotOutput(p("plot"),
                               brush = brushOpts(
-                                  id ="plot_brush",  
+                                  id =p("plot_brush"),  
                                   direction = 'y',
                                   resetOnNew = T,
                                   clip=T
@@ -122,9 +122,9 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
             return(df)
         })
         if(goenabl){
-            env$gotab <- gosrch
+            env[[p("gotab")]] <- gosrch
         } else {
-            env$gotab <- data.frame()
+            env[[p("gotab")]] <- data.frame()
         }
         
         # Works out if any rows are selected and returns selected rows
@@ -133,8 +133,8 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
         calcdt <- reactive({
             numrows <- nrow(selin(env))
             
-            ytop <- round((env$input$plot_brush$ymax + 2)/(54/numrows))
-            ybot <- round((env$input$plot_brush$ymin + 2)/(54/numrows)+1)
+            ytop <- round((env$input[[p("plot_brush")]]$ymax + 2)/(54/numrows))
+            ybot <- round((env$input[[p("plot_brush")]]$ymin + 2)/(54/numrows)+1)
             if(length(ytop) == 0){
                 return(selin(env)[rorder(env),])
             } else {
@@ -143,6 +143,9 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
                 return(sel)
             }
         })
+                
+        # Means to extract selected rows
+        env[[p("rows-selected")]] <- reactive({ rownames(calcdt()) })
         
         # Data table output with selected rows
         output[[p("datab")]] <- DT::renderDataTable(
@@ -159,7 +162,7 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
         )
 
         # Produces plot output
-        output[[p("plot")]] <- shiny::renderPlot({ 
+        output[[p("plot")]] <- shiny::renderPlot(withProgress(message="Plotting", { 
             vp <- viewport(layout.pos.row = 1, layout.pos.col = 1)
             plot.new()
             callback(env)
@@ -169,9 +172,8 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
             par(new=T, plt=pltvec)
             plot(1,type="n", axes=F, xlab ="",ylab="",xlim=c(0,50),ylim=c(0,50))
             
-            popViewport()
-            
-        })
+            popViewport()            
+        }))
         
         # Download handlers---
         output[[p("pdf")]] <- shiny::downloadHandler(

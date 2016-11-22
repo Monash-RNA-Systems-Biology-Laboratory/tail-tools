@@ -103,50 +103,46 @@ class Tail_count(config.Action_with_prefix):
                  item.start -= this_extension
          
          for item in annotations:    
-             item.hits = [] # [ (rel_start, rel_end, tail_length) ]
+             item.hits = [] # [ (tail_length, adaptor_bases) ]
          
          index = span_index.index_annotations(part_annotations)
          
-         for read_name, fragment_alignments, unmapped in sam.bam_iter_fragments(workspace/'alignments_filtered.bam'):
-             for fragment in fragment_alignments:
-                 start = min(item.pos-1 for item in fragment)
-                 end = max(item.pos+item.length-1 for item in fragment)
-                 alignment_length = end-start
-                 strand = -1 if fragment[0].flag&sam.FLAG_REVERSE else 1
-                 fragment_feature = annotation.Annotation(
-                     seqid=fragment[0].rname,
-                     start=start,
-                     end=end,
-                     strand=strand
-                     )
+         for alignment in sam.Bam_reader(workspace/'alignments_filtered_sorted.bam'):
+             if alignment.is_unmapped or alignment.is_secondary or alignment.is_supplementary:
+                 continue
+        
+             start = alignment.reference_start
+             end = alignment.reference_end
+             alignment_length = end-start
+             strand = -1 if alignment.flag&sam.FLAG_REVERSE else 1
+             fragment_feature = annotation.Annotation(
+                 seqid=alignment.reference_name,
+                 start=start,
+                 end=end,
+                 strand=strand
+                 )
+             
+             if strand >= 0:
+                 tail_pos = end
+             else:
+                 tail_pos = start
+             
+             tail_length = 0
+             adaptor_bases = 0
+             for item in alignment.extra:
+                 if item.startswith('AN:i:'):
+                     tail_length = int(item[5:])
+                 elif item.startswith('AD:i:'):
+                     adaptor_bases = int(item[5:])
+             
+             hits = index.get(fragment_feature, same_strand=True)
+             if hits:
+                 gene = min(hits, key=lambda gene: 
+                     (abs(tail_pos - gene.tail_pos), gene.primary.get_id()))
+                     # Nearest by tail_pos
+                     # failing that, by id to ensure a deterministic choice
                  
-                 if strand >= 0:
-                     tail_pos = end
-                 else:
-                     tail_pos = start
-                 
-                 tail_length = 0
-                 adaptor_bases = 0
-                 for item in fragment[0].extra:
-                     if item.startswith('AN:i:'):
-                         tail_length = int(item[5:])
-                     elif item.startswith('AD:i:'):
-                         adaptor_bases = int(item[5:])
-                 
-                 hits = index.get(fragment_feature, same_strand=True)
-                 if hits:
-                     gene = min(hits, key=lambda gene: (abs(tail_pos - gene.tail_pos), gene.primary.get_id()))
-                         # Nearest by tail_pos
-                         # failing that, by id to ensure a deterministic choice
-                         
-                     if strand > 0:
-                         rel_start = start - gene.start
-                         rel_end = end - gene.start
-                     else:
-                         rel_start = gene.end - end
-                         rel_end = gene.end - start
-                     
-                     gene.primary.hits.append( (rel_start,rel_end,tail_length,adaptor_bases) )
+                 gene.primary.hits.append( (tail_length,adaptor_bases) )
 
          for item in annotations:
              del item.parents
@@ -164,11 +160,6 @@ class Tail_count(config.Action_with_prefix):
 """\
 """
 )
-@config.Int_flag('saturation', 
-     'Duplicate start position saturation level. '
-     'Reads that start at the same position will only '
-     'count as up to this many. Zero for no staturation.'
-     )
 @config.Int_flag('tail',
      'Minimum tail length to count as having a tail.'
      )
@@ -177,7 +168,6 @@ class Tail_count(config.Action_with_prefix):
      )
 @config.Main_section('pickles')
 class Aggregate_tail_counts(config.Action_with_output_dir):             
-    saturation = 0
     tail = 4
     adaptor = 0
     pickles = [ ]
@@ -207,7 +197,7 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
             
             try:
                 max_length = max(max_length, max( 
-                    item[2] #tail_length
+                    item[0] #tail_length
                     for feature in datum
                     for item in feature.hits
                     ) + 1)
@@ -216,52 +206,26 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
             
             if i == 0:
                annotations = datum
-               #for item in annotations:
-               #    del item.hits
-        
-            del datum
         
         grace.status(old)
         
         self.log.log("Maximum tail length %d\n" % max_length)
 
-        #data = [ ]                    
-        for i in xrange(len(names)): #, item in enumerate(self.pickles):
-            #f = io.open_possibly_compressed_file(item)
-            #name, tags, sample = pickle.load(f)
-            #f.close()
-            #data.append(sample)            
-            
+        for i in xrange(len(names)):        
             n_alignments = 0
-            n_duplicates = 0
-            n_good = 0
             for feature in data[i]:
-                feature.total_count = 0.0
-                feature.tail_counts = [ 0.0 ] * max_length
+                feature.total_count = len(feature.hits)
+                feature.tail_counts = [ 0 ] * max_length
                 
-                buckets = collections.defaultdict(list)
-                for item in feature.hits:
-                    rel_start,rel_end,tail_length,adaptor_bases = item
-                    buckets[ (rel_start,rel_end) ].append((tail_length,adaptor_bases))
+                n_alignments += feature.total_count
+                
+                for tail_length, adaptor_bases in feature.hits:
+                    if adaptor_bases >= self.adaptor:
+                        feature.tail_counts[tail_length] += 1
+                
                 del feature.hits
-                
-                for item in buckets.values():
-                    n_alignments += len(item)
-                    n_good += 1
-                    if self.saturation < 1 or len(item) <= self.saturation:
-                        weight = 1.0
-                    else:
-                        weight = float(self.saturation) / len(item)
-                        n_duplicates += len(item)
-                    for tail_length, adaptor_bases in item:
-                        feature.total_count += weight
-                        if adaptor_bases >= self.adaptor:
-                            feature.tail_counts[tail_length] += weight                
 
             self.log.datum(names[i], 'Alignments to features', n_alignments)
-            if self.saturation >= 1:
-                self.log.datum(names[i], 'Proportion of alignments with duplicate start and end position', float(n_duplicates)/max(1,n_alignments))
-                self.log.datum(names[i], 'Alignments to features after deduplication', n_good)
                 
         
         counts = [ ]  # [feature][sample](total_count, [taillength])
@@ -275,22 +239,22 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
         n_features = len(counts)
         n_samples = len(data)
         
-        sample_n = [ [0.0]*n_samples for i in xrange(n_features) ]        # [feature][sample]  Total count
-        sample_n_tail = [ [0.0]*n_samples for i in xrange(n_features) ]   # [feature][sample]  Polya count
+        sample_n = [ [0]*n_samples for i in xrange(n_features) ]        # [feature][sample]  Total count
+        sample_n_tail = [ [0]*n_samples for i in xrange(n_features) ]   # [feature][sample]  Polya count
         sample_prop = [ [None]*n_samples for i in xrange(n_features) ]    # [feature][sample]  Proportion of reads with tail (deprecated)
         sample_tail = [ [None]*n_samples for i in xrange(n_features) ]    # [feature][sample]  Mean tail length in each sample
         sample_sd_tail = [ [None]*n_samples for i in xrange(n_features) ] # [feature][sample]  Std dev tail length in each sample
-        sample_total_tail = [ [0.0]*n_samples for i in xrange(n_features) ]
+        sample_total_tail = [ [0]*n_samples for i in xrange(n_features) ]
         
         sample_quantile_tail = collections.OrderedDict( 
             (item, [ [None]*n_samples for i in xrange(n_features) ]) 
             for item in [25,50,75,100]
             )
         
-        overall_n = [ 0.0 ]*n_features       # [feature]          Overall count
+        overall_n = [ 0 ]*n_features       # [feature]          Overall count
         overall_prop = [ None ]*n_features   # [feature]          Overall proportion with tail
         overall_tail = [ None ]*n_features   # [feature]          Overall mean tail length
-        overall_n_tail = [ 0.0 ]*n_features  # [feature]          Overall polya count
+        overall_n_tail = [ 0 ]*n_features  # [feature]          Overall polya count
         for i, row in enumerate(counts):
             for j, (this_this_n, item) in enumerate(row):
                 sample_n[i][j] = this_this_n
@@ -462,111 +426,6 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
                 yield row
         io.write_csv(work/'pooled.csv', pooled())
 
-
-
-
-#@config.help(
-#    'Create a spreadsheet containing various statistics, using the output of "aggregate-tail-lengths:"',
-#    'The prefix should be the same as that given to "aggregate-tail-lengths:".'
-#)
-#class Tail_stats(config.Action_with_prefix, runr.R_action):
-#    def state_filename(self):
-#        return self.prefix + '_tail_stats.state'
-#
-#    def log_filename(self):
-#        if self.prefix is None: return None
-#        return self.prefix + '_tail_stats_log.txt'
-#        
-#    script = r"""
-#    
-#    library(nesoni)
-#
-#    # === Load data ==
-#    
-#    data <- read.grouped.table(sprintf('%s-counts.csv',prefix),require=c('Count','Annotation'))
-#    annotation <- data$Annotation
-#    expression <- voom( as.matrix(data$Count), normalize.method='quantile' )$E
-#    
-#    raw <- as.matrix(read.grouped.table(sprintf('%s-raw.csv',prefix))$All)
-#    
-#    cols <- as.matrix(read.grouped.table(sprintf('%s-raw-columns.csv',prefix))$All)   
-#    
-#    row.names <- rownames(annotation)
-#    n.samples <- nrow(cols)
-#    n.genes <- nrow(raw)
-#    n.lengths <- ncol(cols)
-#    lengths <- basic.seq(n.lengths)-1
-#
-#
-#    # === Calculate mean tail lengths for each sample ===
-#    
-#    # Omit columns for tail length 0,1,2,3    
-#    skip <- 4
-#    good.cols <- cols[,(skip+1):n.lengths,drop=FALSE]
-#    good.lengths <- lengths[(skip+1):n.lengths]
-#    
-#    totals <- matrix(nrow=n.genes,ncol=n.samples) 
-#    x.totals <- matrix(nrow=n.genes,ncol=n.samples) 
-#    xx.totals <- matrix(nrow=n.genes,ncol=n.samples) 
-#    means <- matrix(nrow=n.genes,ncol=n.samples)
-#    sds <- matrix(nrow=n.genes,ncol=n.samples)
-#    colnames(totals) <- rownames(cols)
-#    rownames(totals) <- row.names
-#    colnames(means) <- rownames(cols)
-#    rownames(means) <- row.names
-#    colnames(sds) <- rownames(cols)
-#    rownames(sds) <- row.names
-#    for(c in basic.seq(n.samples)) {
-#        totals[,c] <- rowSums(raw[,good.cols[c,],drop=FALSE])
-#        x.totals[,c] <- rowSums( t(t(raw[,good.cols[c,],drop=FALSE]) * good.lengths) )
-#        xx.totals[,c] <- rowSums( t(t(raw[,good.cols[c,],drop=FALSE]) * (good.lengths*good.lengths) ) )
-#
-#        means[,c] <- x.totals[,c] / totals[,c]
-#        sds[,c] <- sqrt( totals[,c]/(totals[,c]-1) * (xx.totals[,c]/totals[,c] - means[,c]*means[,c]) )
-#        
-#        means[totals[,c] < 1,c] <- NA
-#        sds[totals[,c] < 2,c] <- NA
-#    }
-#
-#
-#    grand.totals <- rowSums(totals)
-#    grand.x.totals <- rowSums(x.totals)
-#    grand.xx.totals <- rowSums(xx.totals)
-#    grand.means <- grand.x.totals / grand.totals
-#    grand.sds <- sqrt( grand.totals/(grand.totals-1) * (grand.xx.totals/grand.totals - grand.means*grand.means) )
-#    grand.means[ grand.totals < 1 ] <- NA
-#    grand.sds[ grand.totals < 2 ] <- NA
-#    pool.frame <- data.frame(
-#        "Reads" = rowSums(raw),
-#        "Tailed reads" = grand.totals,
-#        "Mean tail length" = grand.means,
-#        "StdDev tail length" = grand.sds,
-#        row.names = row.names,
-#        check.names = FALSE,
-#        check.rows = FALSE
-#    )
-#
-#    # === Output ===
-#    
-#    write.grouped.table(
-#        list(
-#            "Annotation" = annotation,
-#            "Count" = as.data.frame( data$Count ),
-#            "Expression" = as.data.frame( expression ),
-#            "Pooled" = pool.frame,
-#            "Tail count" = as.data.frame( totals ),
-#            "Mean tail length" = as.data.frame( means ),
-#            "StdDev tail length" = as.data.frame( sds )
-#        ),
-#        sprintf("%s-statistics.csv", prefix),
-#        comments = c(
-#            '',
-#            'Expression columns are quantile normalized log2 Reads Per Million as produced by the limma voom function',
-#            ''
-#        )
-#    )
-#    
-#    """
 
 
 
@@ -977,11 +836,6 @@ class Collapse_counts(config.Action_with_prefix):
 @config.Int_flag('adaptor',
      'Minimum number of adaptor bases required, 0 for no filtering.'
      )
-@config.Int_flag('saturation',
-     'Duplicate start position saturation level. '
-     'Reads that start at the same position will only '
-     'count as up to this many. Zero for no saturation.'
-     )
 @config.String_flag('title', 'Report title.')
 @config.String_flag('file_prefix', 'Prefix for filenames in report.')
 @config.String_flag('reuse')
@@ -994,7 +848,6 @@ class Analyse_tail_counts(config.Action_with_output_dir):
     extension = None
     tail = 4
     adaptor = 0
-    saturation = 0
     title = 'PAT-Seq expression analysis'
     file_prefix = ''
     working_dirs = [ ]
@@ -1055,7 +908,6 @@ class Analyse_tail_counts(config.Action_with_output_dir):
             Aggregate_tail_counts(
                 output_dir=self.output_dir, 
                 pickles=pickle_filenames,
-                saturation=self.saturation,
                 tail=self.tail,
                 adaptor=self.adaptor
                 ).process_make(stage)
@@ -1065,13 +917,6 @@ class Analyse_tail_counts(config.Action_with_output_dir):
             counts_filename=work/'counts.csv',
             ).make() 
 
-
-        #vst = nesoni.Vst(
-        #    prefix=work/'mlog',
-        #    counts=work/'counts.csv',
-        #    norm_file=work/'norm.csv',
-        #    )
-            
         similarity = nesoni.Similarity(
             prefix=plot_workspace/'similarity',
             counts=work/'counts.csv',
@@ -1110,7 +955,6 @@ class Analyse_tail_counts(config.Action_with_output_dir):
             ]
 
         with nesoni.Stage() as stage:        
-            #vst.process_make(stage)
             similarity.process_make(stage)
             for action in plot_pooleds + plot_comparisons + heatmaps:
                 action.process_make(stage)
@@ -1122,30 +966,6 @@ class Analyse_tail_counts(config.Action_with_output_dir):
             style=web.style(),
             )         
         
-        saturation = self.saturation
-        if saturation:
-            r.p(
-                'Duplicate read removal: Sets of reads aligning with exactly the start and end position in the reference were counted as a single read.'
-            )
-
-        #r.p(
-        #    'This scatterplot show the number of reads aligning to each gene between each pair of samples. '
-        #    'This can be used to discover poor samples.'
-        #)        
-        #
-        #r.p( r.get(self.prefix + '-count.png', image=True) )
-        
-        
-        
-        
-        #r.heading('Spreadsheet with statistics for all genes and all samples')
-        #
-        #if saturation:
-        #    r.p( 'Note: Reads with the same start and end position sometimes don\'t have the same tail length. '
-        #         'After deduplication these can contribute fractionally to the number of reads with tails.' )
-        #
-        ##r.p( r.get(self.prefix + '-statistics.csv') )
-        #r.p( r.get(self.prefix + '-counts.csv') )
         
         similarity.report(r)
         
@@ -1172,10 +992,6 @@ class Analyse_tail_counts(config.Action_with_output_dir):
             'some pair of samples.'
         )
         
-        #r.p(
-        #    'The log2 counts have been quantile normalized.'
-        #)
-        
         for heatmap in heatmaps:
             r.report_heatmap(heatmap)
 
@@ -1193,30 +1009,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         
         for heatmap in plot_comparisons:
             r.report_heatmap(heatmap)
-        
-
-        #r.heading('Raw data')
-        #
-        #r.p(r.get(work/'counts.csv') + ' - raw counts and tail statistics')
-        #r.p(r.get(work/'glog.csv') + ' - glog2 RPM counts')
-        #r.p(r.get(work/'norm.csv') + ' - normalization factors used')
-        #
-        #r.write('<p/><hr>\n')
-        #r.subheading('About normalization and log transformation')
-        #
-        #r.p('Counts are converted to '
-        #    'log2 Reads Per Million using a variance stabilised transformation. '
-        #    'Let the generalised logarithm with moderation m be')
-        #
-        #r.p('glog(x,m) = log2((x+sqrt(x*x+4*m*m))/2)')
-        #
-        #r.p('then the transformed values will be')
-        #
-        #r.p('glog( count/library_size*1e6, log_moderation/mean_library_size*1e6 )')
-        #
-        #r.p('where log_moderation is a parameter, here 5. '
-        #    'The library sizes used are effective library sizes after TMM normalization.')
-        
+                
         r.close()
 
 

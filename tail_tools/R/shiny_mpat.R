@@ -1,67 +1,4 @@
 
-#'
-#' Get BAM filenames from a Tail Tools pipeline output directory
-#'
-#' @export
-pipeline_bams <- function(pipeline_dir) {
-    meta <- jsonlite::fromJSON(file.path(pipeline_dir,"plotter-config.json"))
-    bam_filenames <- meta$samples$bam
-    names(bam_filenames) <- meta$samples$name
-    bam_filenames
-}
-
-
-read_info <- function(bam_filename, query) {
-    library(dplyr)
-
-    sbp <- Rsamtools::ScanBamParam(
-        what=c("qname","pos","cigar","strand"),
-        tag=c("AN"), 
-        flag=Rsamtools::scanBamFlag(isMinusStrand=is_reverse(query)),
-        which=query)
-    
-    result <- Rsamtools::scanBam(bam_filename, param=sbp)[[1]]
-    AN <- as.integer(result$tag$AN) # Convert NULL to integer(0)
-    AN[is.na(AN)] <- 0L
-    
-    if (is_reverse(query)) {
-        three_prime <- result$pos
-        width <- end(query) - three_prime + 1L
-    } else {
-        three_prime <- result$pos + 
-            GenomicAlignments::cigarWidthAlongReferenceSpace(result$cigar) - 1L
-        width <- three_prime - start(query) + 1L
-    }
-    good <- three_prime > query$three_prime_min & three_prime < query$three_prime_max
-    
-    tibble(
-        length=AN[good],
-        width=width[good]
-    ) %>% 
-    count(length, width)
-}
-
-
-meltdown <- function(mat, rows, columns, values) {
-    result <- reshape2::melt(t(as.matrix(mat)))
-    colnames(result) <- c(rows,columns,values)
-    result
-}
-
-
-# sum n, binned by length, respecting existing group_by
-bin_lengths <- function(df, stride) {
-    df %>%
-        mutate(bin = floor((length+0.5)/stride)) %>%
-        group_by(bin, add=TRUE) %>%
-        summarize(n = sum(n)) %>%
-        mutate(
-            length_low = bin*stride-0.5,
-            length_mid = (bin+0.5)*stride-0.5,
-            length_high = (bin+1)*stride-0.5
-        )
-}
-
             
 default_plot_count <- function(df, is_grouped, norm_count_name, ...) { 
     print(
@@ -89,6 +26,7 @@ default_plot_tail <- function(df, is_grouped, ...) {
         theme(axis.text.x=element_text(angle=90, hjust=1, vjust=0.5))
     )
 }
+
 
 #' Shiny report for mPAT results
 #'

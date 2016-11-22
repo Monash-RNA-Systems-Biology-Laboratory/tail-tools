@@ -36,17 +36,21 @@ DATA TITLE
       
       <p>
       <input type="checkbox" id="bam"> BAM files (all reads)
+      
+      <p>
+      <input type="checkbox" checked id="span"> Depth of all reads
       <br>
-      <input type="checkbox" checked id="all"> Plots using all reads
-      <br>
-      <input type="checkbox" id="polya"> Plots using reads with poly(A) tail
+      <input type="checkbox" id="polya3p"> Depth of 3' ends of poly(A) reads      
+      
+      <div style="font-size: 66%">
+        Less useful:
+        <br>
+        <input type="checkbox" id="polyaspan"> Depth of poly(A) reads
+        <br>
+        <input type="checkbox" id="3p"> Depth of 3' ends of all reads
+      </div>
       
       <div id="plots_options">
-        <p>
-        <input type="checkbox" checked id="span"> Whole read
-        <br>
-        <input type="checkbox" id="3p"> 3' end
-        
         <p id="norm_section">
         <input type="checkbox" checked id="raw"> Raw depth
         <br>
@@ -110,7 +114,7 @@ function is_checked(id) {
 }
 
 function refresh() {
-    if (is_checked("all") || is_checked("polya"))
+    if (is_checked("span") || is_checked("polyaspan") || is_checked("3p") || is_checked("polya3p"))
         $("#plots_options").show();
     else
         $("#plots_options").hide();
@@ -126,7 +130,7 @@ function refresh() {
     }
     
     if (is_checked("ambiguity")) {
-        files.push(base+"ambiguity.bw");
+        files.push(base+"total-ambiguity.bw");
         names.push("ambiguity");
     }
     
@@ -139,40 +143,39 @@ function refresh() {
         });
     }
     
-    ["span","3p"].forEach(function(region) {
+    ["span","polyaspan","3p","polya3p"].forEach(function(region) {
         if (!is_checked(region)) return;
-        var region_name = {"span" : "", "3p": " 3'"}[region];
+        var region_name = {
+            "span" : "", 
+            "polyaspan" : " poly(A)",
+            "3p": " 3' all",
+            "polya3p" : " 3' poly(A)"}[region];
         
-        ["all","polya"].forEach(function(subset) {
-            if (!is_checked(subset)) return;
-            var subset_name = {"all":"", "polya":" poly(A)"}[subset];
+        ["raw","norm"].forEach(function(normalization) {
+            if (!is_checked(normalization)) return;
+            var normalization_name = {"raw":"", "norm":" norm"}[normalization];
             
-            ["raw","norm"].forEach(function(normalization) {
-                if (!is_checked(normalization)) return;
-                var normalization_name = {"raw":"", "norm":" norm"}[normalization];
+            ["fwd","rev"].forEach(function(direction) {
+                if (!is_checked(direction)) return;                    
+                if (!is_checked("total")) return;
+                var direction_name = {"fwd":"->","rev":"<-"}[direction];
                 
-                ["fwd","rev"].forEach(function(direction) {
-                    if (!is_checked(direction)) return;                    
-                    if (!is_checked("total")) return;
-                    var direction_name = {"fwd":"->","rev":"<-"}[direction];
+                files.push(base+"total-"+region+"-"+direction+".bw")
+                names.push(direction_name+" total"+normalization_name+region_name)
+            });
+        
+            ["fwd","rev"].forEach(function(direction) {
+                if (!is_checked(direction)) return;
+                var direction_name = {"fwd":"->","rev":"<-"}[direction];
+                
+                $.each(samples, function(i,sample) {
+                    if (!is_checked(i)) return;
                     
-                    files.push(base+"total-"+subset+"-"+region+"-"+direction+".bw")
-                    names.push(direction_name+" total"+subset_name+normalization_name+region_name)
+                    files.push(base+samples[i]+"-"+normalization+"-"+region+"-"+direction+".bw")
+                    names.push(direction_name+" "+samples[i]+normalization_name+region_name)
                 });
-            
-                ["fwd","rev"].forEach(function(direction) {
-                    if (!is_checked(direction)) return;
-                    var direction_name = {"fwd":"->","rev":"<-"}[direction];
-                    
-                    $.each(samples, function(i,sample) {
-                        if (!is_checked(i)) return;
-                        
-                        files.push(base+samples[i]+"-"+subset+"-"+normalization+"-"+region+"-"+direction+".bw")
-                        names.push(direction_name+" "+samples[i]+subset_name+normalization_name+region_name)
-                    });
-                });    
             });    
-        });
+        });    
     });
     
     var url = "http://localhost:60151/load?" + 

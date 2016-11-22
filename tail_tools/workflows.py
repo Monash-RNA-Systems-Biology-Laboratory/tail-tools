@@ -6,7 +6,7 @@ import nesoni
 from nesoni import config, workspace, working_directory, reference_directory, io, reporting, grace, annotation, selection, span_index
 
 import tail_tools
-from . import clip_runs, extend_sam, proportions, tail_lengths, web, alternative_tails, bigwig, web
+from . import clip_runs, extend_sam, proportions, tail_lengths, web, alternative_tails, bigwig, web, peaks
 
 def _make_each(actions):
     for item in actions:
@@ -34,177 +34,22 @@ def _parallel(*items):
             stage.process(item)
 
 
-def join_descriptions(seq, joiner='/'):
-    result = [ ]
-    for item in seq:
-        if item and item not in result: 
-            result.append(item)
-    return joiner.join(result)
-
-
-def _extend(feature, extension):
-    result = feature.shifted(0, min(extension,int(feature.attr.get("max_extension","10000"))))
-    result.parents = feature.parents
-    return result
-
-def _three_prime(feature):
-    result = feature.three_prime()
-    result.parents = feature.parents
-    return result
-
-@config.String_flag('parent')
-@config.String_flag('child')
-@config.Int_flag('extension', 'How far downstrand of the gene can the peak be.')
-class Relate_peaks_to_genes(config.Action_with_prefix):
-    parent = None
-    child = None
-    extension = None
-    
-    def run(self):
-        items = list(annotation.read_annotations(self.parent))
-                
-        annotation.link_up_annotations(items)
-        for item in items:
-            assert len(item.parents) <= 1
-        
-        genes = [ item for item in items if item.type == "gene" ]
-        downstrand_genes = [ _extend(_three_prime(item), self.extension) for item in genes ]
-        exons = [ item for item in items if item.type == "exon" ]
-        utrs = [ _extend(item, self.extension) for item in items if item.type == "three_prime_utr" ]
-        
-        gene_index = span_index.index_annotations(genes)
-        downstrand_gene_index = span_index.index_annotations(downstrand_genes)
-        exon_index = span_index.index_annotations(exons)
-        utr_index = span_index.index_annotations(utrs)
-        
-        peaks = list(annotation.read_annotations(self.child))
-        
-        for peak in peaks:
-            # Query is final base in genome before poly(A) starts
-            query = peak.three_prime().shifted(-1,0)
-            
-            hit_to = "3'UTR"
-            hits = [ item.parents[0].parents[0] for item in
-                     utr_index.get(query, True) ]
-            
-            if not hits:
-                hit_to = "Exon"
-                hits = [ item.parents[0].parents[0] for item in
-                         exon_index.get(query, True) ]
-            
-            # For non-coding RNAs, which don't have a 3' UTR
-            if not hits:
-                hit_to = "Downstrand"
-                hits = downstrand_gene_index.get(query, True)
-            
-            if not hits:
-                hit_to = "Intron"
-                hits = gene_index.get(query, True)
-
-            antisense_hits = gene_index.get(query.reversed(), True)
-            if not hits:
-                hit_to = "Antisense"
-                hits = antisense_hits
-            
-            if hits:
-                peak.attr["Parent"] = join_descriptions([ item.get_id() for item in hits ], ",")
-                peak.attr["Relation"] = hit_to
-                peak.attr["Name"] = join_descriptions([ item.attr.get("Name","") for item in hits ])
-                peak.attr["Product"] = hit_to + " " + join_descriptions([ item.attr.get("Product","") for item in hits ])
-                peak.attr["Biotype"] = join_descriptions([ item.attr.get("Biotype","") for item in hits ])
-            
-            if antisense_hits:
-                peak.attr["Antisense_parent"] = join_descriptions([ item.get_id() for item in antisense_hits ], ",")
-                peak.attr["Antisense_name"] = join_descriptions([ item.attr.get("Name","") for item in antisense_hits ])
-                peak.attr["Antisense_product"] = "Antisense " + join_descriptions([ item.attr.get("Product","") for item in antisense_hits ])
-                peak.attr["Antisense_biotype"] = join_descriptions([ item.attr.get("Biotype","") for item in antisense_hits])
-                
-        
-        annotation.write_gff3(self.prefix+"-parent.gff", genes) #Hmm
-        annotation.write_gff3(self.prefix+"-child.gff", peaks)
-
-
-@config.help(
-    'Call peaks in depth of coverage indicating transcription end sites.',
-    'Note that you must specify --shift-start, and --shift-end.'
-    '\n\n'
-    'Operates as follows:'
-    '\n\n'
-    '- Call end points using "nesoni modes: --what 3prime".\n'
-    '- Extend called modes back by --peak-length.\n'
-    '- Relate resultant peaks to the given annotations.\n'
-    '\n'
-    'Note: As this is a workflow, you may need to specify "--make-do all" to force everything to recompute if an input file is changed. '
-    'Use "--make-do -modes" to recompute everything but the peak calling.'
-    )
-@config.Int_flag('lap', '--lap value for "nesoni modes:". How fuzzy the pileup of 3\' ends can be when calling a peak.')
-@config.Int_flag('radius', '--radius value for "nesoni modes:". How close peaks can be to one another.')
-@config.Int_flag('min_depth', '--min-depth value for "nesoni modes:".')
-@config.Int_flag('peak_length', 'Number of bases to extend peak back from 3\' end point.')
-@config.String_flag('annotations', 'Annotation file. A GFF file containing genes, which contain mRNAs, which contain exons and a three_prime_utr.')
-@config.Int_flag('extension', 'How far downstrand of the gene can the peak be.')
-@config.Main_section('polyas', 'List of ...-polyA directories as produced by "analyse-polya:" or "analyse-polya-batch:".')
-class Call_peaks(config.Action_with_output_dir):
-    lap = 10
-    radius = 50
-    min_depth = 50
-    peak_length = 100
-    
-    annotations = None
-    extension = None
-    
-    polyas = [ ]
-    
-    def run(self):
-        assert self.extension is not None, '--extension must be specified'
-        assert self.annotations is not None, '--annotations must be specified'
-    
-        outspace = self.get_workspace()
-        working = workspace.Workspace(outspace / 'working', must_exist=False)
-        
-        nesoni.Modes(
-            working/'modes',
-            filenames = self.polyas,
-            what = '3prime',
-            lap = self.lap,
-            radius = self.radius,
-            min_depth = self.min_depth,
-            ).make()
-        
-        nesoni.Modify_features(
-            working/'peaks',
-            working/'modes.gff',
-            shift_start = str(-self.peak_length),
-            ).make()
-        
-        Relate_peaks_to_genes(
-            outspace/'relation',
-            parent = self.annotations,
-            #select_parent = '/'.join(self.types.split(',')),
-            child = working/'peaks.gff',
-            extension = self.extension
-            #upstrand = -self.shift_start,
-            #downstrand = self.shift_end,
-            #use = 'in/upstrand/downstrand',
-            #to_child = 'Name/Product/Biotype',
-            ).make()
-            
         
 
-
-
-class Tail_only(config.Action_filter):
-    def run(self):
-        fin = self.begin_input()
-        fout = self.begin_output()
-        
-        for line in fin:
-            if line.startswith('@') or '\tAA:i:' in line:
-                fout.write(line)
-                continue
-        
-        self.end_input(fin)
-        self.end_output(fout)
+#
+#
+#class Tail_only(config.Action_filter):
+#    def run(self):
+#        fin = self.begin_input()
+#        fout = self.begin_output()
+#        
+#        for line in fin:
+#            if line.startswith('@') or '\tAA:i:' in line:
+#                fout.write(line)
+#                continue
+#        
+#        self.end_input(fin)
+#        self.end_output(fout)
 
 
 @config.help(
@@ -234,8 +79,8 @@ class Analyse_polya(config.Action_with_output_dir):
     
     _workspace_class = working_directory.Working
     
-    def get_polya_dir(self):
-        return os.path.normpath(self.output_dir) + '-polyA'
+    #def get_polya_dir(self):
+    #    return os.path.normpath(self.output_dir) + '-polyA'
     
     def get_filter_tool(self):
         if self.consensus:
@@ -252,8 +97,8 @@ class Analyse_polya(config.Action_with_output_dir):
     def get_filter_action(self):
         return self.get_filter_tool()(working_dir = self.output_dir)
 
-    def get_polya_filter_action(self):
-        return self.get_filter_tool()(working_dir = self.get_polya_dir())
+    #def get_polya_filter_action(self):
+    #    return self.get_filter_tool()(working_dir = self.get_polya_dir())
     
     def run(self):
         assert self.reads, 'No read files given.'
@@ -261,14 +106,14 @@ class Analyse_polya(config.Action_with_output_dir):
         assert len(set(colorspace)) == 1, 'Mixture of colorspace and basespace reads is not currently supported.'
         colorspace = colorspace[0]
         
-        polya_dir = self.get_polya_dir()
+        #polya_dir = self.get_polya_dir()
     
         working = working_directory.Working(self.output_dir, must_exist=False)
         working.set_reference(self.reference)
         reference = working.get_reference()
         
-        polya_working = working_directory.Working(polya_dir, must_exist=False)
-        polya_working.set_reference(self.reference)
+        #polya_working = working_directory.Working(polya_dir, must_exist=False)
+        #polya_working.set_reference(self.reference)
         
         clipped_prefix = working/'clipped_reads'
         clipped_filename = clipped_prefix+('.csfastq.gz' if colorspace else '.fastq.gz')
@@ -276,7 +121,7 @@ class Analyse_polya(config.Action_with_output_dir):
         raw_filename = working/'alignments_raw.sam.gz'
         extended_filename = working/'alignments_extended.sam.gz'
         
-        polya_filename = working/'alignments_filtered_polyA.sam.gz'
+        #polya_filename = working/'alignments_filtered_polyA.sam.gz'
 
         if colorspace:
             self.clip_runs_colorspace(
@@ -341,33 +186,35 @@ class Analyse_polya(config.Action_with_output_dir):
         
         self.get_filter_action().make()
 
-        Tail_only(
-            input=working/'alignments_filtered.bam',
-            output=polya_filename,
-        ).make()
+        #Tail_only(
+        #    input=working/'alignments_filtered.bam',
+        #    output=polya_filename,
+        #).make()
         
-        nesoni.Import(
-            input=polya_filename,
-            output_dir=polya_dir,
-            reference=[ self.reference ],
-        ).make()
+        #nesoni.Import(
+        #    input=polya_filename,
+        #    output_dir=polya_dir,
+        #    reference=[ self.reference ],
+        #).make()
         
         # This shouldn't actually filter out any alignments.
         # We do it to produce depth of coverage plots
         # and position-sorted BAM files.
-        self.get_polya_filter_action().make()
+        #self.get_polya_filter_action().make()
         
         nesoni.Tag(self.output_dir, tags=self.tags).make()
-        nesoni.Tag(polya_dir, tags=self.tags).make()
+        #nesoni.Tag(polya_dir, tags=self.tags).make()
         
         
         # Delete unneeded files
         os.unlink(clipped_prefix+'.state')
         os.unlink(clipped_filename)
+        os.unlink(working/'alignments.bam')
+        os.unlink(working/'alignments_filtered.bam')
         os.unlink(working/'run_alignment.state')
         os.unlink(raw_filename)
         os.unlink(extended_filename)
-        os.unlink(polya_filename)
+        #os.unlink(polya_filename)
 
 
 
@@ -426,17 +273,12 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     parts = "exon"
     species = ""
     
-    #include_plots = True
-    #include_genome = False
-    #include_bams = True
     reference = None
     samples = [ ]
     
     groups = [ ]
     
     tests = [ ]
-    
-    #analyse_tail_lengths = tail_lengths.Analyse_tail_lengths()
     
     def run(self):
         #===============================================
@@ -464,10 +306,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         workspace = io.Workspace(self.output_dir, must_exist=False)
         samplespace = io.Workspace(workspace/'samples', must_exist=False)
-        #plotspace = io.Workspace(workspace/'plots', must_exist=False)
         expressionspace = io.Workspace(workspace/'expression', must_exist=False)
         testspace = io.Workspace(workspace/'test', must_exist=False)
-        testspace_dedup = io.Workspace(workspace/'test-dedup', must_exist=False)
         
         self._create_json()
                 
@@ -484,8 +324,6 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 ))
         
         dirs = [ item.output_dir for item in samples ]
-        polya_dirs = [ item + '-polyA' for item in dirs ]        
-        interleaved = [ item2 for item in zip(dirs,polya_dirs) for item2 in item ]
         
         clipper_logs = [ join(item.output_dir, 'clipped_reads_log.txt') for item in samples ]
         filter_logs = [ join(item.output_dir, 'filter_log.txt') for item in samples ]
@@ -493,43 +331,28 @@ class Analyse_polya_batch(config.Action_with_output_dir):
 
         analyse_template = tail_lengths.Analyse_tail_counts(
             working_dirs = dirs,
-            saturation = 0,
             extension = self.extension,
             annotations = reference/'reference.gff',
             types = self.types,
             parts = self.parts
             )
         
-        
         with nesoni.Stage() as stage:        
             for item in samples:
                 item.process_make(stage)
 
-
-
-        analyse_gene_counts_0 = analyse_template(
+        job_gene_counts = analyse_template(
             output_dir = expressionspace/'genewise',
-            saturation = 0,
             extension = self.extension,
             title = 'Genewise expression - ' + self.title,
             file_prefix = file_prefix+'genewise-',
-            )
-        
-        analyse_gene_counts_1 = analyse_template(
-            output_dir = expressionspace/'genewise-dedup',
-            saturation = 1,
-            title = 'Genewise expression with read deduplication - ' + self.title,
-            file_prefix = file_prefix+'genewise-dedup-',
-            reuse =  expressionspace/'genewise'
-            )
-        
-        job_gene_counts = _call(_serial,analyse_gene_counts_0.make,analyse_gene_counts_1.make)
+            ).make
         
         job_peaks = _call(self._run_peaks, 
             workspace=workspace, 
             expressionspace=expressionspace, 
             reference=reference, 
-            dirs = polya_dirs if self.peak_polya else dirs,
+            dirs = dirs,
             analyse_template = analyse_template,
             file_prefix=file_prefix,
             )
@@ -556,31 +379,21 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             extension=self.extension
             ).make
             
-        primpeak_template = analyse_template(
+        job_primpeak_counts = analyse_template(
+            expressionspace/'primarypeakwise',
             annotations=workspace/('peaks','primary-peak-peaks.gff'), 
             extension=0,
             types='peak',
-            parts='peak'
-            )
-        
-        job_primpeak_0 = primpeak_template(
-            expressionspace/'primarypeakwise',
-            saturation=0,
+            parts='peak',
             title='Primary-peakwise expression - ' + self.title,
             file_prefix=file_prefix+'primarypeakwise-',
             ).make
-            
-        job_primpeak_1 = primpeak_template(
-            expressionspace/'primarypeakwise-dedup',
-            saturation=1,
-            title='Primary-peakwise expression with read deduplication - ' + self.title,
-            file_prefix=file_prefix+'primarypeakwise-dedup-',
-            reuse=expressionspace/'primarypeakwise'
-            ).make
         
-        job_primpeak = _call(_serial, job_utrs, job_primpeak_0, job_primpeak_1)
+        job_primpeak = _call(_serial, job_utrs, job_primpeak_counts)
         
-        job_peak_primpeak_bigwig = _call(_serial, job_peaks, _call(_parallel, job_norm_bigwig, job_primpeak))
+        job_peak_primpeak_bigwig = _call(_serial, 
+            job_peaks, 
+            _call(_parallel, job_norm_bigwig, job_primpeak))
         
         job_count = _call(_parallel, job_gene_counts, job_peak_primpeak_bigwig)
             
@@ -589,21 +402,13 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             test_jobs.append(test(
                 output_dir = testspace/test.output_dir,
                 analysis = self.output_dir,
-                dedup = False,
-                ).make)
-        
-        for test in self.tests:
-            test_jobs.append(test(
-                output_dir = testspace_dedup/test.output_dir,
-                analysis = self.output_dir,
-                dedup = True,
                 ).make)
 
         job_test = _call(_parallel, *test_jobs)
 
         job_raw = self._extract_raw
 
-        job_all = _call(_serial, job_count, _call(_parallel,job_raw,job_test))        
+        job_all = _call(_serial, job_count, _call(_parallel, job_raw, job_test))        
         
         job_all()
 
@@ -626,8 +431,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.report_logs('alignment-statistics',
             #[ workspace/'stats.txt' ] +
             clipper_logs + filter_logs + #filter_polya_logs +
-            [ expressionspace/('genewise-dedup','aggregate-tail-counts_log.txt'), #for duplication level
-              expressionspace/('genewise','aggregate-tail-counts_log.txt') ], #but deduplicated statistics take priority
+            [ expressionspace/('genewise','aggregate-tail-counts_log.txt') ],
             filter=lambda sample, field: (
                 field not in [
                     'fragments','fragments aligned to the reference','reads kept',
@@ -638,52 +442,12 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         )
         
 
-        #if self.include_plots:        
-        #    r.heading('IGV plots')
-        #    
-        #    r.p('These files show the depth of coverage. They can be viewed with the IGV genome browser.')
-        #    
-        #    genome_files = [ ]
-        #    if self.include_genome:
-        #        genome_files.append(reference.get_genome_filename())
-        #        genome_dir = reference.get_genome_dir()
-        #        base = os.path.split(self.genome_dir)[1]
-        #        for filename in os.listdir(genome_dir):
-        #            genome_files.append((
-        #                os.path.join(genome_dir, filename),
-        #                os.path.join(base, filename)
-        #                ))
-        #    
-        #    r.p(r.tar('igv-plots',
-        #        genome_files +
-        #        glob.glob(plotspace/'*.tdf')
-        #        ))
-        #
-        #
-        #if self.include_bams:
-        #    r.heading('BAM files')
-        #    
-        #    r.p('These BAM files contain the alignments of reads to the reference sequences.')
-        #    
-        #    r.p('Reads with a poly(A) tail have an \'AN\' attribute giving the length of non-templated poly(A) sequence. '
-        #        'Tail-tools only treats a read as having a tail if this length is at least 4.')
-        #    
-        #    bam_files = [ ]
-        #    for name in names:
-        #        bam_files.append( (samplespace/(name,'alignments_filtered_sorted.bam'),name+'.bam') )
-        #        bam_files.append( (samplespace/(name,'alignments_filtered_sorted.bam.bai'),name+'.bam.bai') )
-        #    r.p(r.tar('bam-files', bam_files))
-
-
         r.heading('Genewise expression')
         
         r.p("This is based on all reads within each gene (possibly from multiple peaks, or decay products).")
         
         io.symbolic_link(source=expressionspace/('genewise','report'),link_name=r.workspace/'genewise')
         r.p('<a href="genewise/index.html">&rarr; Genewise expression</a>')
-
-        io.symbolic_link(source=expressionspace/('genewise-dedup','report'),link_name=r.workspace/'genewise-dedup')
-        r.p('<a href="genewise-dedup/index.html">&rarr; Genewise expression with read deduplication</a>')
 
 
         r.heading('Peakwise expression')
@@ -694,6 +458,10 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.p(r.get(peak_filename, name='peaks.gff') + ' - peaks called')        
 
         self._describe_peaks(r)
+        
+        io.symbolic_link(source=expressionspace/('peakwise','report'),link_name=r.workspace/'peakwise')
+        r.p('<a href="peakwise/index.html">&rarr; Peakwise expression</a>')
+
 
         r.subheading('Primary-peakwise expression')
         
@@ -702,43 +470,21 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         io.symbolic_link(source=expressionspace/('primarypeakwise','report'),link_name=r.workspace/'primarypeakwise')
         r.p('<a href="primarypeakwise/index.html">&rarr; Primary-peakwise expression</a>')
 
-        io.symbolic_link(source=expressionspace/('primarypeakwise-dedup','report'),link_name=r.workspace/'primarypeakwise-dedup')
-        r.p('<a href="primarypeakwise-dedup/index.html">&rarr; Primary-peakwise expression with read deduplication</a>')
-
         r.p(r.get(workspace/('peaks','primary-peak-peaks.gff')) + ' - primary peaks for each gene.')
         r.p(r.get(workspace/('peaks','primary-peak-utrs.gff')) + ' - 3\' UTR regions, based on primary peak call.')
         r.p(r.get(workspace/('peaks','primary-peak-genes.gff')) + ' - full extent of gene, based on primary peak call.')
 
 
-        web.Geneview_webapp(r.workspace/'view').run()        
-        
-        #n_peaks = len(list(annotation.read_annotations(peak_filename)))
-        #r.p('%d peaks called (%d poly(A) reads were required to call a peak).' % (n_peaks, self.peak_min_depth))
-
-        #if self.groups:
-            #r.subheading('Peak shift between groups')
-            #r.p(r.get(workspace/('peak-shift','grouped.csv')) + ' - genes with a potential peak shift')        
-            #r.get(workspace/('peak-shift','grouped.json'))
-
-        #r.subheading('Peak shift between samples')
-        #r.p(r.get(workspace/('peak-shift','individual.csv')) + ' - genes with a potential peak shift')        
-        #r.get(workspace/('peak-shift','individual.json'))
-
-        
-        io.symbolic_link(source=expressionspace/('peakwise','report'),link_name=r.workspace/'peakwise')
-        r.p('<a href="peakwise/index.html">&rarr; Peakwise expression</a>')
-
-        io.symbolic_link(source=expressionspace/('peakwise-dedup','report'),link_name=r.workspace/'peakwise-dedup')
-        r.p('<a href="peakwise-dedup/index.html">&rarr; Peakwise expression with read deduplication</a>')
-                
         if self.tests:
             r.heading('Differential tests')
             for test in self.tests:
                 io.symbolic_link(source=testspace/test.output_dir,link_name=r.workspace/('test-'+test.output_dir))
-                io.symbolic_link(source=testspace_dedup/test.output_dir,link_name=r.workspace/('test-dedup-'+test.output_dir))
                 r.p('<a href="test-%s">&rarr; %s</a> '
-                    ' &nbsp; <a href="test-dedup-%s" style="font-size: 66%%">[&rarr; Deduplicated version]</a>' % (test.output_dir, test.get_title(), test.output_dir))
+                    % (test.output_dir, test.get_title()))
 
+
+        web.Geneview_webapp(r.workspace/'view').run()        
+                
         r.heading('Gene viewers')
         r.p('Having identified interesting genes from heatmaps and differential tests above, '
             'these viewers allow specific genes to be examined in detail.')
@@ -778,72 +524,37 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             'log2 Reads Per Million using Anscombe\'s variance stabilizing transformation '
             'for the negative binomial distribution, implemented in '
             'R package "varistran".')
-        
-        #r.p('Counts are converted to '
-        #    'log2 Reads Per Million using a variance stabilised transformation. '
-        #    'Let the generalised logarithm with moderation m be')
-        #
-        #r.p('glog(x,m) = log2((x+sqrt(x*x+4*m*m))/2)')
-        #
-        #r.p('then the transformed values will be')
-        #
-        #r.p('glog( count/library_size*1e6, log_moderation/mean_library_size*1e6 )')
-        #
-        #r.p('where log_moderation is a parameter, here 5. '
-        #    'The library sizes used are effective library sizes after TMM normalization.')
-        #
-        #r.write('<p/><hr>\n')
-        
-        r.subheading('About deduplication')
-        
-        r.p('Use deduplicated versions with care. '
-            'They may possibly provide more significant results, however they are less quantitative. '
-            'Read deduplication involves throwing away a large amount of data, much of which will not be a technical artifact. '
-            'Deduplicated versions might best be viewed as a check on data quality.')
-        
+                
         r.write('<p/><hr>\n')
 
         r.p('tail-tools version '+tail_tools.VERSION)
         r.p('nesoni version '+nesoni.VERSION)
-        #r.p('SHRiMP version '+grace.get_shrimp_2_version())
         
         r.close()
 
 
     def _run_peaks(self, workspace, expressionspace, reference, dirs, analyse_template, file_prefix):
         shiftspace = io.Workspace(workspace/'peak-shift')
-        shiftspace_dedup = io.Workspace(workspace/'peak-shift-dedup')
 
-        Call_peaks(
+        peaks.Call_peaks(
             workspace/'peaks',
             annotations = reference/'reference.gff',
             extension = self.extension,
             min_depth = self.peak_min_depth,
-            polyas = dirs,
+            polya = self.peak_polya,
+            samples = dirs,
             ).make()
 
-        peak_template = analyse_template(
+        analyse_template(
+            expressionspace/'peakwise',
             annotations=workspace/('peaks','relation-child.gff'), 
             extension=0,
             types='peak',
             parts='peak',
-            )
-
-        peak_template(
-            expressionspace/'peakwise',
-            saturation=0,
             title='Peakwise expression - ' + self.title,
             file_prefix=file_prefix+'peakwise-',
             ).make()
             
-        peak_template(
-            expressionspace/'peakwise-dedup',
-            saturation=1,
-            title='Peakwise expression with read deduplication - ' + self.title,
-            file_prefix=file_prefix+'peakwise-dedup-',
-            reuse=expressionspace/'peakwise',
-            ).make()
-
         alternative_tails.Compare_peaks(
             shiftspace/'individual',
             norm_file=expressionspace/('peakwise','norm.csv'),
@@ -854,18 +565,6 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             parents=workspace/('peaks','relation-parent.gff'),
             children=workspace/('peaks','relation-child.gff'),
             counts=expressionspace/('peakwise','counts.csv'),
-            ).make()
-        
-        alternative_tails.Compare_peaks(
-            shiftspace_dedup/'individual',
-            norm_file=expressionspace/('peakwise-dedup','norm.csv'),
-            utrs=reference/'utr.gff',
-            utr_only=True,
-            top=2,
-            reference=reference/'reference.fa',
-            parents=workspace/('peaks','relation-parent.gff'),
-            children=workspace/('peaks','relation-child.gff'),
-            counts=expressionspace/('peakwise-dedup','counts.csv'),
             ).make()
         
         if self.groups:
@@ -885,64 +584,45 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 children=workspace/('peaks','relation-child.gff'),
                 counts=shiftspace/'grouped-counts.csv',
                 ).make()
-            
-
-            tail_lengths.Collapse_counts(
-                shiftspace_dedup/'grouped-counts',
-                counts=expressionspace/('peakwise-dedup','counts.csv'),
-                groups=self.groups
-                ).make()
-            
-            alternative_tails.Compare_peaks(
-                shiftspace_dedup/'grouped',
-                utrs=reference/'utr.gff',
-                utr_only=True,
-                top=2,
-                reference=reference/'reference.fa',
-                parents=workspace/('peaks','relation-parent.gff'),
-                children=workspace/('peaks','relation-child.gff'),
-                counts=shiftspace/'grouped-counts.csv',
-                ).make()
 
 
     def _extract_raw(self):            
         work = io.Workspace(self.output_dir, must_exist=False)
         raw = io.Workspace(work/'raw', must_exist=False)
         
-        for dedup in ['','-dedup']:
-            for name, counts, norms in [
-                    ('genewise'+dedup,
-                        work/('expression','genewise'+dedup,'counts.csv'),
-                        work/('expression','genewise'+dedup,'norm.csv'),
-                        ),
-                    ('primarypeakwise'+dedup,
-                        work/('expression','primarypeakwise'+dedup,'counts.csv'),
-                        work/('expression','primarypeakwise'+dedup,'norm.csv'),
-                        ),
-                    ('peakwise'+dedup,
-                        work/('expression','peakwise'+dedup,'counts.csv'),
-                        work/('expression','peakwise'+dedup,'norm.csv'),
-                        ),
-                    ('pairwise'+dedup,
-                        work/('peak-shift'+dedup,'individual-pairs.csv'),
-                        work/('peak-shift'+dedup,'individual-pairs-norm.csv'),
-                        ),
-                    ]:
-                nesoni.Vst(
-                    raw/(name+'-mlog2-RPM'),
-                    counts,
-                    norm_file = norms
-                    ).make()
-                
-                counts_table = io.read_grouped_table(counts)
-                io.write_csv_2(raw/(name+'-info.csv'), counts_table['Annotation'])
-                io.write_csv_2(raw/(name+'-count.csv'), counts_table['Count'])
-                io.write_csv_2(raw/(name+'-tail.csv'), counts_table['Tail'])
-                io.write_csv_2(raw/(name+'-tail-count.csv'), counts_table['Tail_count'])
-                io.write_csv_2(raw/(name+'-proportion.csv'), counts_table['Proportion'])
-                
-                norm_table = io.read_grouped_table(norms)
-                io.write_csv_2(raw/(name+'-norm.csv'), norm_table['All'])
+        for name, counts, norms in [
+                ('genewise',
+                    work/('expression','genewise','counts.csv'),
+                    work/('expression','genewise','norm.csv'),
+                    ),
+                ('primarypeakwise',
+                    work/('expression','primarypeakwise','counts.csv'),
+                    work/('expression','primarypeakwise','norm.csv'),
+                    ),
+                ('peakwise',
+                    work/('expression','peakwise','counts.csv'),
+                    work/('expression','peakwise','norm.csv'),
+                    ),
+                ('pairwise',
+                    work/('peak-shift','individual-pairs.csv'),
+                    work/('peak-shift','individual-pairs-norm.csv'),
+                    ),
+                ]:
+            nesoni.Vst(
+                raw/(name+'-mlog2-RPM'),
+                counts,
+                norm_file = norms
+                ).make()
+            
+            counts_table = io.read_grouped_table(counts)
+            io.write_csv_2(raw/(name+'-info.csv'), counts_table['Annotation'])
+            io.write_csv_2(raw/(name+'-count.csv'), counts_table['Count'])
+            io.write_csv_2(raw/(name+'-tail.csv'), counts_table['Tail'])
+            io.write_csv_2(raw/(name+'-tail-count.csv'), counts_table['Tail_count'])
+            io.write_csv_2(raw/(name+'-proportion.csv'), counts_table['Proportion'])
+            
+            norm_table = io.read_grouped_table(norms)
+            io.write_csv_2(raw/(name+'-norm.csv'), norm_table['All'])
 
 
     def _create_json(self):                    
@@ -973,6 +653,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             
         obj = collections.OrderedDict()
         obj['reference'] = os.path.abspath( self.reference )
+        obj['extension'] = self.extension
         obj['genes'] = os.path.abspath( workspace/('peaks','relation-parent.gff') )
         obj['peaks'] = os.path.abspath( workspace/('peaks','relation-child.gff') )
         obj['groups'] = groups

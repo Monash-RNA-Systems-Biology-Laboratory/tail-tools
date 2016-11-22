@@ -39,12 +39,12 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
     
     if(is.null(species) || sum(species == c("Hs", "Sc", "Ce", "Mm"))!=1){
         GOenable <- FALSE
-        cat("Species is missing or incorrect. Not enabling GO Term Analysis\n")
+        if (!is.null(species)) cat("Species is not supported. Not enabling GO Term Analysis\n")
     } else {
         GOenable <- TRUE
     }
     
-    p <- function(name) paste0(prefix,name)
+    p <- NS(prefix)
     sample_labels <- ensure_reactable(sample_labels)
     sample_labels2 <- ensure_reactable(sample_labels2)
     feature_labels <- ensure_reactable(feature_labels)
@@ -59,23 +59,24 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
         width=1000,
         height=700,
         dlname="heatmap",
-        prefix=p("plot_"),
+        prefix=p("plot"),
         goenabl=GOenable,
         selin = function(env){
-            env$seldat()$ann
+            env[[p("seldat")]]()$ann
         },
         spp=species,
         hgc = function(env){
-            env$hgc()
+            env[[p("hgc")]]()
         },
         otype = function(env){
-            env$otype()
+            env[[p("otype")]]()
         }
     )
     
     # Shiny's UI layout 
+    colvec <- names(datfr$Tail)
     panels <- list(
-        shiny::tabPanel("Options",
+        function(request) shiny::tabPanel("Select and filter",
             shiny::h2("Features"),
             shiny::radioButtons(p("selFeat"), 
                                 label="Show features with greatest span of:", 
@@ -91,7 +92,7 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
             shiny::br(),
             
             shiny::h2("Samples"),
-            shiny::uiOutput(p("selCol")),
+            selectizeInput(p("choosecol"), "Choose samples to display",multiple=T,colvec, selected=colvec, width="100%"),
             shiny::radioButtons(p("clusterby"), 
                                 label="Order samples by: ", 
                                 choices=list("Tail length" = 2, "Expression" = 3, "Retain existing order" = 1), 
@@ -101,12 +102,10 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
             
             shiny::h2("Options"),
             shiny::numericInput(p("nmin"), "Trim Tail Counts below value to NA", 50, min=0,max=1000,step=1),
-            shiny::numericInput(p("expmin"), "Exclude genes with expression counts below: ", 0, min=0,max=1500,step=1),
-            shiny::uiOutput(p("chrs"))
-            #shinyURL::shinyURL.ui()
+            shiny::numericInput(p("expmin"), "Exclude genes with all expression counts below: ", 0, min=0,max=1500,step=1)
         ),
-        shiny::tabPanel("Plot",plot$component_ui),
-        shiny::tabPanel("GO analysis of selection",
+        function(request) shiny::tabPanel("Tail heatmap", call_ui(plot$component_ui, request)),
+        function(request) shiny::tabPanel("GO analysis of selection",
             shiny::fluidRow(
                 shiny::column(3, shiny::numericInput(p("fdrcutoff"), "p value cutoff", 0.05, min=0.0001, max=1, step=0.01)),
                 shiny::column(3, shiny::radioButtons(p("ontype"), label="Ontology search type",
@@ -134,12 +133,15 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
             
             datfr2 <- list()
             
-            colvec <- -which(names(datfr$Tail) %in% env$input[[p("choosecol")]])
+            #colvec <- which(names(datfr$Tail) %in% env$input[[p("choosecol")]])
+            colvec <- match(env$input[[p("choosecol")]], names(datfr$Tail))
             
-            datfr$Tail[datfr$Tail_count < env$input[[p("nmin")]]] = NA
+            #datfr$Tail[datfr$Tail_count < env$input[[p("nmin")]]] <- NA
             
-            datfr2$Tail <- datfr$Tail[,-colvec]
-            datfr2$Count <- datfr$Count[,-colvec]
+            datfr2$Tail <- datfr$Tail[,colvec,drop=F]
+            datfr2$Tail[datfr$Tail_count[,colvec,drop=F] < env$input[[p("nmin")]]] <- NA
+            
+            datfr2$Count <- datfr$Count[,colvec,drop=F]
             
             hldvec2 <- apply(datfr2$Tail,1,function(row) {
                 any(sum(!is.na(row))>= 2)
@@ -148,14 +150,14 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
             datfr2$Tail <- datfr2$Tail[hldvec2,]
             datfr2$Count <- datfr2$Count[hldvec2,]
             
-            if(env$input[[p("clusterby")]] == 4){
-                datfr$Tail <- datfr$Tail[env$input[[p("choosecol")]]]
-                datfr2$Count <- datfr$Count[env$input[[p("choosecol")]]]
-            }
+            #if(env$input[[p("clusterby")]] == 4){
+            #    datfr$Tail <- datfr$Tail[env$input[[p("choosecol")]]]
+            #    datfr2$Count <- datfr$Count[env$input[[p("choosecol")]]]
+            #}
             
             #Append names for neatness in graphic
-            colnames(datfr2$Tail) <- paste(colnames(datfr2$Tail), "Tail")
-            colnames(datfr2$Count) <- paste(colnames(datfr2$Count), "Count")
+            #colnames(datfr2$Tail) <- paste(colnames(datfr2$Tail), "Tail")
+            #colnames(datfr2$Count) <- paste(colnames(datfr2$Count), "Count")
             datfr3 <- list()
             
             hldvec3 <- apply(datfr2$Count,1,function(row) {
@@ -176,16 +178,7 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
             datfr3$Tail <- datfr3$Tail[orderedvec,]
             datfr3$Count <- datfr3$Count[orderedvec,]
             datfr3$Tail_count <- datfr3$Tail_count[orderedvec,]
-            datfr3$Tail_count <- datfr3$Tail_count[,-colvec]
-            
-            #Sort into order
-            cvec <- datfr3$annotate$chromosome
-            cvec <- cvec %in% env$input[[p("choosechr")]]
-            
-            datfr3$annotate <- datfr3$annotate[cvec,]
-            datfr3$Tail <- datfr3$Tail[cvec,]
-            datfr3$Tail_count <- datfr3$Tail_count[cvec,]
-            datfr3$Count <- datfr3$Count[cvec,]
+            datfr3$Tail_count <- datfr3$Tail_count[,colvec,drop=F]
             
             #Truncate names for neatness
            # rownames(datfr3$Count) <- substr(rownames(datfr3$Count), 1, 17)
@@ -195,8 +188,11 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
            # datfr3$annotate$product <- substr(datfr3$annotate$product , 1, 76)
            # datfr3$annotate$gene <- substr(datfr3$annotate$gene, 1, 11)
             
-            return(datfr3)
+            datfr3
         })
+        
+        # Means to extract universe for selection
+        env[[p("rows")]] <- reactive({ rownames(wproc()$annotate) })
         
         # Processes the selection of rows by calculating maximum span in either tail length of expression
         selproc <- reactive({
@@ -235,24 +231,14 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
             return(env$input[[p("ontype")]])
         })
         # Enables env to hold the data from sh_hmap_detailed
-        env$seldat <- selproc
-        env$goDB <- goDBret
-        env$hgc <- hgcret
-        env$otype <- otype
+        env[[p("seldat")]] <- selproc
+        #env[[p("goDB")]] <- goDBret
+        env[[p("hgc")]] <- hgcret
+        env[[p("otype")]] <- otype
         
         env$output[[p("debugOut")]] <- shiny::renderText({
             names(env)
         })
-        # RenderUI output for shiny, dynamically generate two selctize elements ---
-        env$output[[p("chrs")]] <- shiny::renderUI({
-            tmpvec <- levels(datfr$Annotation$chromosome)
-            selectizeInput("choosechr", "Choose chromosomes to display",multiple=T,tmpvec, selected=tmpvec, width="100%")
-        })
-        env$output[[p("selCol")]] <- shiny::renderUI({
-            colvec <- names(datfr$Tail)
-            selectizeInput("choosecol", "Choose samples to display",multiple=T,colvec, selected=colvec, width="100%")
-        })
-        #---
         
         env[[p("grob")]] <- reactive({
             
@@ -273,7 +259,7 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
         })
         plot$component_server(env)
         if(GOenable == TRUE){
-            env$output[[p("gotab")]] <- DT::renderDataTable(env$gotab(), 
+            env$output[[p("gotab")]] <- DT::renderDataTable(env[[p("gotab")]](), 
                 server=F
                 #extensions = 'TableTools',
                 #options = list(searchHighlight = TRUE,
@@ -292,7 +278,7 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
         env$output[[p("dlanalysis")]] <- shiny::downloadHandler(
             paste0("Analysis.csv"),
             function(filename) {
-                write.csv(env$gotab(), filename)
+                write.csv(env[[p("gotab")]](), filename)
             }
         )
     }

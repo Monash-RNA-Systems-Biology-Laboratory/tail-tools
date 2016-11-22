@@ -100,6 +100,9 @@ def bedgraph(filename, spanners):
                 pos = pos + length
 
 
+def alignment_is_polya(al):
+    return any( item.startswith("AA:i:") for item in al.extra )
+
 
 def iter_fragments(alf):
     pool = { }
@@ -129,7 +132,7 @@ def iter_fragments(alf):
 
 
 
-def make_bigwig(prefix, bam_filenames, make_spanner, fragments=False, stop_after=None, scale=1.0): 
+def make_bigwig(prefix, bam_filenames, make_spanner, fragments=False, stop_after=None, scale=1.0, polya=False): 
     have_pysam = False
     try:
         import pysam
@@ -167,6 +170,9 @@ def make_bigwig(prefix, bam_filenames, make_spanner, fragments=False, stop_after
             for item in alf:
                 if item.is_unmapped or item.is_secondary or item.is_supplementary:
                     continue
+                    
+                if polya and not alignment_is_polya(item):
+                    continue
             
                 # Assume --> <-- oriented read pairs
                 which = forward if bool(item.is_reverse) == bool(item.is_read2) else reverse
@@ -178,6 +184,9 @@ def make_bigwig(prefix, bam_filenames, make_spanner, fragments=False, stop_after
         
         else:
             for item in iter_fragments(alf):
+                if polya and not any(alignment_is_polya(al) for al in item):
+                    continue
+            
                 # Assume --> <-- oriented read pairs
                 which = forward if bool(item[0].is_reverse) == bool(item[0].is_read2) else reverse
                 which[item[0].reference_name].add( make_spanner(item) )
@@ -264,7 +273,7 @@ def fragment_coverage(items):
 
 
 def make_ambiguity_bigwig(prefix, bam_filenames, stop_after=None, subsample=1): 
-    import pysam
+    #import pysam
     
     #alf = pysam.AlignmentFile(bam_filenames[0])
     #header = alf.header
@@ -279,11 +288,12 @@ def make_ambiguity_bigwig(prefix, bam_filenames, stop_after=None, subsample=1):
 
     #alf.close()
 
-    unambiguous = [ Piler(i) for i in chrom_sizes ]
-    total = [ Piler(i) for i in chrom_sizes ]
+    unambiguous = dict([ (i,Piler(j)) for i,j in zip(chrom_names,chrom_sizes) ])
+    total = dict([ (i,Piler(j)) for i,j in zip(chrom_names,chrom_sizes) ])
 
     for filename in bam_filenames:
-        alf = pysam.AlignmentFile(filename)
+        #alf = pysam.AlignmentFile(filename)
+        alf = sam.Bam_reader(filename)
         n = 0
         
         sub = subsample-1
@@ -294,10 +304,16 @@ def make_ambiguity_bigwig(prefix, bam_filenames, stop_after=None, subsample=1):
             sub = (sub + 1) % subsample
             if sub: continue
         
-            spanner = fragment_split_coverage([item])
-            total[item.reference_id].add(spanner)
-            if item.get_tag("NH") == 1:
-                unambiguous[item.reference_id].add(spanner)
+            #spanner = fragment_split_coverage([item])
+            spanner = fragment_coverage([item])        #TODO fixme when blocks available
+            total[item.reference_name].add(spanner)
+            
+            NH = 1
+            for item2 in item.extra:
+                if item2.startswith("NH:i:"):
+                    NH = int(item2[5:])
+            if NH == 1:
+                unambiguous[item.reference_name].add(spanner)
                 
             n += 1
             if stop_after is not None and n > stop_after: break
@@ -308,8 +324,8 @@ def make_ambiguity_bigwig(prefix, bam_filenames, stop_after=None, subsample=1):
 
     ambiguities = [ ]
     for i in xrange(len(total)):
-        u = unambiguous[i].get()
-        t = map_spanner(lambda x: x*1j, total[i].get())
+        u = unambiguous[chrom_names[i]].get()
+        t = map_spanner(lambda x: x*1j, total[chrom_names[i]].get())
         c = pile([u,t],initial=0.0)
         c = map_spanner(lambda x: max(0.0,x.imag-x.real)/max(x.imag,1.0), c)
         ambiguities.append(c)
@@ -406,6 +422,8 @@ start - Fragment start locations (5' end of read 1).
 end - Fragment end locations (5' end of read 2).
 5p - Read start locations.
 3p - Read end locations.
+polyaspan - Depth of coverage spanned by reads with AA:i:... tag.
+polya3p - Read end location of reads with AA:i:... tag.
 ambiguity - What proportion of reads are multi-mappers at each base, using NH attribute in BAM file.
 
 Note: "cover" alone requires the pysam library. 
@@ -442,6 +460,12 @@ class Bam_to_bigwig(config.Action_with_prefix):
                 elif item == "3p":
                     stage.process(make_bigwig,
                         self.prefix + "-3p", self.bam_files, read_ends, False, scale=self.scale)
+                elif item == "polyaspan":
+                    stage.process(make_bigwig,
+                        self.prefix + "-polyaspan", self.bam_files, fragment_coverage, True, scale=self.scale, polya=True)
+                elif item == "polya3p":
+                    stage.process(make_bigwig,
+                        self.prefix + "-polya3p", self.bam_files, read_ends, False, scale=self.scale, polya=True)
                 elif item == "ambiguity":
                     stage.process(make_ambiguity_bigwig,
                         self.prefix + "-ambiguity", self.bam_files, subsample=self.subsample)
@@ -472,6 +496,7 @@ class Bam_ambiguity(config.Action_with_prefix):
 @config.Main_section("working_dirs", "Working directories or pipeline output directory (from \"analyse-polya-batch:\").")
 class Polya_bigwigs(config.Action_with_output_dir):
     pipeline_dir = None
+    working_dirs = [ ]
     norm_file = ""
     peaks_file = None
     title = "IGV tracks"
@@ -493,19 +518,9 @@ class Polya_bigwigs(config.Action_with_output_dir):
                 if not peaks_file:
                     peaks_file = os.path.join(self.pipeline_dir, "peaks", "relation-child.gff")
 
-        #state_filename = os.path.join(self.pipeline_dir,'analyse-polya-batch.state')
-        #with open(state_filename,'rb') as f:
-        #    state = pickle.load(f)
-
-        #sample_names = [ ]
-        #working_dirs = [ ]
-        #for sample in state.samples:
-        #    sample_names.append(sample.output_dir)
-        #    working_dirs.append(os.path.join(self.pipeline_dir,'samples',sample.output_dir))
         
         sample_names = [ os.path.split(dirname)[1] for dirname in working_dirs ]
         workspaces = [ working_directory.Working(dirname, must_exist=True) for dirname in working_dirs ]
-        workspaces_polya = [ working_directory.Working(dirname+"-polyA", must_exist=True) for dirname in working_dirs ]
         
         workspace = self.get_workspace()
         
@@ -517,9 +532,6 @@ class Polya_bigwigs(config.Action_with_output_dir):
             ))
         
         bams = [ item/"alignments_filtered_sorted.bam" for item in workspaces ]
-        bams_raw = [ item/"alignments.bam" for item in workspaces ]
-        bams_polya = [ item/"alignments_filtered_sorted.bam" for item in workspaces_polya ]
-
         
         for i in xrange(len(sample_names)):
             io.symbolic_link(bams[i], workspace/(sample_names[i]+".bam"))
@@ -527,29 +539,24 @@ class Polya_bigwigs(config.Action_with_output_dir):
         
         io.symbolic_link(peaks_file, workspace/"peaks.gff")
 
-        
-        #print "SKIP!  TODO: bams"
-        #return
                 
         if self.norm_file:
             mults = io.read_grouped_table(self.norm_file)['All']
             norm_mult = [ float(mults[name]['Normalizing.multiplier']) for name in sample_names ]
         
         with nesoni.Stage() as stage:
-            Bam_ambiguity(workspace/"ambiguity", bam_files=bams_raw).process_make(stage)
-            
-            Bam_to_bigwig(workspace/"total-all", bam_files=bams, what="span,3p",
-                ).process_make(stage)
-            Bam_to_bigwig(workspace/"total-polya", bam_files=bams_polya, what="span,3p",
+            Bam_to_bigwig(workspace/"total", bam_files=bams, what="ambiguity,span,3p,polyaspan,polya3p",
                 ).process_make(stage)
             
             for i in xrange(len(sample_names)):
-                for scale_desc, scale in [("raw",1.0)]+([("norm",norm_mult[i])] if self.norm_file else []):
-                    for bam_desc, bam in [("all", bams[i]), ("polya", bams_polya[i])]:
-                        Bam_to_bigwig(
-                            workspace/(sample_names[i]+"-"+bam_desc+"-"+scale_desc), 
-                            bam_files=[bam], what="span,3p", scale=scale
-                            ).process_make(stage)
+                for scale_desc, scale in \
+                        [("raw",1.0)] + \
+                        ([("norm",norm_mult[i])] if self.norm_file else []):
+                    Bam_to_bigwig(
+                        workspace/(sample_names[i]+"-"+scale_desc), 
+                        bam_files=[bams[i]], 
+                        what='span,3p,polyaspan,polya3p', scale=scale
+                        ).process_make(stage)
 
 
 

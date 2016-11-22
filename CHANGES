@@ -1,4 +1,6 @@
 
+1.1  - Remove deduplication.
+
 0.43 - Clip Illumina reads to a region containing 90% bases with quality at
        least 20. Poly(A) tails are only called within this region, this
        means we see less long poly(A) tails, so this changes the tail length statistics 

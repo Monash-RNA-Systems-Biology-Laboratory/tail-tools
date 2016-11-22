@@ -1,4 +1,4 @@
-VERSION = '0.43dev'
+VERSION = '1.1dev'
 #^ Note: this first line is read by the setup.py script to get the version
 
 import nesoni
@@ -12,13 +12,15 @@ from .alternative_tails import Compare_peaks
 from .call_utrs import Call_utrs
 from .test import Test
 from .web import Geneview_webapp
-from .workflows import Call_peaks, Analyse_polya, Analyse_polya_batch
 from .reference_directory import Make_tt_reference, Make_ucsc_reference
 from .reference_directory_ensembl import Make_ensembl_reference
 from .primer_gff import Primer_gff
 from .rnaseq import Make_rnaseq_reference
 from .bigwig import Bam_to_bigwig, Bam_ambiguity, Polya_bigwigs
 from .shiny import Shiny
+from .peaks import Call_peaks
+from .workflows import Analyse_polya, Analyse_polya_batch
+
 
 def main():
     nesoni.run_toolbox([
