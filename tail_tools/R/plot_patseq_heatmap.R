@@ -12,6 +12,7 @@
 #' @param gene_labels Gene labels
 #' @param product_labels Product labels
 #' @param row_ord Order rows by tail length or expression
+#' @param tail_relative Tail lengths are relative to average for feature
 #' 
 #' @import varistran
 #' @export
@@ -26,7 +27,8 @@ plot_patseq_heatmap <- function(
     feature_labels=NULL,
     gene_labels=NULL,
     product_labels=NULL,
-    row_ord=1
+    row_ord=1,
+    tail_relative=TRUE
 ) {
     
     y <- as.matrix(matf1)
@@ -74,7 +76,10 @@ plot_patseq_heatmap <- function(
     
     means <- rowMeans(y, na.rm = TRUE)
     means[is.nan(means)] = 0
-    y_centered <- y - means
+    if (tail_relative)
+        y_centered <- y - means
+    else
+        y_centered <- y
     means2 <- rowMeans(z, na.rm = TRUE)
     means2[is.nan(means2)] = 0
     z_centered <- z - means2
@@ -85,7 +90,10 @@ plot_patseq_heatmap <- function(
     }
     # Set up row ordering from input
     if(row_ord==1){
-        y_scaled <- y_centered / sqrt(rowMeans(y_centered*y_centered, na.rm = TRUE))
+        if (tail_relative)
+            y_scaled <- y_centered / sqrt(rowMeans(y_centered*y_centered, na.rm = TRUE))
+        else
+            y_scaled <- y_centered
         row_order <- varistran::make_ordering(y_scaled, enable=cf)
     } else if (row_ord==2){
         z_scaled <- z_centered / sqrt(rowMeans(z_centered*z_centered, na.rm = TRUE))
@@ -116,8 +124,8 @@ plot_patseq_heatmap <- function(
     #Heatmap 1 (Tail length)
     heatmap <- heatmap_grob(
         y_centered[row_order$order,col_order$order,drop=F],
-        signed=TRUE,
-        legend_title=paste0("difference from\nrow mean"))
+        signed=tail_relative,
+        legend_title=if (tail_relative) "difference from\nrow mean" else "")
     
     #Heatmap 2 (RPM)
     heatmap2 <- heatmap_grob(

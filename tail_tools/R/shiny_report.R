@@ -47,6 +47,11 @@ shiny_counts_report <- function(tc, pipeline_dir=NULL, species=NULL, title="Tail
     
     feature <- shiny_feature(tc, is_peak=is_peaks, peak_tc=peak_tc, prefix=ns("feature"))
     
+    tail_distribution <- shiny_tail_distribution(
+        pipeline_dir = pipeline_dir,
+        peaks = if (is_peaks) tc$features else peak_tc$features,
+        prefix=ns("tail_distribution"))
+    
     panels <- c(
         list("Expression"),
         varistran_app$component_panels,
@@ -65,7 +70,10 @@ shiny_counts_report <- function(tc, pipeline_dir=NULL, species=NULL, title="Tail
             function(request)
                 shiny::tabPanel(what, 
                     shiny::textInput(ns("feature_name"), what, ""),
-                    feature$component_ui(request))))
+                    feature$component_ui(request))),
+            function(request)
+                shiny::tabPanel("- poly(A) tail distribution",
+                    tail_distribution$component_ui(request)))
     
     server <- function(env) {
         e <- function(name) env[[ns(name)]]()
@@ -103,6 +111,20 @@ shiny_counts_report <- function(tc, pipeline_dir=NULL, species=NULL, title="Tail
                 NULL
         })
         
+        env[[ns("tail_distribution-peak_names")]] <- reactive({
+            feature <- e("feature-feature")
+            if (is_peaks)
+                return(feature)
+            else
+                return(peak_tc$features$feature[
+                    peak_tc$features$parent %in% feature &
+                    peak_tc$features$relation != "Antisense"])
+        })
+        
+        env[[ns("tail_distribution-sample_normalizer")]] <- reactive({
+            select_(tc$samples, ~sample, ~normalizer)
+        })
+        
         
         # Sub-components
 
@@ -110,9 +132,25 @@ shiny_counts_report <- function(tc, pipeline_dir=NULL, species=NULL, title="Tail
         heatmap_app$component_server(env)
         featureset$component_server(env)
         feature$component_server(env)
-
+        tail_distribution$component_server(env)
+        
 
         # Non-reactive event handling
+        
+        observeEvent({ e("varistran-rows-selected") }, {
+            if (!length(e("varistran-rows-selected"))) return()
+            
+            updateRadioButtons(env$session, ns("setsource"), selected="heatmap")
+            updateTabsetPanel(env$session, ns("tabset"), selected=paste(what,"set"))
+        })
+        
+        observeEvent({ e("heatmap-plot-rows-selected") }, {
+            if (!length(e("heatmap-plot-rows-selected"))) return()
+            
+            updateRadioButtons(env$session, ns("setsource"), selected="tailmap")
+            updateTabsetPanel(env$session, ns("tabset"), selected=paste(what,"set"))
+        })
+        
         
         # Normalize case, resolve nomeclature gene names
         observeEvent({ i("feature_name") }, {
@@ -159,10 +197,10 @@ shiny_tailtools_report <- function(path, species=NULL, title="Tail Tools report"
     peakwise_filename <- paste0(path,"/expression/peakwise/counts.csv")
     peakwise_tc <- read_tail_counts(peakwise_filename)
 
-    genewise_report <- shiny_counts_report(genewise_tc, species=species, prefix=ns("genewise"), is_peaks=FALSE, peak_tc=peakwise_tc, title=NULL)
+    genewise_report <- shiny_counts_report(genewise_tc, pipeline_dir=path, species=species, prefix=ns("genewise"), is_peaks=FALSE, peak_tc=peakwise_tc, title=NULL)
     genewise_panel <- function(request) tabPanel("Genes", genewise_report$component_ui(request))
 
-    peakwise_report <- shiny_counts_report(peakwise_tc, species=species, pipeline_dir=path, prefix=ns("peakwise"), is_peaks=TRUE, title=NULL)
+    peakwise_report <- shiny_counts_report(peakwise_tc, pipeline_dir=path, species=species, prefix=ns("peakwise"), is_peaks=TRUE, title=NULL)
     peakwise_panel <- function(request) tabPanel("Peaks", peakwise_report$component_ui(request))
     
     panels <- list(
@@ -189,9 +227,9 @@ shiny_tailtools_report <- function(path, species=NULL, title="Tail Tools report"
             }
         })
         
-        observe({
-            print(names(env$input))
-        })
+        #observe({
+        #    print(names(env$input))
+        #})
     }
     
     composable_shiny_panels_app(panels, server, prefix=prefix, title=title, top=TRUE)

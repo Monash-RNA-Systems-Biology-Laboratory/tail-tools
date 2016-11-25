@@ -79,8 +79,8 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
         function(request) shiny::tabPanel("Select and filter",
             shiny::h2("Features"),
             shiny::radioButtons(p("selFeat"), 
-                                label="Show features with greatest span of:", 
-                                choices=list("Tail length"=1, "Expression"=2), 
+                                label="Show features with greatest:", 
+                                choices=list("Span of tail length"=1, "Span of expression"=2, "Average expression"=3), 
                                 selected=1,
                                 inline=TRUE),
             shiny::radioButtons(p("roword"), 
@@ -101,6 +101,7 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
             shiny::br(),
             
             shiny::h2("Options"),
+            shiny::checkboxInput(p("tail_relative"), "Tail lengths relative to mean for feature.", value=TRUE),
             shiny::numericInput(p("nmin"), "Trim Tail Counts below value to NA", 50, min=0,max=1000,step=1),
             shiny::numericInput(p("expmin"), "Exclude genes with all expression counts below: ", 0, min=0,max=1500,step=1)
         ),
@@ -201,15 +202,16 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
                 y <- a1$Tail
             } else if(env$input[[p("selFeat")]] == 2){
                 y <- a1$Count
+            } else {
+                y <- as.matrix(rowMeans(a1$Count, na.rm=TRUE), ncol=1)
             }
-            y <- ensure_reactable(y)
             
             n <- env$input[[p("n")]]
             if (n > 2000) stop("Drawing large heatmaps uses excessive system resources. Sorry.")
             
-            y_val <- as.matrix(y(env))
-            y_span <- apply(y_val,1,max,na.rm=T) - apply(y_val,1,min,na.rm=T)
-            selection <- rep(FALSE,nrow(y_val))
+            y <- as.matrix(y)
+            y_span <- apply(y,1,max,na.rm=T) - apply(y,1,min,na.rm=T)
+            selection <- rep(FALSE,nrow(y))
             selection[ order(-y_span)[ seq_len(n) ] ] <- TRUE
             
             if (sum(selection) < 1) stop("No features to show.")
@@ -254,7 +256,8 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
                 sample_labels2=sample_labels(env),
                 feature_labels=feature_labels(env)[selection],
                 clusterby=env$input[[p("clusterby")]],
-                row_ord=env$input[[p("roword")]]   
+                row_ord=env$input[[p("roword")]],
+                tail_relative=env$input[[p("tail_relative")]]   
             )
         })
         plot$component_server(env)

@@ -54,8 +54,9 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
                               brush = brushOpts(
                                   id =p("plot_brush"),  
                                   direction = 'y',
-                                  resetOnNew = T,
-                                  clip=T
+                                  resetOnNew = TRUE,
+                                  clip = TRUE,
+                                  delay = 600000
                               ),
                               width=env$input[[p("width")]],
                               height=env$input[[p("height")]]
@@ -129,16 +130,17 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
         
         # Works out if any rows are selected and returns selected rows
         # Calculates rows based on y-coordinates from brush output
-        # If no rows are selected, outputs all rows shown in the heatmap
+        ## If no rows are selected, outputs all rows shown in the heatmap
         calcdt <- reactive({
-            numrows <- nrow(selin(env))
+            numrows <- isolate( nrow(selin(env)) )
             
             ytop <- round((env$input[[p("plot_brush")]]$ymax + 2)/(54/numrows))
             ybot <- round((env$input[[p("plot_brush")]]$ymin + 2)/(54/numrows)+1)
             if(length(ytop) == 0){
-                return(selin(env)[rorder(env),])
+                return( isolate( selin(env) )[c(),])
+                #return(selin(env)[rorder(env),])
             } else {
-                sel <- selin(env)[rorder(env),]
+                sel <- isolate( selin(env)[rorder(env),] )
                 sel <- sel[(ytop):ybot,]
                 return(sel)
             }

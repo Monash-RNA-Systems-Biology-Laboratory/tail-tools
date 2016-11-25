@@ -53,10 +53,13 @@ shiny_featureset <- function(tc, fs=NULL, species=NULL, is_peaks=FALSE, prefix="
         })
         
         env[[ns("feature-selected")]] <- reactive({
-            if (nrow(e("table-df")) == 1)
-                e("table-df")$feature
+            table_df <- isolate(e("table-df"))
+            rows_selected <- env$input[[ns("table-table_rows_selected")]]
+            
+            if (nrow(table_df) == 1)
+                table_df$feature
             else
-                e("table-df")$feature[ env$input[[ns("table-table_rows_selected")]] ]
+                table_df$feature[rows_selected]
         })
         
         
@@ -82,15 +85,14 @@ shiny_featureset <- function(tc, fs=NULL, species=NULL, is_peaks=FALSE, prefix="
         
         if (have_species) env[[ns("enrich-options")]] <- reactive({
             col_names <- colnames(e("enrich-df"))
-            cols <- seq_len(col_names)
-            colnames(cols) <- col_names
+            cols <- as.list(seq_along(col_names)-1)
+            names(cols) <- col_names
             
             list(
                 pageLength=20,
                 columnDefs=list(
-                    
-                )
-            )
+                    precision_coldef(cols$FDR, 3),
+                    precision_coldef(cols$p_value, 3)))
         })
         
         table$component_server(env)

@@ -17,7 +17,17 @@ shiny_table <- function(df=NULL, options=NULL, title="Table", filename="table.cs
     
     server <- function(env) {
         df <- ensure_reactive(df, ns("df"), env)
-        options <- ensure_reactive(options, ns("options"), env, default=list(pageLength=50))
+        options <- ensure_reactive(options, ns("options"), env, default=function() list())
+        
+        options_plus <- reactive({
+            result <- list(
+                pageLength=50, 
+                selected=c())
+            opts <- options()
+            for(name in names(opts))
+                result[[name]] <- opts[[name]]
+            result
+        })
         
         env$output[[ns("table")]] <- DT::renderDataTable(
             selection = "single",

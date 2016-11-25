@@ -25,8 +25,8 @@ read_tail_counts <- function(filename) {
            feature = rep(features$feature, nrow(samples)),
            sample = rep(samples$sample, each=nrow(features)),
            count = do.call(c, tab$Count),
-           tail = do.call(c, tab$Tail),
-           tail_count = do.call(c, tab$Tail_count))
+           tail_count = do.call(c, tab$Tail_count),
+           tail = do.call(c, tab$Tail))
    
    list(
        obs = obs, 
@@ -86,9 +86,13 @@ tail_counts_vst <- function(tc) {
     
     vmat <- varistran::vst(mat)
     
-    tc$obs$vst <- c(vmat)
+    lib_size <- attr(vmat,"lib.size")
+    
+    tc$obs$norm_count <- c(t(t(mat) / (lib_size/mean(lib_size))))
+    tc$obs$log2_norm_count <- c(vmat)
     tc$samples$true_lib_size <- attr(vmat, "true.lib.size")
     tc$samples$effective_lib_size <- attr(vmat, "lib.size")
+    tc$samples$normalizer <- tc$samples$effective_lib_size / mean(tc$samples$effective_lib_size)
     tc$vst_dispersion <- attr(vmat, "dispersion") 
     tc$vst_method <- attr(vmat, "method")
     tc$vst_lib_size_method <- attr(vmat, "lib.size.method")
@@ -101,7 +105,7 @@ tail_counts_vst <- function(tc) {
 #' Extract the vst values from a tail_counts
 #'
 tail_counts_get_vst <- function(tc) {
-    mat <- tail_counts_get_matrix(tc, "vst")
+    mat <- tail_counts_get_matrix(tc, "log2_norm_count")
     attr(mat, "true.lib.size") <- tc$sample$true_lib_size
     attr(mat, "lib.size") <- tc$sample$effective_lib_size
     attr(mat, "dispersion") <- tc$vst_dispersion

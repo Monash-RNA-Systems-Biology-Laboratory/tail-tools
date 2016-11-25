@@ -7,6 +7,27 @@ Maintainer: Paul Harrison <paul.harrison@monash.edu>
 URL: https://github.com/Victorian-Bioinformatics-Consortium/tail-tools
 Version: 0.1
 License: LGPL-2.1
-Depends: BiocGenerics, S4Vectors, edgeR, limma, rtracklayer, GenomicRanges, ggbio, gridBase, dplyr, readr, purrr, tidyr, stringr, assertthat, ggplot2, seriation, shiny, DT, nesoni, varistran
+Depends: 
+    BiocGenerics, 
+    S4Vectors, 
+    edgeR, 
+    limma, 
+    rtracklayer, 
+    GenomicRanges, 
+    ggbio, 
+    gridBase, 
+    dplyr, 
+    readr, 
+    purrr, 
+    tidyr, 
+    stringr, 
+    assertthat, 
+    ggplot2, 
+    viridis,
+    seriation, 
+    shiny, 
+    DT, 
+    nesoni, 
+    varistran
 Suggests: GOstats, org.Sc.sgd.db, org.Hs.eg.db, org.Ce.eg.db, org.Mm.eg.db
 RoxygenNote: 5.0.1
