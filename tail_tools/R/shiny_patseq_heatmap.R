@@ -200,19 +200,21 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
             a1 <- wproc()
             if(env$input[[p("selFeat")]] == 1){
                 y <- a1$Tail
+                y <- as.matrix(y)
+                interest <- apply(y,1,max,na.rm=T) - apply(y,1,min,na.rm=T)
             } else if(env$input[[p("selFeat")]] == 2){
                 y <- a1$Count
+                y <- as.matrix(y)
+                interest <- apply(y,1,max,na.rm=T) - apply(y,1,min,na.rm=T)
             } else {
-                y <- as.matrix(rowMeans(a1$Count, na.rm=TRUE), ncol=1)
+                interest <- as.matrix(rowMeans(a1$Count, na.rm=TRUE), ncol=1)
             }
             
             n <- env$input[[p("n")]]
             if (n > 2000) stop("Drawing large heatmaps uses excessive system resources. Sorry.")
             
-            y <- as.matrix(y)
-            y_span <- apply(y,1,max,na.rm=T) - apply(y,1,min,na.rm=T)
-            selection <- rep(FALSE,nrow(y))
-            selection[ order(-y_span)[ seq_len(n) ] ] <- TRUE
+            selection <- rep(FALSE,length(interest))
+            selection[ order(-interest)[ seq_len(n) ] ] <- TRUE
             
             if (sum(selection) < 1) stop("No features to show.")
             
