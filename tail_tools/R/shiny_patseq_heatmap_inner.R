@@ -134,14 +134,18 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
         calcdt <- reactive({
             numrows <- isolate( nrow(selin(env)) )
             
-            ytop <- round((env$input[[p("plot_brush")]]$ymax + 2)/(54/numrows))
-            ybot <- round((env$input[[p("plot_brush")]]$ymin + 2)/(54/numrows)+1)
+            #ytop <- round((env$input[[p("plot_brush")]]$ymax + 2)/(54/numrows))
+            #ybot <- round((env$input[[p("plot_brush")]]$ymin + 2)/(54/numrows)+1)
+            brush <- env$input[[p("plot_brush")]]
+            ytop <- max(1, min(numrows, floor(brush$ymax*numrows+0.5)))            
+            ybot <- max(1, min(numrows, floor(brush$ymin*numrows+1.5)))
+            
             if(length(ytop) == 0){
-                return( isolate( selin(env) )[c(),])
+                return( isolate( selin(env) )[c(),] )
                 #return(selin(env)[rorder(env),])
             } else {
                 sel <- isolate( selin(env)[rorder(env),] )
-                sel <- sel[(ytop):ybot,]
+                sel <- sel[ytop:ybot,]
                 return(sel)
             }
         })
@@ -168,13 +172,21 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
             vp <- viewport(layout.pos.row = 1, layout.pos.col = 1)
             plot.new()
             callback(env)
+            
+            #seekViewport("prodVP")
+            #pltvec <- gridPLT()
+            #pltvec <- c(0, 1, pltvec[3], pltvec[4])
+            #par(new=T, plt=pltvec)
+            #plot(1,type="n", axes=F, xlab ="",ylab="",xlim=c(0,50),ylim=c(0,50))
+            #popViewport()            
+            
             seekViewport("prodVP")
-            pltvec <- gridPLT()
+            pltvec <- gridBase::gridPLT()
+            # Selection to span full width of plot
             pltvec <- c(0, 1, pltvec[3], pltvec[4])
             par(new=T, plt=pltvec)
-            plot(1,type="n", axes=F, xlab ="",ylab="",xlim=c(0,50),ylim=c(0,50))
-            
-            popViewport()            
+            plot(1, type="n", axes=F, xlab="", ylab="", xlim=c(0,1), ylim=c(0,1),
+                 xaxs="i", yaxs="i")
         }))
         
         # Download handlers---

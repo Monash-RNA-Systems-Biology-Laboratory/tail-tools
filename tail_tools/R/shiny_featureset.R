@@ -86,15 +86,7 @@ shiny_featureset <- function(tc, fs=NULL, species=NULL, is_peaks=FALSE, prefix="
             geneset            
         })
         
-        if (have_species) env$output[[ns("description")]] <- renderUI({
-            shiny::div(
-                shiny::p( 
-                    paste0(
-                        length(geneset()$set), " genes from a universe of ", 
-                        length(geneset()$universe), ".")))
-        })
-        
-        if (have_species) env[[ns("enrich-df")]] <- reactive(withProgress(
+        if (have_species) enrich_result <- reactive(withProgress(
             message="Testing gene sets", {
             if (length(geneset()$set) == 0 || all(geneset()$universe %in% geneset()$set))
                 return(NULL)
@@ -107,6 +99,21 @@ shiny_featureset <- function(tc, fs=NULL, species=NULL, is_peaks=FALSE, prefix="
                     if (env$input[[ns("CC")]]) "CC",
                     if (env$input[[ns("KEGG")]]) "KEGG"))
         }))
+
+        if (have_species) env$output[[ns("description")]] <- renderUI({
+            shiny::div(
+                shiny::p( 
+                    paste0(
+                        length(geneset()$set), " genes from a universe of ", 
+                        length(geneset()$universe), "."),
+                    if (!is.null(enrich_result())) shiny::p(
+                        "Present in the gene-sets tested: ",
+                        length(enrich_result()$set), " genes from a universe of ",
+                        length(enrich_result()$universe), ".")))
+        })
+        
+        
+        if (have_species) env[[ns("enrich-df")]] <- reactive( enrich_result()$table )
         
         if (have_species) env[[ns("enrich-options")]] <- reactive({
             col_names <- colnames(e("enrich-df"))

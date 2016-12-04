@@ -113,7 +113,7 @@ featureset_test_genesets <- function(fs, species, minimum_set_size=2, ontologies
         select_(~FDR, p_value=~P.DE, size=~N, overlap=~DE, ~set_name, ~ontology, ~description) %>%
         arrange_(~p_value)
     
-    result    
+    list(table=result, set=set, universe=universe)    
 }
 
 
