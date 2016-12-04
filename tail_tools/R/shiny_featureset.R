@@ -37,7 +37,9 @@ shiny_featureset <- function(tc, fs=NULL, species=NULL, is_peaks=FALSE, prefix="
                         shiny::checkboxInput(ns("KEGG"), "KEGG Pathways", TRUE)),
                     shiny::column(8,
                         shiny::numericInput(ns("min_set"), "Minimum set size", 2))),
-                enrich_table$component_ui(request)))
+                shiny::uiOutput(ns("description")),
+                enrich_table$component_ui(request),
+                shiny::p("p values and FDR are from Fisher's Exact Test. They may be overly liberal as this test does not account for inter-gene correlation.")))
     
     server <- function(env) {
         e <- function(name) env[[ns(name)]]()
@@ -49,7 +51,20 @@ shiny_featureset <- function(tc, fs=NULL, species=NULL, is_peaks=FALSE, prefix="
                 dplyr::data_frame(feature=fs()$set),
                 tc$features,
                 "feature") %>%
-            dplyr::select_(~-Length, ~-product)
+            dplyr::select_(~-one_of(c("Length","product","antisense_product"))) %>%
+            dplyr::rename_(chr="chromosome")
+        })
+        
+        env[[ns("table-options")]] <- reactive({
+            col_names <- colnames(e("table-df"))
+            cols <- as.list(seq_along(col_names)-1)
+            names(cols) <- col_names
+            
+            list(
+                pageLength=20,
+                columnDefs=list(
+                    fixed_coldef(cols$"mean-tail", 1),
+                    fixed_coldef(cols$"proportion-with-tail", 2)))
         })
         
         env[[ns("feature-selected")]] <- reactive({
@@ -62,19 +77,29 @@ shiny_featureset <- function(tc, fs=NULL, species=NULL, is_peaks=FALSE, prefix="
                 table_df$feature[rows_selected]
         })
         
-        
-        if (have_species) env[[ns("enrich-df")]] <- reactive(withProgress(
-            message="Testing gene sets", {
-            if (length(fs()$set) == 0 || all(fs()$universe %in% fs()$set))
-                return(NULL)
-            
+        if (have_species) geneset <- reactive({
             geneset <- fs()
             if (is_peaks) {
                 geneset$set <- peaks_to_genes(tc, geneset$set)
                 geneset$universe <- peaks_to_genes(tc, geneset$universe)
             }
+            geneset            
+        })
+        
+        if (have_species) env$output[[ns("description")]] <- renderUI({
+            shiny::div(
+                shiny::p( 
+                    paste0(
+                        length(geneset()$set), " genes from a universe of ", 
+                        length(geneset()$universe), ".")))
+        })
+        
+        if (have_species) env[[ns("enrich-df")]] <- reactive(withProgress(
+            message="Testing gene sets", {
+            if (length(geneset()$set) == 0 || all(geneset()$universe %in% geneset()$set))
+                return(NULL)
             
-            featureset_test_genesets(geneset, species, 
+            featureset_test_genesets(geneset(), species, 
                 minimum_set_size=env$input[[ns("min_set")]],
                 ontologies = c(
                     if (env$input[[ns("BP")]]) "BP",
