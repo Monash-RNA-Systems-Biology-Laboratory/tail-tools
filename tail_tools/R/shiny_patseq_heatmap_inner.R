@@ -37,31 +37,22 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
             shiny::column(3, shiny::tags$label("Download Selection as .csv"), shiny::tags$br(),
                           shiny::downloadButton(p("dlsel"), ".csv"))
         ),
-        shiny::uiOutput(p("plotui"), width="auto", height="auto"),
+        shiny::plotOutput(p("plot"),
+                          brush = brushOpts(
+                              id =p("plot_brush"),  
+                              direction = 'y',
+                              resetOnNew = TRUE,
+                              clip = TRUE,
+                              delay = 600000
+                          ),
+                          width="auto", height="auto"),
         DT::dataTableOutput(p('datab'))
       )
     
     # Shiny's server 
     server <- function(env) { 
-        output <- env$output
-        
-        
+        output <- env$output        
         i <- function(name) env$input
-        
-        # Renders plot and enables a brush object
-        output[[p("plotui")]] <- shiny::renderUI({
-            shiny::plotOutput(p("plot"),
-                              brush = brushOpts(
-                                  id =p("plot_brush"),  
-                                  direction = 'y',
-                                  resetOnNew = TRUE,
-                                  clip = TRUE,
-                                  delay = 600000
-                              ),
-                              width=env$input[[p("width")]],
-                              height=env$input[[p("height")]]
-            )
-        })
         
         gosrch <- reactive({
             library(GOstats)
@@ -168,17 +159,16 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
         )
 
         # Produces plot output
-        output[[p("plot")]] <- shiny::renderPlot(withProgress(message="Plotting", { 
-            vp <- viewport(layout.pos.row = 1, layout.pos.col = 1)
-            plot.new()
-            callback(env)
+        output[[p("plot")]] <- shiny::renderPlot(
+                width=function() env$input[[p("width")]],
+                height=function() env$input[[p("height")]], 
+                withProgress(message="Plotting", { 
             
-            #seekViewport("prodVP")
-            #pltvec <- gridPLT()
-            #pltvec <- c(0, 1, pltvec[3], pltvec[4])
-            #par(new=T, plt=pltvec)
-            #plot(1,type="n", axes=F, xlab ="",ylab="",xlim=c(0,50),ylim=c(0,50))
-            #popViewport()            
+            # Change of size triggers redraw
+            env$input[[p("width")]]
+            env$input[[p("height")]]
+            
+            callback(env)
             
             seekViewport("prodVP")
             pltvec <- gridBase::gridPLT()
