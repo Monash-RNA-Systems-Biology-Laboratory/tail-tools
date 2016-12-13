@@ -123,7 +123,7 @@ shiny_end_shift <- function(result) {
             items <- list(
                 tags$h2( vars$result$title ),
                 numericInput("fdr", "Circle genes significant at FDR", 0.05),
-                mr_plot$component_ui,
+                call_ui(mr_plot$component_ui, NULL),
                 tags$p("Drag to select a subset of genes."),
                 HTML("<p>Genes significant by various methods with FDR &le; 0.05 are circled.</p>"),
                 tags$p( nrow(vars$df), "genes with multiple peaks and averaging at least", vars$result$min_reads, "reads per sample.")
