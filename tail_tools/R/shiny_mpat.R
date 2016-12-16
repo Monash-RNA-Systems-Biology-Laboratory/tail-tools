@@ -291,7 +291,7 @@ shiny_mpat <- function(
 
     # App
 
-    ui <- div(
+    ui <- function(request) div(
         titlePanel(title),
         navlistPanel(
             widths=c(2,10),
@@ -333,7 +333,7 @@ shiny_mpat <- function(
             tabPanel("Overview",
                 h1("Expression levels"),
                 p("Note these are shown on a log scale."),
-                overview$component_ui,
+                call_ui(overview$component_ui,request),
                 h1("Tail lengths"),
                 p("Where there are few poly(A) reads, the length is shown in red."),
                 overview_tail$component_ui
@@ -343,8 +343,8 @@ shiny_mpat <- function(
                 if (have_plotters) checkboxInput("plotter_custom", "Use customized plots", value=TRUE),
                 p("Note expression levels are *not* log transformed in this plot."),
                 fluidRow(
-                    column(6, individual_count$component_ui),
-                    column(6, individual_tail$component_ui)),
+                    column(6, call_ui(individual_count$component_ui, request)),
+                    column(6, call_ui(individual_tail$component_ui, request))),
                 br(),
                 br(),
                 if (have_bams) h2("Detail"),
@@ -364,10 +364,10 @@ shiny_mpat <- function(
                     column(3, numericInput("tail_max", "Maximum tail length", max_tail, min=1)),
                     column(3, conditionalPanel("input.tail_style != 'Cumulative'", 
                         numericInput("tail_bin", "Tail length bin size", 1, min=1)))),
-                if (have_bams) tail_distribution$component_ui,                
+                if (have_bams) call_ui(tail_distribution$component_ui, request),                
                 if (have_bams) br(),
                 if (have_bams) h3("Templated sequence"),
-                if (have_bams) end_distribution$component_ui
+                if (have_bams) call_ui(end_distribution$component_ui, request)
             )
         )
     )
