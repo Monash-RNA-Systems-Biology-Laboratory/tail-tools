@@ -37,7 +37,7 @@ def main():
             Tail_count,
             Aggregate_tail_counts,
             Plot_pooled,
-            Plot_comparison,
+            #Plot_comparison,
             Compare_peaks,
             Call_utrs,
             Test,

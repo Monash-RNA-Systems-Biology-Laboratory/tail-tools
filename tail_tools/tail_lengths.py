@@ -397,25 +397,25 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
             write_csv_matrix(work/('tail_quantile_%d.csv'%quantile), sample_quantile_tail[quantile])
 
 
-        def raw_columns():
-            for i in xrange(n_samples):
-                row = collections.OrderedDict()
-                row['Sample'] = names[i]
-                for j in xrange(max_length):
-                    row['length-%d' % j] = str(i*max_length+j+1) #For R+, so 1 based
-                yield row
-        io.write_csv(work/'raw-columns.csv', raw_columns())
-
-        #Somewhat inefficient        
-        def raw():
-            for i in xrange(n_features):
-                row = collections.OrderedDict()
-                row['Feature'] = annotations[i].get_id()
-                for j in xrange(n_samples):
-                    for k in xrange(max_length):
-                        row['%d %s' % (k,names[j])] = str( counts[i][j][1][k] )
-                yield row
-        io.write_csv(work/'raw.csv', raw())
+        #def raw_columns():
+        #    for i in xrange(n_samples):
+        #        row = collections.OrderedDict()
+        #        row['Sample'] = names[i]
+        #        for j in xrange(max_length):
+        #            row['length-%d' % j] = str(i*max_length+j+1) #For R+, so 1 based
+        #        yield row
+        #io.write_csv(work/'raw-columns.csv', raw_columns())
+        #
+        ##Somewhat inefficient        
+        #def raw():
+        #    for i in xrange(n_features):
+        #        row = collections.OrderedDict()
+        #        row['Feature'] = annotations[i].get_id()
+        #        for j in xrange(n_samples):
+        #            for k in xrange(max_length):
+        #                row['%d %s' % (k,names[j])] = str( counts[i][j][1][k] )
+        #        yield row
+        #io.write_csv(work/'raw.csv', raw())
         
         def pooled():
             for i in xrange(n_features):
@@ -932,18 +932,18 @@ class Analyse_tail_counts(config.Action_with_output_dir):
                 )
             #for min_tails in (20,50,100,200,500,1000,2000)
             ]
-
-        plot_comparisons = [
-            Plot_comparison(
-                prefix = plot_workspace/('comparison-min-tails-%d-min-span-%.1f' % (min_tails,min_span)),
-                aggregate = self.output_dir,
-                min_tails = min_tails,
-                min_span = min_span,
-                )
-            for min_tails in [50,100,200,500]
-            for min_span in [2,4,8,10,15,20,25,30]
-            ]
-
+        
+        #plot_comparisons = [
+        #    Plot_comparison(
+        #        prefix = plot_workspace/('comparison-min-tails-%d-min-span-%.1f' % (min_tails,min_span)),
+        #        aggregate = self.output_dir,
+        #        min_tails = min_tails,
+        #        min_span = min_span,
+        #        )
+        #    for min_tails in [50,100,200,500]
+        #    for min_span in [2,4,8,10,15,20,25,30]
+        #    ]
+        #
         heatmaps = [
             nesoni.Heatmap(
                 prefix = plot_workspace/('heatmap-min-fold-%.1f' % fold),
@@ -956,7 +956,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
 
         with nesoni.Stage() as stage:        
             similarity.process_make(stage)
-            for action in plot_pooleds + plot_comparisons + heatmaps:
+            for action in plot_pooleds + heatmaps: #+ plot_comparisons:
                 action.process_make(stage)
         
         
@@ -994,21 +994,21 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         
         for heatmap in heatmaps:
             r.report_heatmap(heatmap)
-
-
-        r.heading('Average poly(A) tail length and its relation to expression levels')
         
-        r.p(
-            'Only reads with a poly(A) sequence of four or more bases was included in the averages.'
-            )
         
-        r.p(
-            'Genes were selected based on there being at least a certain number of reads with poly(A) sequence in <i>each</i> sample (min-tails), '
-            'and on there being at least some amount of difference in average tail length between samples (min-span).'
-            )
-        
-        for heatmap in plot_comparisons:
-            r.report_heatmap(heatmap)
+        #r.heading('Average poly(A) tail length and its relation to expression levels')
+        #
+        #r.p(
+        #    'Only reads with a poly(A) sequence of four or more bases was included in the averages.'
+        #    )
+        #
+        #r.p(
+        #    'Genes were selected based on there being at least a certain number of reads with poly(A) sequence in <i>each</i> sample (min-tails), '
+        #    'and on there being at least some amount of difference in average tail length between samples (min-span).'
+        #    )
+        #
+        #for heatmap in plot_comparisons:
+        #    r.report_heatmap(heatmap)
                 
         r.close()
 
