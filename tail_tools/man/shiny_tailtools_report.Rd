@@ -4,12 +4,15 @@
 \alias{shiny_tailtools_report}
 \title{Shiny report based on pipeline output}
 \usage{
-shiny_tailtools_report(path, species = NULL)
+shiny_tailtools_report(path, species = NULL, title = "Tail Tools report",
+  prefix = "")
 }
 \arguments{
 \item{path}{Directory containing pipeline output.}
 
 \item{species}{Species for tail heatmap. Currently supports Human ("Hs"), Saccharomyces cerevisiae ("Sc"), Caenorhabditis elegans ("Ce"), Mus musculus ("Mm")}
+
+\item{title}{Title for report.}
 }
 \description{
 Shiny report based on pipeline output

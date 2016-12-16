@@ -4,14 +4,16 @@
 \alias{end_shift_pipeline}
 \title{End shift statistics from tail-tools pipeline output.}
 \usage{
-end_shift_pipeline(path, condition, group = NULL, ci = 0.95, fdr = T,
-  edger = T, limma = T, antisense = T, colliders = T, non_utr = T,
-  min_reads = 10, title = "End-shift test", fdr_max_permute = 1000)
+end_shift_pipeline(path, condition, group = NULL, select = NULL,
+  ci = 0.95, fdr = T, edger = T, limma = T, antisense = T,
+  colliders = T, non_utr = T, min_reads = 10, title = "End-shift test",
+  fdr_max_permute = 1000)
 }
 \arguments{
 \item{fdr}{Produce permutation based q values, can be very slow.
 
-Samples with NA in condition will be omitted.}
+Samples with NA in condition will be omitted.
+Samples can also be selected using select=, which should contain a logical vector of samples to retain.}
 }
 \description{
 End shift statistics from tail-tools pipeline output.

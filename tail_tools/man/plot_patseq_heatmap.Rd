@@ -6,7 +6,8 @@
 \usage{
 plot_patseq_heatmap(matf1, matf2, gmatf, clusterby = 1,
   sample_labels = NULL, sample_labels2 = NULL, feature_labels = NULL,
-  gene_labels = NULL, product_labels = NULL, row_ord = 1)
+  gene_labels = NULL, product_labels = NULL, row_ord = 1,
+  tail_relative = TRUE)
 }
 \arguments{
 \item{matf1}{Data frame of Tail length}
@@ -28,6 +29,8 @@ plot_patseq_heatmap(matf1, matf2, gmatf, clusterby = 1,
 \item{product_labels}{Product labels}
 
 \item{row_ord}{Order rows by tail length or expression}
+
+\item{tail_relative}{Tail lengths are relative to average for feature}
 }
 \details{
 Produces a print-able heatmap grob

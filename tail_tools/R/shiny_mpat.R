@@ -589,5 +589,5 @@ shiny_mpat <- function(
 
 
 #' @export
-shiny_repat <- function(...) shiny_mpat(...)
+shiny_repat <- shiny_mpat
 
