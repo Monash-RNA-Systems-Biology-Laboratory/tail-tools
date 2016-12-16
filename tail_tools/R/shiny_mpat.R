@@ -336,7 +336,7 @@ shiny_mpat <- function(
                 call_ui(overview$component_ui,request),
                 h1("Tail lengths"),
                 p("Where there are few poly(A) reads, the length is shown in red."),
-                overview_tail$component_ui
+                call_ui(overview_tail$component_ui,request)
             ),
             tabPanel("Individual genes",
                 selectInput("individual_gene", "Gene", choices=sort(genes)),
