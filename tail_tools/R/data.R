@@ -65,7 +65,7 @@ tail_counts_subset_samples <- function(tc, samples) {
         arrange_(~ sample)
     
     tc$obs <-
-        filter(~ sample %in% samples) %>%
+        filter_(~ sample %in% samples) %>%
         mutate_(sample =~ factor(sample, samples))
     
     tc

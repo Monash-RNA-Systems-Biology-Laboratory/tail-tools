@@ -5,7 +5,7 @@
 
 #' @export
 bigwig_get <- function(bigwig_fwd, bigwig_rev, pos) {
-   splitter <- paste0(seqnames(pos), strand(pos))
+   splitter <- paste0(GenomeInfoDb::seqnames(pos), BiocGenerics::strand(pos))
    assert_that(noNA(splitter))
 
    split_pos <- split(pos, splitter, drop=TRUE)
@@ -14,7 +14,7 @@ bigwig_get <- function(bigwig_fwd, bigwig_rev, pos) {
    for(item in names(split_pos)) {
        this_pos <- split_pos[[item]]
        
-       this_is_reverse <- as.logical(strand(this_pos)[1] == "-")
+       this_is_reverse <- as.logical(BiocGenerics::strand(this_pos)[1] == "-")
        
        bigwig <- if (this_is_reverse == "TRUE") bigwig_rev else bigwig_fwd
        
@@ -25,21 +25,21 @@ bigwig_get <- function(bigwig_fwd, bigwig_rev, pos) {
        #vec <- rep(got$score, width(got))
        
        # import.bw shuffles results by seqname!
-       vecs <- import.bw(bigwig,"bigWig",which=this_pos,as="NumericList") %>% as.list
+       vecs <- rtracklayer::import.bw(bigwig,"bigWig",which=this_pos,as="NumericList") %>% as.list
        
        assert_that(length(vecs) == length(this_pos))
        
-       vecs <- map(vecs, function(item) { item[is.na(item)] <- 0 ; item })
+       vecs <- purrr::map(vecs, function(item) { item[is.na(item)] <- 0 ; item })
        
        if (this_is_reverse == "TRUE")
-           vecs <- map(vecs, rev)
+           vecs <- purrr::map(vecs, rev)
        
        result[[item]] <- vecs
    }
    
    result <- unsplit(result, splitter)
    
-   assert_that(all( sapply(result,length) == width(pos) ))
+   assert_that(all( sapply(result,length) == BiocGenerics::width(pos) ))
    
    result
 }
@@ -72,8 +72,8 @@ end_shift_rnaseq_batch <- function(samples, utrs, extended_utrs, exons) {
 
     result <- map_df(seq_along(utrs), function(i) {
         forward <- all_forward[i]
-        utr_width <- width(utrs)[i]
-        extended_width <- width(extended_utrs)[i]
+        utr_width <- BiocGenerics::width(utrs)[i]
+        extended_width <- BiocGenerics::width(extended_utrs)[i]
         
         exonic_depth <- rep(0L, extended_width)
         if (utr_width < extended_width)
@@ -85,7 +85,7 @@ end_shift_rnaseq_batch <- function(samples, utrs, extended_utrs, exons) {
                 start(this_exons) - start(utrs)[i]
             else
                 end(utrs)[i] - end(this_exons)
-        exon_widths <- width(this_exons)
+        exon_widths <- BiocGenerics::width(this_exons)
         for(j in seq_along(exon_starts)) {
             this_start <- exon_starts[j]
             this_width <- exon_widths[j]
@@ -116,8 +116,8 @@ end_shift_rnaseq_batch <- function(samples, utrs, extended_utrs, exons) {
         range <- seq_len(distal)
         exonic_range <- which(exonic[range])
         
-        mat <- lapply(seq_len(nrow(samples)), function(j) all_ends[[j]][[i]][exonic_range]) %>%
-            { do.call(cbind,.) }
+        mat <- lapply(seq_len(nrow(samples)), function(j) all_ends[[j]][[i]][exonic_range]) 
+        mat <- do.call(cbind,mat)
         
         result <- combined_r(mat, condition, sample_splitter)
         
@@ -156,14 +156,14 @@ end_shift_rnaseq_batch <- function(samples, utrs, extended_utrs, exons) {
             gene_id = utrs$gene_id[i],
             gene_name = utrs$gene[i],
             description = utrs$description[i],
-            chromosome = seqnames(utrs)[i] %>% as.character,
-            strand = strand(utrs)[i] %>% as.character,
+            chromosome = GenomeInfoDb::seqnames(utrs)[i] %>% as.character,
+            strand = BiocGenerics::strand(utrs)[i] %>% as.character,
             five_prime = 
-                ( if (forward) start(utrs)[i] else end(utrs)[i] ),
+                ( if (forward) BiocGenerics::start(utrs)[i] else BiocGenerics::end(utrs)[i] ),
             three_prime_given = 
-                ( if (forward) end(utrs)[i] else start(utrs)[i] ),
+                ( if (forward) BiocGenerics::end(utrs)[i] else BiocGenerics::start(utrs)[i] ),
             three_prime_extended = 
-                ( if (forward) start(utrs)[i]+distal-1 else end(utrs)[i]-distal+1 )
+                ( if (forward) BiocGenerics::start(utrs)[i]+distal-1 else BiocGenerics::end(utrs)[i]-distal+1 )
         )
     })
     
@@ -188,20 +188,20 @@ end_shift_rnaseq <- function(samples, utrs, extended_utrs=NULL, exons=NULL, ci=0
     
     if (is.null(exons)) {
         exons <- utrs
-        mcols(exons)$Parent <- exons$ID
+        S4Vectors::mcols(exons)$Parent <- exons$ID
     }
     
     # import() likes to make Parent a CharacterList
     unlisted <- BiocGenerics::unlist(exons$Parent)
     assert_that(length(unlisted) == length(exons))
-    mcols(exons)$Parent <- unlisted 
+    S4Vectors::mcols(exons)$Parent <- unlisted 
 
     exons <- GenomicRanges::split(exons, exons$Parent)
 
     reorder <- order(
-        seqnames(utrs) %>% as.character, 
-        strand(utrs) %>% as.character, 
-        start(utrs) %>% as.integer)
+        GenomeInfoDb::seqnames(utrs) %>% as.character, 
+        BiocGenerics::strand(utrs) %>% as.character, 
+        BiocGenerics::start(utrs) %>% as.integer)
     utrs <- utrs[ reorder ]
     extended_utrs <- extended_utrs[ reorder ]
     
@@ -217,23 +217,23 @@ end_shift_rnaseq <- function(samples, utrs, extended_utrs=NULL, exons=NULL, ci=0
     ci_sds <- qnorm((1+ci)/2)    
     
     result <- result %>% 
-        dplyr::filter(min_reads >= min_min_reads) %>%
-        dplyr::mutate(
-            sd = sqrt(var),
-            r_low = r - sd*ci_sds,
-            r_high = r + sd*ci_sds,
-            interest = ( abs(r) - sd*ci_sds ) %>% replace(.,is.na(.),-Inf)
+        dplyr::filter_(~min_reads >= min_min_reads) %>%
+        dplyr::mutate_(
+            sd =~ sqrt(var),
+            r_low =~ r - sd*ci_sds,
+            r_high =~ r + sd*ci_sds,
+            interest =~ ( abs(r) - sd*ci_sds ) %>% na_replace(-Inf)
         ) %>%
-        dplyr::arrange(desc(interest)) %>%
-        dplyr::mutate( rank=seq_len(n()) )
+        dplyr::arrange_(~desc(interest)) %>%
+        dplyr::mutate_( rank=~seq_len(n()) )
     
     #arrange(-abs(r))
     
     gene_result <- result %>% 
-        group_by(gene_id) %>%
-        filter(seq_len(n()) == which.min(rank)) %>%
+        group_by_(~gene_id) %>%
+        filter_(~seq_len(n()) == which.min(rank)) %>%
         ungroup() %>%
-        mutate( rank=seq_len(n()) )
+        mutate_( rank=~seq_len(n()) )
 
     list(
         samples = samples,

@@ -1,6 +1,6 @@
 
 #' @export
-is_reverse <- function(granges) as.logical(strand(granges) == "-")
+is_reverse <- function(granges) as.logical(BiocGenerics::strand(granges) == "-")
 
 #' @export
 is_forward <- function(granges) !is_reverse(granges)
@@ -22,3 +22,9 @@ cached <- function(prefix, func, args_var=list(), args_const=list(), version=NUL
     
     result
 }
+
+
+
+na_replace <- function(vec, replacement) 
+    ifelse(is.na(vec),replacement,vec)
+

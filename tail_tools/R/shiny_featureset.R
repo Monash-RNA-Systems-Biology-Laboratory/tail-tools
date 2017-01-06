@@ -24,7 +24,7 @@ shiny_featureset <- function(tc, fs=NULL, species=NULL, is_peaks=FALSE, prefix="
             filename="enrichment.csv",
             prefix=ns("enrich"))
     
-    ui <- function(requst)
+    ui <- function(request)
         shiny::div(
             table$component_ui(request),            
             if (have_species) shiny::div(

@@ -18,6 +18,8 @@ shiny_mpat(filename, normalizing_gene = NULL, title = "mPAT results",
 \item{pipeline_dir}{Pipeline output directory, if you want to view detailed poly(A) tail length distributions extracted from BAM files.}
 
 \item{max_tail}{Default limit on tail length for tail length distribution plot.}
+
+\item{grouping}{If you want to be able to group samples, a data frame with a "group" and a "sample" column.}
 }
 \value{
 A shiny appobj. Printing it runs the app.

@@ -63,28 +63,24 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
                 stop("Inappropriate selection for GO term analysis (One set is of size 0)")
             
             if(spp == "Sc"){
-                library(org.Sc.sgd.db)
                 annlabel <- "org.Sc.sgd.db"
-                lib <- org.Sc.sgd.db
+                lib <- org.Sc.sgd.db::org.Sc.sgd.db
             }else if(spp == "Hs"){
-                library(org.Hs.eg.db)
                 annlabel <- "org.Hs.eg.db"
-                lib <- org.Hs.eg.db
+                lib <- org.Hs.eg.db::org.Hs.eg.db
             }else if(spp == "Ce"){
-                library(org.Ce.eg.db)
                 annlabel <- "org.Ce.eg.db"
-                lib <- org.Ce.eg.db
+                lib <- org.Ce.eg.db::org.Ce.eg.db
             }else if(spp == "Mm"){
-                library(org.Mm.eg.db)
                 annlabel <- "org.Mm.eg.db"
-                lib <- org.Mm.eg.db
+                lib <- org.Mm.eg.db::org.Mm.eg.db
             }
             
             colkp <- c("GENENAME", "ENTREZID")
             remrows <- rownames(allrows[-which(rownames(selrows) %in% rownames(allrows)),])
             selrowsname <- rownames(selrows)
-            unisel <- select(lib, keys=remrows, columns=colkp, keytype="ENSEMBL")
-            intsel <- select(lib, keys=selrowsname, columns=colkp, keytype="ENSEMBL")
+            unisel <- AnnotationDbi::select(lib, keys=remrows, columns=colkp, keytype="ENSEMBL")
+            intsel <- AnnotationDbi::select(lib, keys=selrowsname, columns=colkp, keytype="ENSEMBL")
             #Deduplicate rows
             unisel <- unisel[!duplicated(unisel$ENTREZID),]
             intsel <- intsel[!duplicated(intsel$ENTREZID),]
@@ -103,8 +99,8 @@ shiny_patseq_heatmap_inner <- function(callback, width=500, height=500, dlname="
             #Setup hyperG or fischer's exact test params
             gc <- hgc(env)
             hgparam <- new("GOHyperGParams",annotation=annlabel,geneIds=intsel,universeGeneIds=unisel,ontology=ot, testDirection="over",pvalueCutoff=gc)
-            hg <- hyperGTest(hgparam)
-            hg.pv <- pvalues(hg)
+            hg <- GOstats::hyperGTest(hgparam)
+            hg.pv <- GOstats::pvalues(hg)
             hgadjpv <- p.adjust(hg.pv,'fdr')
             sigGOID <- names(hgadjpv[hgadjpv < gc])
             df <- GOstats::summary(hg)   

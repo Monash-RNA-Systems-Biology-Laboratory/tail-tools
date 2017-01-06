@@ -8,17 +8,13 @@ get_organism_db <- function(species) {
         return(NULL)
 
     if (species == "Sc"){
-        library(org.Sc.sgd.db)
-        return(org.Sc.sgd.db)
+        return(org.Sc.sgd.db::org.Sc.sgd.db)
     } else if (species == "Hs"){
-        library(org.Hs.eg.db)
-        return(org.Hs.eg.db)
+        return(org.Hs.eg.db::org.Hs.eg.db)
     } else if(species == "Ce"){
-        library(org.Ce.eg.db)
-        return(org.Ce.eg.db)
+        return(org.Ce.eg.db::org.Ce.eg.db)
     } else if(species == "Mm"){
-        library(org.Mm.eg.db)
-        return(org.Mm.eg.db)
+        return(org.Mm.eg.db::org.Mm.eg.db)
     }
     
     stop(paste("Unsupported species:", species))
@@ -30,16 +26,16 @@ get_organism_db <- function(species) {
     if (is.null(org_db)) return(NULL)
     
     gene_set <- 
-        select(
+        AnnotationDbi::select(
             org_db, 
-            keys(org_db, "ENSEMBL"), 
+            AnnotationDbi::keys(org_db, "ENSEMBL"), 
             keytype="ENSEMBL", 
             columns="GOALL") %>%
         select_(name=~ENSEMBL, set_name=~GOALL) %>%
         unique()
     
     set_info <-
-        select(
+        AnnotationDbi::select(
             GO.db::GO.db,
             unique(gene_set$set_name),
             c("TERM","ONTOLOGY")) %>%

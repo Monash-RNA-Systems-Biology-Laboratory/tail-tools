@@ -2,7 +2,7 @@
             
 default_plot_count <- function(df, is_grouped, norm_count_name, ...) { 
     print(
-        ggplot(df, aes(x=sample, y=norm_count)) +
+        ggplot(df, aes_(x=~sample, y=~norm_count)) +
         geom_bar(stat="identity", color="#000000", fill="#cccccc") +
         ylab(norm_count_name) +
         xlab("") +
@@ -16,7 +16,7 @@ default_plot_tail <- function(df, is_grouped, ...) {
     df_bad <- filter_(df, ~is_low_tail_count)
     
     print(
-        ggplot(df, aes(x=sample, y=tail)) +
+        ggplot(df, aes_(x=~sample, y=~tail)) +
         geom_bar(stat="identity", color="#000000", fill="#ccffcc") +
         geom_bar(data=df_bad, 
                  stat="identity", color="#000000", fill="#ff0000") +
@@ -40,7 +40,7 @@ default_plot_tail <- function(df, is_grouped, ...) {
 #'
 #' @param max_tail Default limit on tail length for tail length distribution plot.
 #'
-#' @grouping If you want to be able to group samples, a data frame with a "group" and a "sample" column.
+#' @param grouping If you want to be able to group samples, a data frame with a "group" and a "sample" column.
 #'
 #' @return A shiny appobj. Printing it runs the app.
 #'
@@ -92,22 +92,22 @@ shiny_mpat <- function(
         bam_filenames <- pipeline_bams(pipeline_dir)
     
         # Create relevant genomic ranges
-        ranges <- GRanges(
+        ranges <- GenomicRanges::GRanges(
             tables$Annotation$chromosome, 
-            IRanges(tables$Annotation$start, tables$Annotation$end),
+            IRanges::IRanges(tables$Annotation$start, tables$Annotation$end),
             ifelse(tables$Annotation$strand < 0, "-","+"))
         names(ranges) <- rownames(tables$Annotation)
         
-        ranges$three_prime <- ifelse(strand(ranges) == "+", end(ranges), start(ranges))
+        ranges$three_prime <- ifelse(BiocGenerics::strand(ranges) == "+", end(ranges), start(ranges))
         
         bounds <- ranges %>% as.data.frame
         bounds$name <- names(ranges)
         bounds <- bounds %>% 
-            arrange(seqnames,strand,three_prime) %>% 
-            group_by(seqnames,strand) %>%
-            mutate(
-                three_prime_min = pmax(-Inf, (three_prime + lag(three_prime))*0.5, na.rm=T),
-                three_prime_max = pmin(Inf, (three_prime + lead(three_prime))*0.5, na.rm=T)
+            arrange_(~seqnames,~strand,~three_prime) %>% 
+            group_by_(~seqnames,~strand) %>%
+            mutate_(
+                three_prime_min =~ pmax(-Inf, (three_prime + lag(three_prime))*0.5, na.rm=T),
+                three_prime_max =~ pmin(Inf, (three_prime + lead(three_prime))*0.5, na.rm=T)
             ) %>%
             ungroup()
         matching <- match(names(ranges), bounds$name)
@@ -122,7 +122,7 @@ shiny_mpat <- function(
         normed <- env$normed()
         
         print( 
-            ggplot(normed$norm_data,aes(x=sample,y=log2_fold_norm_count)) + 
+            ggplot(normed$norm_data,aes_(x=~sample,y=~log2_fold_norm_count)) + 
             geom_point() + 
             facet_wrap(~ gene, drop=F) + 
             ylab(ifelse(normed$is_differential,"log2 fold change",paste0("log2 ",normed$norm_count_name))) +
@@ -137,7 +137,7 @@ shiny_mpat <- function(
         df <- filter_(normed$norm_data, ~tail_count > 0)
         df_bad <- filter_(df, ~is_low_tail_count)
         print(
-            ggplot(df,aes(x=sample,y=relative_tail)) + 
+            ggplot(df,aes_(x=~sample,y=~relative_tail)) + 
             geom_point() + 
             geom_point(data=df_bad,color="red") +
             facet_wrap(~ gene, drop=F) +
@@ -189,28 +189,28 @@ shiny_mpat <- function(
                 labeller <- env$read_info()$labeller
                 transformer <- env$read_info()$transformer
                 tail_lengths <- env$read_info()$read_info %>% 
-                    group_by(sample, length) %>% summarize(n=sum(n)) %>% ungroup()
+                    group_by_(sample, ~length) %>% summarize_(n=~sum(n)) %>% ungroup()
                 
                 tail_lengths <- tail_lengths %>%
                     left_join(normalizer, "sample") %>%
-                    mutate(n = n / normalizer)
+                    mutate_(n =~ n / normalizer)
                 
                 if (env$input$tail_style == "Cumulative") {
                     print(
                         tail_lengths %>% 
-                        arrange(sample, desc(length)) %>% 
-                        group_by(sample) %>%
-                        mutate(
-                            cumn = cumsum(n),
-                            cumn_lag = dplyr::lag(cumn,1,0),
-                            length_lead = dplyr::lead(length,1,0)
+                        arrange_(~sample, ~desc(length)) %>% 
+                        group_by_(~sample) %>%
+                        mutate_(
+                            cumn =~ cumsum(n),
+                            cumn_lag =~ dplyr::lag(cumn,1,0),
+                            length_lead =~ dplyr::lead(length,1,0)
                         ) %>%
                         ungroup() %>%
-                        ggplot(aes(color=sample)) +
+                        ggplot(aes_(color=~sample)) +
                         #geom_point(aes(x=length,y=cumn_lag)) +
-                        ggplot2::geom_segment(aes(x=length,xend=length,y=transformer(cumn),yend=transformer(cumn_lag))) +
-                        ggplot2::geom_segment(aes(x=length_lead,xend=length,y=transformer(cumn),yend=transformer(cumn))) +
-                        scale_x_continuous(lim=c(0,tail_max), oob=function(a,b)a) +
+                        ggplot2::geom_segment(aes_(x=~length,xend=~length,y=~transformer(cumn),yend=~transformer(cumn_lag))) +
+                        ggplot2::geom_segment(aes_(x=~length_lead,xend=~length,y=~transformer(cumn),yend=~transformer(cumn))) +
+                        scale_x_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                         scale_y_continuous(labels = labeller) +
                         labs(x="poly(A) tail length", y=describer, color=samples_called) +
                         theme_bw()
@@ -219,10 +219,10 @@ shiny_mpat <- function(
                     print(
                         tail_lengths %>%
                         complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
-                        group_by(sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
-                        ggplot(aes(color=sample,group=sample,x=length_mid,y=transformer(n))) + 
+                        group_by_(~sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
+                        ggplot(aes_(color=~sample,group=~sample,x=~length_mid,y=~transformer(n))) + 
                         geom_line() +
-                        scale_x_continuous(lim=c(0,tail_max), oob=function(a,b)a) +
+                        scale_x_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                         scale_y_continuous(labels = labeller) +
                         labs(x="poly(A) tail length", y=describer, color=samples_called) +
                         theme_bw()   
@@ -234,10 +234,10 @@ shiny_mpat <- function(
                         #mutate(n = n/max(n)) %>%
                         #ungroup() %>%
                         complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
-                        group_by(sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
-                        ggplot(aes(x=sample,y=length_mid,fill=transformer(n))) + 
+                        group_by_(~sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
+                        ggplot(aes_(x=~sample,y=~length_mid,fill=~transformer(n))) + 
                         geom_tile(height=tail_bin) +
-                        scale_y_continuous(lim=c(0,tail_max), oob=function(a,b)a) +
+                        scale_y_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                         scale_fill_viridis(guide=FALSE) +
                         labs(x="", y="poly(A) tail length") +
                         theme_minimal() +
@@ -259,27 +259,27 @@ shiny_mpat <- function(
                 labeller <- env$read_info()$labeller
                 transformer <- env$read_info()$transformer
                 widths <- env$read_info()$read_info %>% 
-                    group_by(sample, width) %>% summarize(n=sum(n)) %>% ungroup()
+                    group_by_(sample, ~width) %>% summarize_(n=~sum(n)) %>% ungroup()
                 
                 widths <- widths %>%
                     left_join(normalizer, "sample") %>%
-                    mutate(n = n / normalizer)
+                    mutate_(n =~ n / normalizer)
                 
                 print(
                         widths %>%
-                        arrange(sample, desc(width)) %>% 
-                        group_by(sample) %>%
-                        mutate(
-                            cumn = cumsum(n),
-                            cumn_lag = dplyr::lag(cumn,1,0),
-                            width_lead = dplyr::lead(width,1,0)
+                        arrange_(~sample, ~desc(width)) %>% 
+                        group_by_(~sample) %>%
+                        mutate_(
+                            cumn =~ cumsum(n),
+                            cumn_lag =~ dplyr::lag(cumn,1,0),
+                            width_lead =~ dplyr::lead(width,1,0)
                         ) %>%
                         ungroup() %>%
-                        ggplot(aes(color=sample)) +
+                        ggplot(aes_(color=~sample)) +
                         #geom_point(aes(x=length,y=cumn_lag)) +
-                        ggplot2::geom_segment(aes(x=width,xend=width,y=transformer(cumn),yend=transformer(cumn_lag))) +
-                        ggplot2::geom_segment(aes(x=width_lead,xend=width,y=transformer(cumn),yend=transformer(cumn))) +
-                        #scale_x_continuous(lim=c(0,tail_max), oob=function(a,b)a) +
+                        ggplot2::geom_segment(aes_(x=~width,xend=~width,y=~transformer(cumn),yend=~transformer(cumn_lag))) +
+                        ggplot2::geom_segment(aes_(x=~width_lead,xend=~width,y=~transformer(cumn),yend=~transformer(cumn))) +
+                        #scale_x_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                         scale_y_continuous(labels = labeller) +
                         labs(x="Position relative to primer start", y=describer, color=samples_called) +
                         theme_bw()
@@ -510,7 +510,7 @@ shiny_mpat <- function(
                     sample=factor(this_samples, this_samples),
                     info=lapply(bam_filenames[this_samples], read_info, query)
                 ) %>%
-                unnest(info)
+                unnest_(~info)
             }))
 
             env$read_info <- reactive({
@@ -519,10 +519,10 @@ shiny_mpat <- function(
                 
                 if (env$input$tail_tail)
                     read_info <- read_info %>%
-                        filter(length >= env$input$tail_min)
+                        filter_(~length >= env$input$tail_min)
                 
                 if (env$input$tail_percent) {
-                    normalizer <- read_info %>% group_by(sample) %>% summarize(normalizer=sum(n))
+                    normalizer <- read_info %>% group_by_(~sample) %>% summarize_(normalizer=~sum(n))
                     describer <- "Percent reads"
                     labeller <- function(x) paste0(sapply(x*100,scales::comma),"%")
                 } else {
@@ -538,18 +538,18 @@ shiny_mpat <- function(
                     this_samples <- levels(respectful_grouping$group)                    
                     read_info <- read_info %>%
                         left_join(respectful_grouping, "sample") %>%
-                        group_by(group, length, width) %>%
-                        summarize(n=sum(n)) %>%
+                        group_by_(~group, ~length, ~width) %>%
+                        summarize_(n=~sum(n)) %>%
                         ungroup() %>%
-                        select(sample=group, length, width, n)
+                        select_(sample=~group, ~length, ~width, ~n)
                 }
 
                 if (have_grouping && env$input$group_samples) {
                     normalizer <- normalizer %>%
                         left_join(respectful_grouping, "sample") %>%
-                        group_by(group) %>%
-                        summarize(normalizer = sum(normalizer)) %>%
-                        select(sample=group, normalizer)
+                        group_by_(~group) %>%
+                        summarize_(normalizer =~ sum(normalizer)) %>%
+                        select_(sample=~group, ~normalizer)
                 }
                 
                 transformer <- identity

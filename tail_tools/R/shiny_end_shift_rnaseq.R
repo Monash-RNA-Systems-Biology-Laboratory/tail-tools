@@ -6,19 +6,19 @@
 get_rnaseq_depth <- function(samples) {
     mean_depth <- function(filename) {
         result <- 
-            rtracklayer::summary(BigWigFile(filename), type="mean") %>% 
+            rtracklayer::summary(rtracklayer::BigWigFile(filename), type="mean") %>% 
             BiocGenerics::unlist()
-        sum(result$score * width(result)) / sum(as.numeric(width(result)))
+        sum(result$score * BiocGenerics::width(result)) / sum(as.numeric(BiocGenerics::width(result)))
     }
 
     samples %>%
     rowwise() %>%
-    mutate(
-        mean_cover = 0.5*(mean_depth(cover_fwd)+mean_depth(cover_rev))
+    mutate_(
+        mean_cover =~ 0.5*(mean_depth(cover_fwd)+mean_depth(cover_rev))
     ) %>%
     ungroup() %>%
-    mutate(
-        depth_normalizer = mean_cover / mean(mean_cover)
+    mutate_(
+        depth_normalizer =~ mean_cover / mean(mean_cover)
     )
 }
 
@@ -85,10 +85,10 @@ shiny_end_shift_rnaseq_server <- function(input, output, session, result, sample
     })
     
     callModule(shiny_plot_server, "mr_plot", session=session, callback=function() {
-        ggplot(df(),aes(x=min_reads, y=r)) +
+        ggplot(df(),aes_(x=~min_reads, y=~r)) +
             scale_x_log10() +
             coord_cartesian(ylim=c(-1,1)) +
-            ggplot2::geom_segment(aes(xend=min_reads, y=r_low, yend=r_high), color="#bbbbbb") +
+            ggplot2::geom_segment(aes_(xend=~min_reads, y=~r_low, yend=~r_high), color="#bbbbbb") +
             geom_point() +
             theme_bw() +
             labs(x = "Min reads per sample (log scale)",
@@ -105,7 +105,7 @@ shiny_end_shift_rnaseq_server <- function(input, output, session, result, sample
         result <- df()
         if (!is.null(input$mr_plot_brush)) {
             result <- result %>%
-                filter(!is.na(r)) %>%
+                filter_(~!is.na(r)) %>%
                 brushedPoints(input$mr_plot_brush, "min_reads", "r")
         }
         
@@ -161,9 +161,9 @@ shiny_end_shift_rnaseq_server <- function(input, output, session, result, sample
         a <- con$five_prime
         b <- con$three_prime_extended
         w <- abs(a-b) %/% 2
-        pos <- GRanges( 
+        pos <- GenomicRanges::GRanges( 
              con$chromosome,
-             IRanges(min(a,b)-w,max(a,b)+w),
+             IRanges::IRanges(min(a,b)-w,max(a,b)+w),
              strand=con$strand)       
          
         updateTextInput(session, "browser-location", value=as.character(pos))
@@ -251,12 +251,12 @@ shiny_end_shift_rnaseq_multiple_server <- function(
         this_samples <- samples
         this_samples$condition <- tests[[test]]$condition
         this_samples$group <- tests[[test]]$group
-        this_samples <- dplyr::filter(this_samples, !is.na(condition))
+        this_samples <- dplyr::filter_(this_samples, ~!is.na(condition))
     
         reference_dir <- references[reference]
-        utrs <- import(file.path(reference_dir,"utr.gff"))
-        extended_utrs <- import(file.path(reference_dir,"utr_extended.gff"))
-        exons <- import(file.path(reference_dir,"utr_part.gff"))
+        utrs <- rtracklayer::import(file.path(reference_dir,"utr.gff"))
+        extended_utrs <- rtracklayer::import(file.path(reference_dir,"utr_extended.gff"))
+        exons <- rtracklayer::import(file.path(reference_dir,"utr_part.gff"))
         
         withProgress(message=paste0(test," ",reference),
             cached(name, end_shift_rnaseq,

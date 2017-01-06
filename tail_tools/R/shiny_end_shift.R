@@ -15,10 +15,10 @@ shiny_end_shift <- function(result) {
         
         cutoff <- env$input$fdr
         
-        plot <- ggplot(df,aes(x=mean_reads, y=r)) +
+        plot <- ggplot(df,aes_(x=~mean_reads, y=~r)) +
             scale_x_log10() +
             coord_cartesian(ylim=c(-1,1)) +
-            ggplot2::geom_segment(aes(xend=mean_reads, y=r_low, yend=r_high), color="#bbbbbb") +
+            ggplot2::geom_segment(aes_(xend=~mean_reads, y=~r_low, yend=~r_high), color="#bbbbbb") +
             geom_point() +
             theme_bw() +
             labs(x = "Mean reads per sample (log scale)",
@@ -29,7 +29,7 @@ shiny_end_shift <- function(result) {
         size <- 3
         if ("fdr" %in% names(df) && any(df$fdr <= cutoff)) {
             plot <- plot + geom_point(
-                data=filter(df, fdr <= cutoff),aes(color="r"),
+                data=filter_(df,~fdr <= cutoff),aes_(color=~"r"),
                 shape=1,stroke=1.5,size=size)
             colors <- c(colors,"r"="#ff6666")
             size <- size + 2
@@ -37,7 +37,7 @@ shiny_end_shift <- function(result) {
 
         if ("edger_fdr" %in% names(df) && any(df$edger_fdr <= cutoff)) {
             plot <- plot + geom_point(
-                data=filter(df, edger_fdr <= cutoff),aes(color="edgeR"),
+                data=filter_(df,~edger_fdr <= cutoff),aes_(color=~"edgeR"),
                 shape=1,stroke=1.5,size=size)
             colors <- c(colors,"edgeR"="#66ff66")
             size <- size + 2
@@ -45,7 +45,7 @@ shiny_end_shift <- function(result) {
         
         if ("limma_fdr" %in% names(df) && any(df$limma_fdr <= cutoff)) {
             plot <- plot + geom_point(
-                data=filter(df, limma_fdr <= cutoff),aes(color="limma"),
+                data=filter_(df,~limma_fdr <= cutoff),aes_(color=~"limma"),
                 shape=1,stroke=1.5,size=size)
             colors <- c(colors,"limma"="#6666ff")
             size <- size + 2
@@ -105,7 +105,7 @@ shiny_end_shift <- function(result) {
             
             if (!is.null(input$mr_plot_brush)) {
                 df <- df %>%
-                    filter(!is.na(r)) %>%
+                    filter_(~!is.na(r)) %>%
                     brushedPoints(input$mr_plot_brush, "mean_reads", "r")
             }
             
@@ -260,7 +260,7 @@ shiny_end_shift <- function(result) {
             
             df <- 
                 bind_cols(out, mat) %>%
-                arrange(condition, group)
+                arrange_(~condition, ~group)
     
             DT::renderDataTable(
                 options=list(
