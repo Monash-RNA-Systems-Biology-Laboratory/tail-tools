@@ -98,7 +98,7 @@ shiny_mpat <- function(
             ifelse(tables$Annotation$strand < 0, "-","+"))
         names(ranges) <- rownames(tables$Annotation)
         
-        ranges$three_prime <- ifelse(BiocGenerics::strand(ranges) == "+", end(ranges), start(ranges))
+        ranges$three_prime <- ifelse(BiocGenerics::strand(ranges) == "+", BiocGenerics::end(ranges), BiocGenerics::start(ranges))
         
         bounds <- ranges %>% as.data.frame
         bounds$name <- names(ranges)

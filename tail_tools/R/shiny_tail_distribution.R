@@ -26,11 +26,11 @@ read_info <- function(bam_filename, query) {
     
     if (is_reverse(query)) {
         three_prime <- result$pos
-        width <- end(query) - three_prime + 1L
+        width <- BiocGenerics::end(query) - three_prime + 1L
     } else {
         three_prime <- result$pos + 
             GenomicAlignments::cigarWidthAlongReferenceSpace(result$cigar) - 1L
-        width <- three_prime - start(query) + 1L
+        width <- three_prime - BiocGenerics::start(query) + 1L
     }
     good <- three_prime > query$three_prime_min & three_prime < query$three_prime_max
     
@@ -95,7 +95,7 @@ shiny_tail_distribution <- function(
         ifelse(peaks$strand < 0, "-","+"))
     names(ranges) <- peaks$feature
     
-    ranges$three_prime <- ifelse(BiocGenerics::strand(ranges) == "+", end(ranges), start(ranges))
+    ranges$three_prime <- ifelse(BiocGenerics::strand(ranges) == "+", BiocGenerics::end(ranges), BiocGenerics::start(ranges))
     
     bounds <- ranges %>% as.data.frame
     bounds$name <- names(ranges)
