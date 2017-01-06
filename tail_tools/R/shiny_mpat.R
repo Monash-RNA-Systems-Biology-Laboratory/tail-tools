@@ -192,7 +192,7 @@ shiny_mpat <- function(
                     group_by_(~sample, ~length) %>% summarize_(n=~sum(n)) %>% ungroup()
                 
                 tail_lengths <- tail_lengths %>%
-                    left_join(normalizer, "sample") %>%
+                    left_join(normalizer, "sample") %>% 
                     mutate_(n =~ n / normalizer)
                 
                 if (env$input$tail_style == "Cumulative") {
