@@ -32,6 +32,7 @@ Depends:
     tidyr, 
     stringr, 
     ggplot2, 
+    scales,
     viridis,
     seriation, 
     shiny, 
