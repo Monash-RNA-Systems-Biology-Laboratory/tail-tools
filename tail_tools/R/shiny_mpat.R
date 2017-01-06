@@ -259,7 +259,7 @@ shiny_mpat <- function(
                 labeller <- env$read_info()$labeller
                 transformer <- env$read_info()$transformer
                 widths <- env$read_info()$read_info %>% 
-                    group_by_(sample, ~width) %>% summarize_(n=~sum(n)) %>% ungroup()
+                    group_by_(~sample, ~width) %>% summarize_(n=~sum(n)) %>% ungroup()
                 
                 widths <- widths %>%
                     left_join(normalizer, "sample") %>%
