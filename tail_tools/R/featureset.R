@@ -52,7 +52,7 @@ get_organism_db <- function(species) {
     
     if (!is.null(species.KEGG)) {
         keggs <- limma::getGeneKEGGLinks(species.KEGG, convert=TRUE)
-        conversion <- select(org_db, unique(keggs$GeneID), 
+        conversion <- AnnotationDbi::select(org_db, unique(keggs$GeneID), 
             keytype="ENTREZID",  columns="ENSEMBL")
         
         keggs <- keggs %>%
