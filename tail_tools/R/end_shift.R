@@ -237,8 +237,8 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
     cat("Lib size\n")
     
     dge <- 
-      edger::DGEList(counts, genes=peak_info) %>%
-      edger::calcNormFactors()
+      edgeR::DGEList(counts, genes=peak_info) %>%
+      edgeR::calcNormFactors()
     
     lib_size <- dge$samples$lib.size * dge$samples$norm.factors
     
@@ -308,9 +308,9 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
     }
         
     cat("Annotate\n")
-    gene_info <- peak_info[,c("parent",gene_info_columns)] %>%
+    gene_info <- peak_info[,c("parent",gene_info_columns),drop=FALSE] %>%
         dplyr::group_by_(~parent) %>%
-        dplyr::summarise_each_(~funs(paste(unique(as.character(.)),collapse="/") ))
+        dplyr::summarize_all(function(item) paste(unique(as.character(item)),collapse="/"))
 
     result <- 
         dplyr::data_frame(parent=names(scores), score=scores) %>% 
