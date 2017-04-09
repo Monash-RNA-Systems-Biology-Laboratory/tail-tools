@@ -1,4 +1,12 @@
 
+
+#' Put most important columns first in a data frame, for display
+prioritize_columns <- function(df, columns) {
+    reordering <- order(match(colnames(df), columns))
+    df[,reordering,drop=FALSE]
+}
+
+
 #' Shiny dataTable with download button
 #'
 shiny_table <- function(df=NULL, options=NULL, title="Table", filename="table.csv", prefix="") {
@@ -12,7 +20,7 @@ shiny_table <- function(df=NULL, options=NULL, title="Table", filename="table.cs
                 shiny::column(4, 
                     style="text-align: right",
                     shiny::br(),
-                    shiny::downloadButton(ns("download"), "Download CSV file"))),
+                    shiny::downloadButton(ns("download"), "CSV"))),
             DT::dataTableOutput(ns("table")))
     
     server <- function(env) {

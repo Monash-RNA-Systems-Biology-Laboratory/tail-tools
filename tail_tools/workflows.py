@@ -424,7 +424,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.write('<div style="font-size: 150%; margin-top: 1em; margin-bottom: 1em;"><a href="bigwigs/index.html">&rarr; Load tracks into IGV</a></div>')
 
         tail_tools.Shiny(workspace/('report','shiny'), self.output_dir, title=self.title, species=self.species).run()
-        r.write('<div style="font-size: 150%; margin-top: 1em; margin-bottom: 1em;"><a href="shiny/">&rarr; Interactive report (shiny)</a></div>')
+        r.write('<div style="font-size: 150%; margin-top: 1em; margin-bottom: 1em;"><a href="shiny/" target="_blank">&rarr; Interactive report (shiny)</a></div>')
         
         r.heading('Alignment to reference')
         

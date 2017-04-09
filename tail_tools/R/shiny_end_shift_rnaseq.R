@@ -136,7 +136,7 @@ shiny_end_shift_rnaseq_server <- function(input, output, session, result, sample
     output$table_download <- downloadHandler(
         filename="end-shift.csv",
         content=function(file) {
-            write_csv(selected_df(), file)
+            readr::write_csv(selected_df(), file)
         }
     )
 

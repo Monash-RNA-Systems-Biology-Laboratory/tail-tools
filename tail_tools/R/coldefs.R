@@ -6,7 +6,7 @@
 precision_coldef <- function(target, digits) {
     list(
         targets=target,
-        render=JS('
+        render=htmlwidgets::JS('
         function(data,type,row,meta) {
             var x = parseFloat(data);
             return isNaN(x) ? "" : x.toPrecision(',digits,');
@@ -17,7 +17,7 @@ precision_coldef <- function(target, digits) {
 fixed_coldef <- function(target, digits) {
     list(
         targets=target,
-        render=JS('
+        render=htmlwidgets::JS('
         function(data,type,row,meta) {
             var x = parseFloat(data);
             return isNaN(x) ? "" : x.toFixed(',digits,');
@@ -30,7 +30,7 @@ r_coldef <- function(target, r_low, r_high) {
     list(
         targets=target,
         className="dt-center",
-        render=JS('
+        render=htmlwidgets::JS('
         function(data,type,row,meta) {
             var r = parseFloat(data);
             var r_low = parseFloat(row[',r_low,']);
@@ -55,7 +55,7 @@ r_coldef <- function(target, r_low, r_high) {
 n_coldef <- function(targets, maximum, digits=0) {
     list(
         targets=targets,
-        render=JS('
+        render=htmlwidgets::JS('
         function(data,type,row,meta) {
             var max = ',maximum,';
             var digits = ',digits,';
@@ -76,7 +76,7 @@ rank_coldef <- function(target, fdr) {
 
     list(
         targets=target,
-        render=JS('function(data,type,row,meta) {
+        render=htmlwidgets::JS('function(data,type,row,meta) {
             var fdr = parseFloat(row[',fdr,']);
             var stars = "";
             var fdr_text, color;
@@ -96,4 +96,47 @@ rank_coldef <- function(target, fdr) {
         }')
     )
 }
+
+
+confect_coldef <- function(target, confect, low, high) {
+    list(
+        targets=target,
+        render=htmlwidgets::JS('function(data,type,row,meta) {
+            var low=',low,';
+            var high=',high,';
+            var effect=parseFloat(data);
+            var color="#000";
+            var from, to, bound;
+            if (row[',confect,'] == null) {
+                from = low;
+                to = high
+                color = "#d00";
+                bound = "";
+            } else {
+                var confect = parseFloat(row[',confect,']);
+                if (effect >= 0.0) {
+                    from = confect;
+                    to = high;
+                } else {
+                    from = low;
+                    to = confect;
+                }
+                bound = " (" + (effect>=0?"&geq;":"&leq;") + (confect>=0?" ":"") + confect.toFixed(2) + ")"
+            }
+            function tr(x) { return (x-low)/(high-low) * 200 + 1.5; }
+            return "<tt style=\\"white-space: pre\\">" + 
+                   effect.toFixed(2) + 
+                   bound +
+                   "</tt>" +
+                   "<svg width=203 height=21 style=\\"vertical-align: middle\\">" +
+                   "<line x1="+tr(low)+" y1=0 x2="+tr(low)+" y2=21 stroke=#bbb stroke-width=1 />" +
+                   "<line x1="+tr(high)+" y1=0 x2="+tr(high)+" y2=21 stroke=#bbb stroke-width=1 />" +
+                   "<line x1="+tr(0)+" y1=0 x2="+tr(0)+" y2=21 stroke=#bbb stroke-width=1 />" +
+                   "<line x1="+tr(from)+" y1=10 x2="+tr(to)+" y2=10 " + 
+                         "stroke="+color+" stroke-width=2 stroke-linecap=butt />" +
+                   "<circle cx="+tr(effect)+" cy=10 r=4 fill="+color+" />" +
+                   "</svg>"
+        }'))
+}
+
 

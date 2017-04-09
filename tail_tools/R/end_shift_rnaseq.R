@@ -60,17 +60,17 @@ end_shift_rnaseq_batch <- function(samples, utrs, extended_utrs, exons) {
     #todo: fix extension
         
     cat("get\n")
-    all_covers <- map(seq_len(nrow(samples)), function(i) {
+    all_covers <- purrr::map(seq_len(nrow(samples)), function(i) {
         bigwig_get(samples$cover_fwd[i],samples$cover_rev[i], extended_utrs)
     })
-    all_ends <- map(seq_len(nrow(samples)), function(i) {
+    all_ends <- purrr::map(seq_len(nrow(samples)), function(i) {
         bigwig_get(samples$end_fwd[i],samples$end_rev[i], extended_utrs)
     })
     cat("think\n")
 
     all_forward <- is_forward(utrs)
 
-    result <- map_df(seq_along(utrs), function(i) {
+    result <- purrr::map_df(seq_along(utrs), function(i) {
         forward <- all_forward[i]
         utr_width <- BiocGenerics::width(utrs)[i]
         extended_width <- BiocGenerics::width(extended_utrs)[i]
@@ -208,7 +208,7 @@ end_shift_rnaseq <- function(samples, utrs, extended_utrs=NULL, exons=NULL, ci=0
     range <- seq_along(utrs)
     batches <- range %/% 1000
     split_ranges <- split(range, batches)
-    result <- map_df(seq_along(split_ranges), function(i) {
+    result <- purrr::map_df(seq_along(split_ranges), function(i) {
         cat(i,"of",length(split_ranges),"\n")
         batch <- split_ranges[[i]]
         end_shift_rnaseq_batch(samples, utrs[batch], extended_utrs[batch], exons) 

@@ -78,7 +78,7 @@ random_permutations <- function(condition, group, n) {
             permutation[group] <- condition[group][sample(length(group))]
         
         # Inefficient!
-        seen <- map_lgl(permutations, function(item) identical(permutation,item)) %>% any()
+        seen <- purrr::map_lgl(permutations, function(item) identical(permutation,item)) %>% any()
         if (!seen) permutations[[length(permutations)+1]] <- permutation
     }
     
@@ -297,7 +297,7 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
             lapply(perms, function(condition_perm) {
                 cat(paste0(ifelse(condition_perm,"+","-")),"\n")
                 
-                map_dbl(splitter, function(peaks) {
+                purrr::map_dbl(splitter, function(peaks) {
                     item <- combined_r(counts[peaks,,drop=F], condition_perm, sample_splitter)
                     abs(item$r) - sqrt(item$var)*ci_sds
                 })
@@ -399,7 +399,7 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
 #' Samples can also be selected using select=, which should contain a logical vector of samples to retain.
 #'
 end_shift_pipeline <- function(path, condition, group=NULL, select=NULL, ci=0.95, fdr=T, edger=T, limma=T, antisense=T, colliders=T, non_utr=T, min_reads=10, title="End-shift test", fdr_max_permute=1000) {
-    dat <- read.grouped.table(paste0(path,"/expression/peakwise/counts.csv"))
+    dat <- read_grouped_table(paste0(path,"/expression/peakwise/counts.csv"))
     
     counts <- as.matrix(dat$Count)
     peak_info <- dplyr::as_data_frame(dat$Annotation)
@@ -444,7 +444,7 @@ end_shift_pipeline <- function(path, condition, group=NULL, select=NULL, ci=0.95
     }
 
 
-    peak_info$product <- str_match(peak_info$product, "^[^ ]+ (.*)$")[,2]
+    peak_info$product <- stringr::str_match(peak_info$product, "^[^ ]+ (.*)$")[,2]
     
     peak_info$position <- ifelse(peak_info$strand>0, peak_info$end, peak_info$start)
     anti <- peak_info$relation == "Antisense"

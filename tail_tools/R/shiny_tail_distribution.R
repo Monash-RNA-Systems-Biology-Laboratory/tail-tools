@@ -1,19 +1,6 @@
 
-#'
-#' Get BAM filenames from a Tail Tools pipeline output directory
-#'
-#' @export
-pipeline_bams <- function(pipeline_dir) {
-    meta <- jsonlite::fromJSON(file.path(pipeline_dir,"plotter-config.json"))
-    bam_filenames <- meta$samples$bam
-    names(bam_filenames) <- meta$samples$name
-    bam_filenames
-}
-
 
 read_info <- function(bam_filename, query) {
-    library(dplyr)
-
     sbp <- Rsamtools::ScanBamParam(
         what=c("qname","pos","cigar","strand"),
         tag=c("AN"), 
@@ -205,7 +192,7 @@ shiny_tail_distribution <- function(
                      sample=factor(this_samples, this_samples),
                      info=lapply(bam_filenames[this_samples], read_info, ranges[peak])
                  ) %>%
-                 unnest_(~info)
+                 tidyr::unnest_(~info)
             ) %>%
             bind_rows
         }))
@@ -320,7 +307,7 @@ shiny_tail_distribution <- function(
             } else if (i("tail_style") == "Density") {
                 print(
                     tail_lengths %>%
-                    complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
+                    tidyr::complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
                     group_by_(~sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
                     ggplot(aes_(color=~sample,group=~sample,x=~length_mid,y=~transformer(n))) + 
                     geom_line() +
@@ -335,12 +322,12 @@ shiny_tail_distribution <- function(
                     #group_by(sample) %>%
                     #mutate(n = n/max(n)) %>%
                     #ungroup() %>%
-                    complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
+                    tidyr::complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
                     group_by_(~sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
                     ggplot(aes_(x=~sample,y=~length_mid,fill=~transformer(n))) + 
                     geom_tile(height=tail_bin) +
                     scale_y_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
-                    scale_fill_viridis(guide=FALSE) +
+                    viridis::scale_fill_viridis(guide=FALSE) +
                     labs(x="", y="poly(A) tail length") +
                     theme_minimal() +
                     theme(panel.grid=element_blank(), 

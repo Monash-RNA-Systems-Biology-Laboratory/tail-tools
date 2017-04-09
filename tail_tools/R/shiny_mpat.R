@@ -55,18 +55,18 @@ shiny_mpat <- function(
         
         plot_count=NULL,
         plot_tail=NULL) {
-    library(shiny)
-    library(nesoni)
-    library(reshape2)
-    library(varistran)
-    library(ggplot2)
-    library(gridExtra)
-    library(rtracklayer)
-    library(dplyr)
-    library(tidyr)
-    library(viridis)
+    #library(shiny)
+    #library(nesoni)
+    #library(reshape2)
+    #library(varistran)
+    #library(ggplot2)
+    #library(gridExtra)
+    #library(rtracklayer)
+    #library(dplyr)
+    #library(tidyr)
+    #library(viridis)
 
-    tables <- read.grouped.table(filename)
+    tables <- read_grouped_table(filename)
     genes <- rownames(tables$Count)
     samples <- colnames(tables$Count)
     
@@ -218,7 +218,7 @@ shiny_mpat <- function(
                 } else if (env$input$tail_style == "Density") {
                     print(
                         tail_lengths %>%
-                        complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
+                        tidyr::complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
                         group_by_(~sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
                         ggplot(aes_(color=~sample,group=~sample,x=~length_mid,y=~transformer(n))) + 
                         geom_line() +
@@ -233,12 +233,12 @@ shiny_mpat <- function(
                         #group_by(sample) %>%
                         #mutate(n = n/max(n)) %>%
                         #ungroup() %>%
-                        complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
+                        tidyr::complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
                         group_by_(~sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
                         ggplot(aes_(x=~sample,y=~length_mid,fill=~transformer(n))) + 
                         geom_tile(height=tail_bin) +
                         scale_y_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
-                        scale_fill_viridis(guide=FALSE) +
+                        viridis::scale_fill_viridis(guide=FALSE) +
                         labs(x="", y="poly(A) tail length") +
                         theme_minimal() +
                         theme(panel.grid=element_blank(), 
@@ -510,7 +510,7 @@ shiny_mpat <- function(
                     sample=factor(this_samples, this_samples),
                     info=lapply(bam_filenames[this_samples], read_info, query)
                 ) %>%
-                unnest_(~info)
+                tidyr::unnest_(~info)
             }))
 
             env$read_info <- reactive({

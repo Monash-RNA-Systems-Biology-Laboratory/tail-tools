@@ -14,8 +14,18 @@ Suggests:
     S4Vectors,
     rtracklayer,
     ggbio,
-    edgeR,
-    limma
+    GenomicRanges,
+    GenomicAlignments,
+    IRanges,
+    Rsamtools,
+    GOstats, 
+    GO.db,
+    org.Sc.sgd.db, 
+    org.Hs.eg.db, 
+    org.Ce.eg.db, 
+    org.Mm.eg.db,
+    nesoni,
+    topconfects
 Depends: 
     methods,
     stats,
@@ -27,18 +37,19 @@ Depends:
     gridBase, 
     magrittr,
     dplyr, 
-    readr, 
-    purrr, 
-    tidyr, 
-    stringr, 
     ggplot2, 
+    shiny,
+    edgeR,
+    limma
+Imports:
+    reshape2,
+    jsonlite,
+    DT,
+    htmlwidgets,
     scales,
     viridis,
-    seriation, 
-    shiny, 
-    DT, 
-    nesoni, 
-    varistran,
-    GenomicRanges
-Suggests: GOstats, org.Sc.sgd.db, org.Hs.eg.db, org.Ce.eg.db, org.Mm.eg.db
+    purrr,
+    readr,
+    tidyr,
+    varistran
 RoxygenNote: 5.0.1

@@ -58,9 +58,9 @@ shiny_end_shift <- function(result) {
     }, prefix="mr_plot_", width=800, brush=brushOpts(id="mr_plot_brush", delay=600000))
 
     panels <- list(
-        tabPanel("Overview", 
+        function(request) tabPanel("Overview", 
             uiOutput("overview")),
-        tabPanel("Results",
+        function(request) tabPanel("Results",
             DT::dataTableOutput("table"),
             downloadButton("table_download", "Download CSV file"),
             uiOutput("blurb"),
@@ -119,6 +119,9 @@ shiny_end_shift <- function(result) {
     
         output$overview <- renderUI({
             vars <- env$vars()
+            df <- vars$df
+            if (is.null(df)) return()        
+            cutoff <- env$input$fdr
             
             items <- list(
                 tags$h2( vars$result$title ),
@@ -131,12 +134,14 @@ shiny_end_shift <- function(result) {
             
             if (!is.null(vars$result$edger))
                 items <- c(items,list( 
-                    tags$p( sprintf("%.1f",vars$result$edger$dge$prior.df), "edgeR prior degrees of freedom." )
+                    tags$p( sprintf("%.1f",vars$result$edger$dge$prior.df), "edgeR prior degrees of freedom." ),
+                    tags$p( sum(df$edger_fdr <= cutoff), "genes significant by edgeR." )
                 ))
             
             if (!is.null(vars$result$limma))
                 items <- c(items,list(
-                    tags$p( sprintf("%.1f",vars$result$limma$fit$df.prior), "limma prior degrees of freedom." )
+                    tags$p( sprintf("%.1f",vars$result$limma$fit$df.prior), "limma prior degrees of freedom." ),
+                    tags$p( sum(df$limma_fdr <= cutoff), "genes significant by limma." )
                 ))
             
             items <- c(items,list(
@@ -200,7 +205,7 @@ shiny_end_shift <- function(result) {
         output$table_download <- downloadHandler(
             filename="alternative-utrs.csv",
             content=function(file) {
-                write_csv(env$selected_rows(), file)
+                readr::write_csv(env$selected_rows(), file)
             }
         )
         
@@ -320,7 +325,7 @@ shiny_end_shift_pipeline <- function(tests, cache_prefix="cache_") {
     assert_that(!is.null(names(tests)))
     assert_that(!any(duplicated(names(tests))))
     
-    titles <- map2_chr(names(tests), tests, function(name,param) {
+    titles <- purrr::map2_chr(names(tests), tests, function(name,param) {
         if (!is.null(param$title)) param$title 
         else name
     })
@@ -337,7 +342,7 @@ shiny_end_shift_pipeline <- function(tests, cache_prefix="cache_") {
     subapp <- shiny_end_shift(function(env) env$test_result())
     
     panels <- list(
-        tabPanel("Select test",
+        function(request) tabPanel("Select test",
             h2("Select test"),
             selectizeInput("test", "Test", choices=choices, selected=NULL, width="100%"),
             selectizeInput("peak_set", "Peaks to use", choices=peak_choices, selected="all", width="100%"),
