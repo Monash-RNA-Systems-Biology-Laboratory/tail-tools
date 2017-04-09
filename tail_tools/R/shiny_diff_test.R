@@ -16,7 +16,7 @@ shiny_test <- function(confects=NULL, title=NULL, prefix="") {
         shiny::tabPanel("Overview", 
             shiny::uiOutput(ns("description")),
             me_plot$component_ui(request),
-            shiny::p("Grey dots show estimated effect size -- these estimates tend to be noisy when there are few reads. Black dots show confident effect size, a confident smallest bound on the effect size at the specified FDR.")
+            shiny::p("Grey dots show estimated effect size -- these estimates tend to be noisy when there are few reads. Black dots show confident effect size, a confident smallest bound on the effect size at the specified FDR."))
 
     results_panel <- function(request)
         shiny::tabPanel("Results",
