@@ -92,15 +92,15 @@ shiny_test <- function(confects=NULL, prefix="") {
                     fixed_coldef(cols$logCPM,1))) 
         })
 
-        env[[ns("gene-tc")]] <- reactive({
+        env[[ns("gene-tc")]] <- reactive(withProgress(message="Loading", {
             read_tail_counts(paste0(confects()$pipeline_dir, "/expression/genewise/counts.csv")) %>%
             tail_counts_vst
-        })
+        }))
 
-        env[[ns("gene-peak_tc")]] <- reactive({
+        env[[ns("gene-peak_tc")]] <- reactive(withProgess(message="Loading", {
             read_tail_counts(paste0(confects()$pipeline_dir, "/expression/peakwise/counts.csv")) %>%
             tail_counts_vst
-        })
+        }))
 
         env[[ns("gene-feature")]] <- reactive({
             rows_selected <- env$input[[ns("results-table_rows_selected")]]
