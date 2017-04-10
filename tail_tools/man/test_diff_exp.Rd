@@ -4,7 +4,8 @@
 \alias{test_diff_exp}
 \title{Test for differential expression}
 \usage{
-test_diff_exp(counts_filename, min_reads = 10, samples = NULL, design, ...)
+test_diff_exp(pipeline_dir, design, min_reads = 10, samples = NULL,
+  title = NULL, ...)
 }
 \arguments{
 \item{min_reads}{There must be this many reads for an item to be included in the test, summing over all relevant samples.}
