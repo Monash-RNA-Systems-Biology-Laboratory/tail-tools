@@ -38,7 +38,7 @@ shiny_test <- function(confects=NULL, title=NULL, prefix="") {
         env$output[[ns("description")]] <- renderUI({
             shiny::div(
                 shiny::h2( title() ),
-                shiny::pre( topconfects::confects_description(confects()) ))
+                shiny::pre( topconfects:::confects_description(confects()) ))
         })
 
         env[[ns("results-df")]] <- reactive({ 
