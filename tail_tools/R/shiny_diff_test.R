@@ -1,6 +1,6 @@
 
 #' @export
-shiny_test <- function(confects=NULL, title=NULL, prefix="") {
+shiny_test <- function(confects=NULL, prefix="") {
     ns <- shiny::NS(prefix)
 
     me_plot <- shiny_plot(prefix=ns("me_plot"))
@@ -20,6 +20,7 @@ shiny_test <- function(confects=NULL, title=NULL, prefix="") {
 
     results_panel <- function(request)
         shiny::tabPanel("Results",
+            shiny::uiOutput(ns("result_description")),
             results_table$component_ui(request),
             gene_view$component_ui(request)
             )
@@ -28,7 +29,13 @@ shiny_test <- function(confects=NULL, title=NULL, prefix="") {
 
     server <- function(env) {
         confects <- ensure_reactive(confects, ns("confects"), env)
-        title <- ensure_reactive(title, ns("title"), env, function() "Differential test")
+
+        title <- reactive({
+            if (!is.null(confects()$title))
+                confects()$title
+            else
+                "Differential test"
+        })
 
         env[[ns("me_plot-callback")]] <- function() {
             topconfects::confects_plot_me(confects()) %>% 
@@ -39,6 +46,10 @@ shiny_test <- function(confects=NULL, title=NULL, prefix="") {
             shiny::div(
                 shiny::h2( title() ),
                 shiny::pre( topconfects:::confects_description(confects()) ))
+        })
+
+        env$output[[ns("result_description")]] <- renderUI({
+            shiny::h2( title() )
         })
 
         env[[ns("results-df")]] <- reactive({ 
@@ -55,8 +66,8 @@ shiny_test <- function(confects=NULL, title=NULL, prefix="") {
             names(cols) <- col_names
             
             if (is.null(confects()$limits)) {
-                min_effect <- min(confects()$table$effect, na.rm=TRUE)
-                max_effect <- max(confects()$table$effect, na.rm=TRUE)
+                min_effect <- min(0, confects()$table$effect, na.rm=TRUE)
+                max_effect <- max(0, confects()$table$effect, na.rm=TRUE)
                 if (!is.finite(max_effect)) {
                     low <- -1.05
                     high <- 1.05
@@ -134,7 +145,7 @@ shiny_tests <- function(tests, cache_prefix="cache_", title="Differential tests"
         if (!is.null(tests[[i]]$title))
             titles[i] <- tests[[i]]$title
 
-    version <- 5
+    version <- 6
     get <- function(name, fdr) {
         filename <- paste0(cache_prefix,name,"_fdr",fdr,".rds")
         call <- c(tests[[name]], list(fdr=fdr))

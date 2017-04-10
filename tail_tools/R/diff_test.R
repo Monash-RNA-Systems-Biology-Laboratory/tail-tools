@@ -118,10 +118,6 @@ test_end_shift <- function(
 
     peak_info$product <- stringr::str_match(peak_info$product, "^[^ ]+ (.*)$")[,2]
     
-    peak_info$position <- ifelse(peak_info$strand>0, peak_info$end, peak_info$start)
-    anti <- peak_info$relation == "Antisense"
-    peak_info$strand[anti] <- peak_info$strand[anti] * -1
-    
     # Filter by relation to gene
     keep <- peak_info$parent != ""
     
@@ -139,6 +135,17 @@ test_end_shift <- function(
     keep2 <- rowSums(counts) >= min_reads
     counts <- counts[keep2,,drop=F]
     peak_info <- peak_info[keep2,,drop=F]
+
+
+    # Order by position
+    position <- ifelse(peak_info$strand>0, peak_info$end, peak_info$start)
+    strand <- peak_info$strand
+    anti <- peak_info$relation == "Antisense"
+    strand[anti] <- strand[anti] * -1
+    
+    ord <- order(strand*position)
+    counts <- counts[ord,,drop=F]
+    peak_info <- peak_info[ord,,drop=F]
 
 
     # Perform test

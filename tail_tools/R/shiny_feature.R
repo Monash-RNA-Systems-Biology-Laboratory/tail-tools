@@ -85,7 +85,7 @@ shiny_feature <- function(tc=NULL, feature=NULL, is_peak=FALSE, peak_tc=NULL, pe
 
                 col_names <- colnames(e("sample_peak_table-df"))
 
-                maximum <- max(relevant_peaks()$obs$norm_count)
+                maximum <- max(1, relevant_peaks()$obs$norm_count)
                 norm_count_cols <- seq_len(length(col_names)-1)
 
                 list(
@@ -125,7 +125,7 @@ shiny_feature <- function(tc=NULL, feature=NULL, is_peak=FALSE, peak_tc=NULL, pe
             cols <- as.list(seq_along(col_names)-1)
             names(cols) <- col_names
 
-            maximum <- max(e("table-df")$norm_count)
+            maximum <- max(1, e("table-df")$norm_count)
             
             list(
                 dom="t",
