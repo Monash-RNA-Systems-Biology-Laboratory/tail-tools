@@ -97,7 +97,7 @@ shiny_test <- function(confects=NULL, prefix="") {
             tail_counts_vst
         }))
 
-        env[[ns("gene-peak_tc")]] <- reactive(withProgess(message="Loading", {
+        env[[ns("gene-peak_tc")]] <- reactive(withProgress(message="Loading", {
             read_tail_counts(paste0(confects()$pipeline_dir, "/expression/peakwise/counts.csv")) %>%
             tail_counts_vst
         }))
