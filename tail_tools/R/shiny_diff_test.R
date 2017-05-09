@@ -112,14 +112,17 @@ shiny_test <- function(confects=NULL, prefix="") {
         
         # Awfully hacky
         env[[ns("gene-peak_names")]] <- reactive({
-            if (is.null(confects()$members))
-                return(NULL)
-
             feature <- env[[ns("gene-feature")]]()
             if (is.null(feature))
                 return(NULL)
 
-            # Awfully hacky
+            if (!is.null(confects()$display_members))
+                return(confects()$display_members[[ feature ]])
+
+            if (is.null(confects()$members))
+                return(NULL)
+
+            # Awfully hacky fallback
             rownames(confects()$edger_fit)[ confects()$members[[feature]] ]
         })
 

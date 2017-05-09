@@ -34,9 +34,9 @@ test_diff_exp <- function(pipeline_dir, design, min_reads=10, samples=NULL, titl
 }
 
 
-test_diff_tail <- function(counts_filename, min_reads=10, ...) {
-
-}
+#test_diff_tail <- function(counts_filename, min_reads=10, ...) {
+#
+#}
 
 
 
@@ -51,12 +51,39 @@ test_diff_tail <- function(counts_filename, min_reads=10, ...) {
 
 
 
-
+#' Test for 3' end shift
+#'
+#' @param pipeline_dir Pipeline directory.
+#'
+#' @param design Design matrix. Should have a column for expression level in condition 1, and a column for expression level in condition 2.
+#'
+#' @param coef1 Column number in the design matrix for expression level in condition 1.
+#'
+#' @param coef2 Column number in the design matrix for expression level in condition 2.
+#'
+#' @param min_reads Minimum total reads in order to use a peak.
+#'
+#' @param samples Sample names to be used. Rows of the design matrix should correspond to these samples. Defaults to all samples in the order they were given when the pipeline was run.
+#'
+#' @param fdr False Discovery Rate to maintain.
+#'
+#' @param step Accuracy of "confect" value. Should not need to be changed.
+#'
+#' @param antisense Include most antisense peaks.
+#'
+#' @param colliders In combination with antisense=TRUE, include antisense peaks, even those that are more likely sense peaks for another gene.
+#'
+#' @param non_utr Include non-3'UTR peaks.
+#'
+#' @param collapse_utr Use in combination with non_utr=TRUE. Collapse 3'UTR peaks into a "single peak", to look for shifts to/from non-3'UTR peaks.
+#'
+#' @param title A title for this test.
+#'
 #' @export
 test_end_shift <- function(
         pipeline_dir, design, coef1, coef2, min_reads=10, samples=NULL,  
         fdr=0.05, step=0.01,
-        antisense=F, colliders=F, non_utr=F,
+        antisense=F, colliders=F, non_utr=F, collapse_utr=F,
         title=NULL) {
     assert_that(length(coef1) == 1)
     assert_that(length(coef2) == 1)
@@ -137,16 +164,33 @@ test_end_shift <- function(
     peak_info <- peak_info[keep2,,drop=F]
 
 
-    # Order by position
+    # Order by position within gene
     position <- ifelse(peak_info$strand>0, peak_info$end, peak_info$start)
     strand <- peak_info$strand
     anti <- peak_info$relation == "Antisense"
     strand[anti] <- strand[anti] * -1
     
-    ord <- order(strand*position)
+    ord <- order(peak_info$parent, strand*position)
     counts <- counts[ord,,drop=F]
     peak_info <- peak_info[ord,,drop=F]
 
+    parent <- peak_info$parent
+
+    display_members <- split(rownames(counts), parent)
+
+    if (collapse_utr) {
+        mapping <- cumsum(!(peak_info$relation %in% c("3'UTR","Downstrand")) | parent != dplyr::lag(parent,default=""))
+        n <- mapping[length(mapping)]
+        new_parent <- rep("",n)
+        new_counts <- matrix(0, nrow=n, ncol=ncol(counts))
+        for(i in seq_along(mapping)) {
+            j <- mapping[i]
+            new_parent[j] <- parent[i]
+            new_counts[j,] <- new_counts[j,] + counts[i,]
+        }
+        parent <- new_parent
+        counts <- new_counts
+    }
 
     # Perform test
     fit <- 
@@ -158,12 +202,13 @@ test_end_shift <- function(
     group_effect <- topconfects::group_effect_shift_log2(design, coef1, coef2)
 
     result <- topconfects::edger_group_confects(
-        fit, peak_info$parent, group_effect, step=step, fdr=fdr)
+        fit, parent, group_effect, step=step, fdr=fdr)
 
     result$table <- cbind(result$table, gene_dat$Annotation[result$table$name,,drop=F])
 
     result$pipeline_dir <- pipeline_dir
     result$title <- title
+    result$display_members <- display_members
 
     result
 }

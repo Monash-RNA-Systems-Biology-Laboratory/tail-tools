@@ -88,7 +88,7 @@ class Tail_count(config.Action_with_prefix):
          self.log.log('%d annotations\n' % len(annotations))
          self.log.log('%d part annotations\n' % len(part_annotations))
          
-         assert annotations, 'No annotations of specified types in file'
+         #assert annotations, 'No annotations of specified types in file'
          
          for item in part_annotations:
              this_extension = self.extension
