@@ -179,7 +179,26 @@ test_end_shift <- function(
     display_members <- split(rownames(counts), parent)
 
     if (collapse_utr) {
-        mapping <- cumsum(!(peak_info$relation %in% c("3'UTR","Downstrand")) | parent != dplyr::lag(parent,default=""))
+        #mapping <- cumsum(!(peak_info$relation %in% c("3'UTR","Downstrand")) | parent != dplyr::lag(parent,default=""))
+        prev_parent <- ""
+        in_utr <- FALSE
+        mapping <- rep(NA, nrow(counts))
+        j <- 0
+        for(i in seq_len(nrow(counts))) {
+            if (parent[i] != prev_parent) {
+                prev_parent <- parent[i]
+                in_utr <- FALSE
+            }
+
+            if (!in_utr)
+                j <- j + 1
+            mapping[i] <- j
+
+            if (peak_info$relation[i] %in% c("3'UTR","Downstrand"))
+                in_utr <- TRUE
+        }
+
+
         n <- mapping[length(mapping)]
         new_parent <- rep("",n)
         new_counts <- matrix(0, nrow=n, ncol=ncol(counts))
