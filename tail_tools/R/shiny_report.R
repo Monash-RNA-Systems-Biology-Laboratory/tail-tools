@@ -2,8 +2,6 @@
 
 shiny_counts_report <- function(tc, pipeline_dir=NULL, species=NULL, title="Tail Tools count report", is_peaks=FALSE, peak_tc=NULL, prefix="") {
     ns <- NS(prefix)
-
-    tc <- tail_counts_vst(tc)
     
     what <- if (is_peaks) "Peak" else "Gene"
     
@@ -192,10 +190,14 @@ shiny_tailtools_report <- function(path, species=NULL, title="Tail Tools report"
     ns <- NS(prefix)
 
     genewise_filename <- paste0(path,"/expression/genewise/counts.csv")
-    genewise_tc <- read_tail_counts(genewise_filename)
+    genewise_tc <- 
+        read_tail_counts(genewise_filename) %>%
+        tail_counts_vst()
 
     peakwise_filename <- paste0(path,"/expression/peakwise/counts.csv")
-    peakwise_tc <- read_tail_counts(peakwise_filename)
+    peakwise_tc <- 
+        read_tail_counts(peakwise_filename) %>%
+        tail_counts_vst()
 
     genewise_report <- shiny_counts_report(genewise_tc, pipeline_dir=path, species=species, prefix=ns("genewise"), is_peaks=FALSE, peak_tc=peakwise_tc, title=NULL)
     genewise_panel <- function(request) tabPanel("Genes", genewise_report$component_ui(request))
