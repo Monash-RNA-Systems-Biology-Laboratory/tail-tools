@@ -10,6 +10,8 @@ attr_renaming = {
     "description" : "Product",    
 }
 
+source_levels = { "ensembl_havana":0, "havana":1, "ensembl":2 }
+
 def translate_attr(attr):
     result = { }
     for name in attr:
@@ -87,6 +89,92 @@ def extract_and_translate(items, type, biotype, transcript_type, transcript_biot
     return result
 
 
+
+def ablate(items, ablators, radius):
+    result = [ ]
+    ablated_any = False
+    for ablator in ablators:
+        ablator = ablator.shifted(-radius, radius)
+        todo = items[:]
+        items = [ ]
+        while todo:
+            item = todo.pop()
+            if not item.overlaps(ablator):
+                items.append(item)
+                continue
+
+            ablated_any = True
+
+            item1 = item.copy()
+            item1.children = [ ]
+            item1.end = ablator.start
+            if item1.start < item1.end:
+                items.append(item1)
+
+            item2 = item.copy()
+            item2.children = [ ]
+            item2.start = ablator.end
+            if item2.start < item2.end:
+                items.append(item2)
+
+    return items, ablated_any
+
+
+def dominate(genes, log, radius=20):
+    """ Reduce overlaps between exons in different genes. 
+        Priority is given to ensemb+havana then havana then ensembl, 
+        and then to furthest upstrand-ending transcript (differences less than radius are ignored),
+        then to protein_coding genes """
+    transcripts = [ ]
+    for gene in genes:
+        for transcript in gene.children:
+            transcript.parent = gene
+        transcripts.extend(gene.children)
+
+    transcript_index = span_index.index_annotations(transcripts)
+
+    result = [ ]
+    for gene in genes:
+        new_gene = gene.copy()
+        new_gene.children = [ ]
+        for transcript in gene.children:
+            new_exons = [ item for item in transcript.children if item.type == "exon" ]
+            for hit in transcript_index.get(transcript, same_strand=True):
+                if hit.parent == transcript.parent: continue
+                if hit.strand > 0:
+                    offset = hit.end - transcript.end
+                else:
+                    offset = transcript.start - hit.start
+                
+                hit_score = (
+                    source_levels.get(hit.source, 0),
+                    min(offset+radius,0) if offset < 0 else max(0,offset-radius),
+                    hit.attr["Biotype"] != "protein_coding"
+                )
+                transcript_score = (
+                    source_levels.get(transcript.source, 0),
+                    0,
+                    transcript.attr["Biotype"] != "protein_coding"
+                )
+
+                if hit_score < transcript_score:
+                    new_exons, ablated_any = ablate(new_exons, 
+                        [ item for item in hit.children if item.type == "exon" ],
+                        radius)
+                    #if ablated_any:
+                    #    print hit.attr["Biotype"], transcript.attr["Biotype"], transcript.attr["Name"]
+
+            if new_exons:
+                new_transcript = transcript.copy()
+                new_transcript.children = [ item for item in transcript.children if item.type != "exon" ] + new_exons
+                new_gene.children.append(new_transcript)
+
+        if new_gene.children:
+            result.append(new_gene)
+
+    return result
+
+
 class Union_find(object):
     def __init__(self, items):
         self.items = items
@@ -111,6 +199,13 @@ class Union_find(object):
         for item in self.items:
             sets[self.root(item)].add(item)
         return sets.values()
+
+
+def join_up(items, brief=False):
+    items = natural_sorted(items)
+    if brief and len(items) > 3:
+        items = items[:2] + ["etc"]
+    return  "/".join(items)
 
 
 def merge(genes, log):
@@ -175,8 +270,11 @@ def merge(genes, log):
             for name in gene.attr:
                 attr[name].add(gene.attr[name])
         for name in attr:
-            attr[name] = "/".join(natural_sorted(attr[name]))
+            attr[name] = join_up(attr[name], brief = name == "Name")
         attr = dict(attr)
+
+        if len(gene_set) >= 2:
+            print "Merged gene:", attr.get("Name",""), attr.get("Biotype","")
         
         merged_gene = annotation.Annotation(
             seqid = seqid,
@@ -231,6 +329,8 @@ def get_genes(items, extractions, log):
         genes.extend(this_genes)
     
     log.log("\n")
+    genes = dominate(genes,log)
+    log.log("\n")
     genes = merge(genes,log)
     features = [ ]
     for gene in genes:
@@ -245,62 +345,38 @@ def get_genes(items, extractions, log):
 # ================ Actual tool =================
 
 @config.help("""\
-Create a tail-tools reference directory using Ensembl.
+Create a tail-tools reference directory using Ensembl files.
+""", """\
+Genome and annotation should be downloaded from the Ensembl servers.
 
-Genome and annotation is downloaded from the Ensembl servers.
+Find the appropriate fasta file in ftp.ensembl.org. The "primary_assembly" is preferred (otherwise "toplevel"), tail-tools is not able to cope with the variant contigs in Ensembl.
 
-Find the appropriate fasta file in ftp.ensembl.org to work out correct flags. The "primary_assembly" is preferred (otherwise "toplevel"), tail-tools is not able to cope with the variant contigs in Ensembl.
-
-For example if the fasta file url was:
+For example for release 82 of homo sapiens, you would download the files:
 
 ftp://ftp.ensembl.org/pub/release-82/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
-
-use flags
-
---release 82 --species Homo_sapiens --assembly GRCh38 --dna dna.primary_assembly
+ftp://ftp.ensembl.org/pub/release-82/gff3/homo_sapiens/Homo_sapiens.GRCh38.82.gff3.gz
 
 """)
-@config.Bool_flag('download', 'Download latest Ensembl files. Only disable if re-building reference directory.')
 @config.Bool_flag('index', 'Generate bowtie2 and shrimp indexes. Only disable if re-building reference directory.')
-@config.String_flag('release',
-    'Ensemble release number.'
-    )
-@config.String_flag('species',
-    'Species. First letter is uppercase.'
-    )
-@config.String_flag('assembly',
-    'Name of the genome assembly.'
-    )
-@config.String_flag('dna', 
-    'If available specify "dna.primary_assembly", otherwise "dna.toplevel".'
-    )
 @config.String_flag('genes',
     'Comma separated list of gene_type/gene_biotype/transcript_type/transcript_biotype. Any of these can be left blank. Regular expressions can be used.'
     )
 @config.String_flag('rename',
     'Comma separated list of old=new chromosome renamings.'
     )
+@config.Positional('genome', 'Genome FASTA file.')
+@config.Positional('annotation', 'Genome annotation in GFF3 format.')
 class Make_ensembl_reference(config.Action_with_output_dir):
     _workspace_class = reference_directory.Tailtools_reference
     
-    download = True
     index = True
+    rename = ''    
+    genes = '///'
     
-    release = None
-    species = None
-    assembly = None
-    dna = None
-    
-    rename = ''
-    
-    genes = "///"
+    genome = None
+    annotation = None
     
     def run(self):
-        assert self.release
-        assert self.species
-        assert self.assembly
-        assert self.dna
-        
         extractions = [ ]
         for item in self.genes.split(','):
             extraction = item.split('/')
@@ -314,30 +390,16 @@ class Make_ensembl_reference(config.Action_with_output_dir):
                 rename[old] = new
 
         work = self.get_workspace()        
-        ensembl = workspace.Workspace(work/'ensembl')
-        
-        genome_filename = self.species+"."+self.assembly+"."+self.dna+".fa.gz"
-        genome_url = "rsync://ftp.ensembl.org/ensembl/pub/release-"+self.release+"/fasta/"+self.species.lower()+"/dna/"+genome_filename
-        
-        gff_filename = self.species+"."+self.assembly+"."+self.release+".gff3.gz"
-        gff_url = "rsync://ftp.ensembl.org/ensembl/pub/release-"+self.release+"/gff3/"+self.species.lower()+"/"+gff_filename
-        
-        
-        if self.download:
-            self.log.log("Fetching "+genome_url+"\n")
-            io.execute(['rsync','-aP',genome_url, ensembl/genome_filename])
-            self.log.log("Fetching "+gff_url+"\n")
-            io.execute(['rsync','-aP',gff_url, ensembl/gff_filename])
         
         with workspace.tempspace() as temp:
-            items = list(annotation.read_annotations(ensembl/gff_filename))
+            items = list(annotation.read_annotations(self.annotation))
             for item in items:
                 item.seqid = rename.get(item.seqid, item.seqid)
             annotation.write_gff3(temp/'temp.gff', get_genes(items, extractions, self.log))
             del items
             
             with open(temp/'temp.fa','wb') as f:
-                for name,seq in io.read_sequences(ensembl/genome_filename):
+                for name,seq in io.read_sequences(self.genome):
                     name = name.split()[0]
                     name = rename.get(name,name)
                     io.write_fasta(f, name, seq)

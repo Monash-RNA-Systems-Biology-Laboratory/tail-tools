@@ -256,10 +256,10 @@ def kmer_pile_add(pile1, pile2):
 #    for name, pile in p.items():
 #        pylab.plot(pile)
 
-def stack_kmer_pile(p):
+def stack_kmer_pile(p, border=(0,0,0), border_thickness=1.5, figsize=(20.0,6.0), position=[0.05,0.05,0.85,0.93]):
     import pylab
     from matplotlib.patches import Rectangle
-    pylab.figure(figsize=(20.0,6.0))
+    pylab.figure(figsize=figsize)
     
     pylab.axvline(alpha=0.5, color='black')
     
@@ -282,16 +282,21 @@ def stack_kmer_pile(p):
         heights[i:i+k] = [ offset+height ] * k
         for j in xrange(k):
             pylab.gca().add_patch(Rectangle((p.start-0.5+i+j,offset),1,height,
-                linewidth=0.1,
+                linewidth=border_thickness/15,
+                edgecolor = border,
                 facecolor = COLORS[kmer[j]]))
             #if height > 0.02*p.n:
             #    pylab.annotate(kmer[j],(p.start-0.5+i+j+0.5,offset+height*0.5), size=8, ha='center', va='center')
         #if height > 0.05*p.n:
         #    pylab.annotate('%.0f%%' % (height*100.0/p.n),(p.start-0.5+i+k,offset), size=8,ha='right',va='bottom')
-        pylab.gca().add_patch(Rectangle((p.start-0.5+i,offset),k,height, fill=False,linewidth=1.5))
+        pylab.gca().add_patch(Rectangle((
+            p.start-0.5+i,offset),k,height, 
+            fill=False,
+            edgecolor=border,
+            linewidth=border_thickness))
 
     for i,c in enumerate('ACGT'):
-        pylab.figtext(0.95,0.9-i*0.05, c, size=15.0, backgroundcolor=COLORS[c], ha='center')
+        pylab.figtext(0.95,0.9-i*0.1, c, size=15.0, backgroundcolor=COLORS[c], ha='center')
     
     pylab.xlim(p.start-1,p.end+1)
     pylab.ylim(0,max(heights))   
@@ -299,7 +304,7 @@ def stack_kmer_pile(p):
     pylab.yticks([ 0.1*p.n ], [ '10%' ])
     #pylab.yticks([])
     
-    pylab.gca().set_position([0.05,0.05, 0.85,0.93])
+    pylab.gca().set_position(position)
     #pylab.tight_layout() 
     
     

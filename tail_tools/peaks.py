@@ -213,7 +213,7 @@ class Relate_peaks_to_genes(config.Action_with_prefix):
             hit_to = "3'UTR"
             hits = [ item.parents[0].parents[0] for item in
                      utr_index.get(query, True) ]
-            
+
             if not hits:
                 hit_to = "Exon"
                 hits = [ item.parents[0].parents[0] for item in

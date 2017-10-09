@@ -175,10 +175,10 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
             
             orderedvec <- order(datfr3$annotate$chromosome, datfr3$annotate$start)
             
-            datfr3$annotate <- datfr3$annotate[orderedvec,]
-            datfr3$Tail <- datfr3$Tail[orderedvec,]
-            datfr3$Count <- datfr3$Count[orderedvec,]
-            datfr3$Tail_count <- datfr3$Tail_count[orderedvec,]
+            datfr3$annotate <- datfr3$annotate[orderedvec,,drop=F]
+            datfr3$Tail <- datfr3$Tail[orderedvec,,drop=F]
+            datfr3$Count <- datfr3$Count[orderedvec,,drop=F]
+            datfr3$Tail_count <- datfr3$Tail_count[orderedvec,,drop=F]
             datfr3$Tail_count <- datfr3$Tail_count[,colvec,drop=F]
             
             #Truncate names for neatness
@@ -249,7 +249,7 @@ shiny_patseq_heatmap <- function(datfr, sample_labels=NULL, sample_labels2=NULL,
             selrt <- selproc()
             splitDF <- selrt$a1
             selection <- selrt$sel
-            
+
             plot_patseq_heatmap(
                 matf1=splitDF$Tail[selection,,drop=FALSE],
                 matf2=splitDF$Count[selection,,drop=FALSE],
