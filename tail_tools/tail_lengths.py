@@ -14,9 +14,9 @@ def str_na(value):
         return str(value)
 
 
-@config.help("""
-Create file to be used by "aggregate-tail-lengths:".
-
+@config.help("""\
+Create file to be used by "aggregate-tail-lengths:".\
+""","""\
 Reads are aligned to "parts" features. A parent is then sought of type "types", possibly several levels up, or possibly zero levels up.
 
 If part features have a "max_extension" attribute, this is respected when extending them. Typically this is used to avoid extending into a following CDS.
