@@ -514,7 +514,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         r.p(r.get(reference/'reference.gff') + ' - Reference annotations in GFF3 format')
         r.p(r.get(reference/'utr.gff') + ' - 3\' UTR regions')
-        
+
         r.p('<b>%d further bases 3\' extension was allowed</b> beyond the GFF files above (but not extending into the next gene on the same strand).' % self.extension)
 
         r.write('<p/><hr>\n')
@@ -527,8 +527,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 
         r.write('<p/><hr>\n')
 
-        r.p('tail-tools version '+tail_tools.VERSION)
-        r.p('nesoni version '+nesoni.VERSION)
+        r.p('Reference directory '+self.reference)
+        r.p('Tail Tools version '+tail_tools.VERSION)
+        r.p('Nesoni version '+nesoni.VERSION)
         
         r.close()
 
