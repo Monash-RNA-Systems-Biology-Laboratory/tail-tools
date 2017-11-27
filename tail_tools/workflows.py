@@ -292,9 +292,10 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             all_inputs.extend(sample.reads)
         assert len(set(all_inputs)) == len(all_inputs), "Duplicate read filename."
         
+        assert len(set([ item.output_dir for item in self.tests ])) == len(self.tests), "Duplicate test name."
+        
         for test in self.tests:
             assert not test.analysis, "analysis parameter for tests should not be set, will be filled in automatically"
-        
         
         #===============================================
         #                Run pipeline
