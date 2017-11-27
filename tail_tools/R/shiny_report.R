@@ -136,6 +136,7 @@ shiny_counts_report <- function(tc, pipeline_dir=NULL, species=NULL, title="Tail
         # Non-reactive event handling
         
         observeEvent({ e("varistran-rows-selected") }, {
+            if (!identical(i("tabset"), "Heatmap")) return() 
             if (!length(e("varistran-rows-selected"))) return()
             
             updateRadioButtons(env$session, ns("setsource"), selected="heatmap")
@@ -143,6 +144,7 @@ shiny_counts_report <- function(tc, pipeline_dir=NULL, species=NULL, title="Tail
         })
         
         observeEvent({ e("heatmap-plot-rows-selected") }, {
+            if (!identical(i("tabset"), "Tail heatmap")) return() 
             if (!length(e("heatmap-plot-rows-selected"))) return()
             
             updateRadioButtons(env$session, ns("setsource"), selected="tailmap")

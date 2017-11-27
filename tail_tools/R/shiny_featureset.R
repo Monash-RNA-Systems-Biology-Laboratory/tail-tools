@@ -71,10 +71,10 @@ shiny_featureset <- function(tc, fs=NULL, species=NULL, is_peaks=FALSE, prefix="
             table_df <- isolate(e("table-df"))
             rows_selected <- env$input[[ns("table-table_rows_selected")]]
             
-            if (nrow(table_df) == 1)
-                table_df$feature
-            else
-                table_df$feature[rows_selected]
+            #if (nrow(table_df) == 1)
+            #    table_df$feature
+            #else
+            table_df$feature[rows_selected]
         })
         
         if (have_species) geneset <- reactive({
