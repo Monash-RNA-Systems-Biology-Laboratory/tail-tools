@@ -90,16 +90,18 @@ Reads should be in FASTQ format.
 """)
 @config.String_flag('sample', 'Sample name (for logging of statistics).')
 @config.Int_flag('clip_quality', 'Genomic sequence is clipped to a region containing 90% of bases with at least this quality.')
-@config.Int_flag('ignore_quality', 'When calling poly(A) and adaptor, ignore bases below this quality. This may be lower than --clip-quality.')
+#@config.Int_flag('ignore_quality', 'When calling poly(A) and adaptor, ignore bases below this quality. This may be lower than --clip-quality.')
+@config.Int_flag('min_score', 'Minimum score to call a poly(A) tail, essentially number of As+adaptor bases matched.')
 @config.String_flag('adaptor', 'Adaptor sequence expected after poly-A tail (basespace only).')
 @config.Int_flag('length', 'Minimum length.')
 @config.Bool_flag('debug', 'Show detected poly-A region and adaptor location in each read.')
 @config.Main_section('filenames', 'Input FASTQ files.')
 class Clip_runs_basespace(config.Action_with_prefix):
     sample = 'sample'
-    adaptor = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC'    
-    clip_quality = 20
-    ignore_quality = 0
+    adaptor = 'GATCGGAAGAGCACACGTCTGAACTCCAGTCAC'    
+    clip_quality = 0
+    #ignore_quality = 0
+    min_score = 10
     length = 20
     debug = False
     filenames = [ ]
@@ -111,7 +113,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
         
         """
         clip_quality = chr(33+self.clip_quality)
-        ignore_quality = chr(33+self.ignore_quality)
+        #ignore_quality = chr(33+self.ignore_quality)
         
         with io.open_possibly_compressed_writer(self.prefix+'.fastq.gz') as out_file, \
              io.open_possibly_compressed_writer(self.prefix+'.clips.gz') as out_clips_file:
@@ -149,7 +151,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
                         i += 1
                             
                     
-                    best_score = 0
+                    best_score = self.min_score-1
                     best_a_start = good_quality_end
                     best_a_end = good_quality_end
                     best_adaptor_bases = 0
@@ -158,7 +160,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
                     best_aonly_end = good_quality_end
                     
                     # Consider each possible start position for the poly(A)
-                    for a_start in xrange(good_quality_end):
+                    for a_start in xrange(len(seq)):
                         if a_start and seq[a_start-1] == 'A': continue
                         
                         # Consider each possible end position for the poly(A)
@@ -172,46 +174,66 @@ class Clip_runs_basespace(config.Action_with_prefix):
                             
                             
                             # The poly(A) should be followed by adaptor,
-                            # at least until the end of good quality sequence.
+                            ## at least until the end of good quality sequence.
                             # However if there is evidence of the adaptor beyond
                             # the end of good quality, we still want to know that,
                             # and count it towards the number of adaptor bases present.
                             score = aonly_score
                             adaptor_bases = 0
                             i = a_end
-                            while True:
-                                if (score > best_score and 
-                                    (i >= good_quality_end or i >= a_end+len(self.adaptor))):
+                            abort_score = best_score-len(self.adaptor)
+                            abort_i = min(len(seq), a_end+len(self.adaptor))
+                            while score >= abort_score:
+                                #if (score > best_score and 
+                                #    (i >= good_quality_end or i >= a_end+len(self.adaptor))):
+                                if score > best_score:
                                     best_score = score
                                     best_a_start = a_start
                                     best_a_end = a_end
                                     best_adaptor_bases = adaptor_bases
                             
-                                if i >= a_end+len(self.adaptor) or i >= len(seq):
+                                if i >= abort_i:
                                     break
                             
-                                if qual[i] >= ignore_quality:
-                                    if seq[i] == self.adaptor[i-a_end]:
-                                        score += 1
-                                        adaptor_bases += 1
-                                    else:
-                                        score -= 4
+                                if seq[i] == self.adaptor[i-a_end]:
+                                    score += 1
+                                    adaptor_bases += 1
+                                else:
+                                    score -= 4
                                 i += 1
                                 
                             #if a_end >= len(seq): break
                             
+                            # Modified 2018-03-21
                             # poly(A) tail only within good quality region.
-                            if a_end >= good_quality_end: break
-                            
-                            
-                            if qual[a_end] >= ignore_quality:
-                                if seq[a_end] == 'A':
-                                    aonly_score += 1
-                                else:
-                                    aonly_score -= 4
-                                    if aonly_score <= 0: break
+                            #if a_end >= good_quality_end: break
+                            #if qual[a_end] >= ignore_quality:
+                            #    if seq[a_end] == 'A':
+                            #        aonly_score += 1
+                            #    else:
+                            #        aonly_score -= 4
+                            #        if aonly_score <= 0: break
+
+                            if a_end >= len(seq): break
+
+                            if seq[a_end] == 'A':
+                                aonly_score += 1
+                            else: #if qual[a_end] >= ignore_quality:
+                                aonly_score -= 4
+                            #else:
+                            #    aonly_score -= 1                       
+
                             a_end += 1
-                        
+                    
+                    # 2018-03-21 
+                    # Look for tail starting after good quality,
+                    # however don't call a tail if starts after good quality 
+                    if best_a_start > good_quality_end:
+                        best_a_start = good_quality_end
+                        best_a_end = good_quality_end
+                        best_adaptor_bases = 0
+                        best_score = 0
+
                     a_start = best_a_start
                     a_end = best_a_end
                     adaptor_bases = best_adaptor_bases
@@ -221,8 +243,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
                     if self.debug: # and a_end == a_start and a_end < len(seq)-10:        
                         print name
                         print ''.join( 
-                            'I' if item<ignore_quality 
-                            else ('C' if item<clip_quality else ' ') 
+                            ('C' if item<clip_quality else ' ') 
                             for item in qual )
                         print '-' * good_quality_end
                         print seq
@@ -243,7 +264,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
                     # 6 - number of adaptor bases matched
                     print >> out_clips_file, '%s\t%d\t%d\t%d\t%d\t%d\t%d' % (name, len(seq) , a_start, a_end, aonly_start, aonly_end,  adaptor_bases)
                     
-                    if a_start > self.length:
+                    if a_start >= self.length:
                         if a_start < len(seq):
                             n_clipped += 1
                             total_clipped += a_start

@@ -233,8 +233,9 @@ action = tail_tools.Analyse_polya_batch(
         # Allow reads/peaks this far downstrand of 
         # the annotated transcript end point
         # (however extension will not continue into CDS on the same strand)
-        # For sparser genomes than yeast, perhaps use 2000
-        extension = 400,
+        # For yeast use 400, for sparser genomes than yeast use 2000
+        # (Left blank since it's easy to forget to change.)
+        extension = ... ,
         
         # Optional: Species to use in GO term analysis, choices are: Sc Ce Mm Hs
         species="Sc",

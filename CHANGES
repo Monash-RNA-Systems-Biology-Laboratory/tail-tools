@@ -1,5 +1,7 @@
 
 1.1  - Remove deduplication.
+       poly(A) calling in reads no longer uses quality information,
+           a sequence of 10 "A"s and/or adaptor sequence is called as poly(A) tail.
 
 0.43 - Clip Illumina reads to a region containing 90% bases with quality at
        least 20. Poly(A) tails are only called within this region, this
