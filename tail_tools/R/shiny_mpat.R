@@ -581,7 +581,6 @@ shiny_mpat <- function(
                 },
                 content = function(file) {
                     env$read_info_basic() %>%
-                    select(sample, polya=length, templated=width, n) %>%
                     write_csv(file)
                 }
             )
