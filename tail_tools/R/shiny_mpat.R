@@ -348,6 +348,7 @@ shiny_mpat <- function(
                 br(),
                 br(),
                 if (have_bams) h2("Detail"),
+                if (have_bams) downloadButton("detail_download", "Download raw data CSV"),
                 if (have_bams) fluidRow(
                     column(6,
                         checkboxInput("tail_tail", "Only show reads with poly(A) tail", value=TRUE),
@@ -573,6 +574,17 @@ shiny_mpat <- function(
                     samples_called = samples_called
                 )            
             })
+            
+            output$detail_download <- downloadHandler(
+                filename = function() {
+                    paste0("detail-", input$individual_gene, ".csv")
+                },
+                content = function(file) {
+                    env$read_info_basic() %>%
+                    select(sample, polya=length, templated=width, n) %>%
+                    write_csv(file)
+                }
+            )
         }
             
         overview$component_server(env)

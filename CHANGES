@@ -1,4 +1,6 @@
 
+1.2  - Allow raw poly(A) lengthh and templated width download from mPAT shiny report.
+
 1.1  - Remove deduplication.
        poly(A) calling in reads no longer uses quality information,
            a sequence of 10 "A"s and/or adaptor sequence is called as poly(A) tail.
