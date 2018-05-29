@@ -580,7 +580,7 @@ shiny_mpat <- function(
                 },
                 content = function(file) {
                     env$read_info_basic() %>%
-                    write_csv(file)
+                    readr::write_csv(file)
                 }
             )
         }
