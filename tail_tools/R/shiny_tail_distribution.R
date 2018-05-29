@@ -90,8 +90,8 @@ shiny_tail_distribution <- function(
         arrange_(~seqnames,~strand,~three_prime) %>% 
         group_by_(~seqnames,~strand) %>%
         mutate_(
-    	    three_prime_min =~ pmax(-Inf, (three_prime + lag(three_prime))*0.5, na.rm=T),
-    	    three_prime_max =~ pmin(Inf, (three_prime + lead(three_prime))*0.5, na.rm=T)
+    	    three_prime_min =~ pmax(-Inf, (three_prime + dplyr::lag(three_prime))*0.5, na.rm=T),
+    	    three_prime_max =~ pmin(Inf, (three_prime + dplyr::lead(three_prime))*0.5, na.rm=T)
         ) %>%
         ungroup()
     matching <- match(names(ranges), bounds$name)

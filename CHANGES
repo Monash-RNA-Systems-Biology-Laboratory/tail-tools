@@ -1,5 +1,6 @@
 
 1.2  - Allow raw poly(A) lengthh and templated width download from mPAT shiny report.
+       Fix bug setting three prime bounds for cumulative read distribution plots (missing dplyr:: for lead and lag)
 
 1.1  - Remove deduplication.
        poly(A) calling in reads no longer uses quality information,
