@@ -148,22 +148,23 @@ shiny_tests <- function(tests, cache_prefix="cache_", title="Differential tests"
         if (!is.null(tests[[i]]$title))
             titles[i] <- tests[[i]]$title
 
-    version <- 6
-    get <- function(name, fdr) {
-        filename <- paste0(cache_prefix,name,"_fdr",fdr,".rds")
-        call <- c(tests[[name]], list(fdr=fdr))
+    version <- 7
+    get <- function(name, func, fdr) {
+        filename <- paste0(cache_prefix,name,"_",func,"_fdr",fdr,".rds")
+        call <- c(tests[[name]][-1], list(fdr=fdr))
 
         if (file.exists(filename)) {
             cached_value <- readRDS(filename)
-            if (identical(cached_value$call, call) &&
+            if (identical(cached_value$func, func) &&
+                identical(cached_value$call, call) &&
                 identical(cached_value$version, version))
                 return(cached_value$result)
         }
 
         result <- withProgress(
-            message=paste0("Calculating ",filename),
-            do.call(call[[1]], call[-1]))
-        saveRDS(list(call=call, version=version, result=result), filename)
+            message=paste0("Calculating ",filename), value=1,
+            do.call(func, call))
+        saveRDS(list(func=func, call=call, version=version, result=result), filename)
         result
     }
 
@@ -177,9 +178,11 @@ shiny_tests <- function(tests, cache_prefix="cache_", title="Differential tests"
         function(request) tabPanel("Select test",
             h2("Select test"),
             selectizeInput(ns("test"), "Test", choices=choices, selected=NULL, width="100%"),
+            uiOutput(ns("test_variant_control")),
+            
             numericInput(ns("fdr"), "False Discovery Rate", 0.05),
-            div(style="height: 4em"),
-            actionButton(ns("cache_all"), "Ensure all tests are cached") 
+            div(style="height: 4em") #,
+            #actionButton(ns("cache_all"), "Ensure all tests are cached") 
         )
     )
     
@@ -188,16 +191,22 @@ shiny_tests <- function(tests, cache_prefix="cache_", title="Differential tests"
     server <- function(env) {
         e <- function(name) env[[ns(name)]]()
         
-        observe({
-            if (env$input[[ns("cache_all")]] == 0) return()
+        #observe({
+        #    if (env$input[[ns("cache_all")]] == 0) return()
+        #    
+        #    for(name in names(tests))
+        #        for(fdr in c(0.05, 0.01))
+        #            get(name, fdr)
+        #})
+        
+        env$output[[ns("test_variant_control")]] <- renderUI({
+            variants <- test_variants[[ tests[[env$input[[ns("test")]]]][[1]] ]]
             
-            for(name in names(tests))
-                for(fdr in c(0.05, 0.01))
-                    get(name, fdr)
+            selectizeInput(ns("variant"), "Test variant", choices=variants, width="100%")
         })
     
         env[[ns("test-confects")]] <- reactive({
-            get(env$input[[ns("test")]], env$input[[ns("fdr")]])
+            get(env$input[[ns("test")]], env$input[[ns("variant")]], env$input[[ns("fdr")]])
         })
     
         subapp$component_server(env)
