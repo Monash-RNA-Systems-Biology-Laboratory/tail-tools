@@ -56,14 +56,15 @@ shiny_feature <- function(tc=NULL, feature=NULL, is_peak=FALSE, peak_tc=NULL, pe
                         return(NULL)
                 
                     fixed_peak_names <- peak_tc()$features$feature[hits]
+                    result <- tail_counts_subset_features(peak_tc(), fixed_peak_names)
+                    ordering <- order(ifelse(result$features$strand >= 0,result$features$end,-result$features$start))
+                    fixed_peak_names <- fixed_peak_names[ordering]
                 }
 
                 if (length(fixed_peak_names) == 0)
                     return(NULL)
 
-                result <- tail_counts_subset_features(peak_tc(), fixed_peak_names)
-                ordering <- order(ifelse(result$features$strand >= 0,result$features$end,-result$features$start))
-                tail_counts_subset_features(result, result$features$feature[ordering])
+                tail_counts_subset_features(peak_tc(), fixed_peak_names)
             })
 
             env[[ns("sample_peak_table-df")]] <- reactive({

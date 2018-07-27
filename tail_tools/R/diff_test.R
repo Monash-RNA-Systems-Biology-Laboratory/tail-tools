@@ -3,8 +3,11 @@
 
 test_variants = list(
     "test_vs" = c(
-       "End shift"="test_end_shift", 
-       "End shift, old quasi-likelihood method"="test_end_shift_ql",
+       "End shift, UTR only"="test_end_shift", 
+       "End shift, including all sense peaks"="test_end_shift_nonutr",
+       "End shift, including all sense and antisense peaks, not overlapping other genes"="test_end_shift_nonutr_antisense",
+       "End shift, including all sense and antisense peaks, including antisense peaks overlapping other genes"="test_end_shift_nonutr_antisense_collider",
+       "End shift, UTR only, old quasi-likelihood method"="test_end_shift_ql",
        "Differential expression"="test_diff_exp")
 )
 # For legacy code
@@ -193,7 +196,7 @@ test_end_shift <- function(
 
     parent <- peak_info$parent
 
-    display_members <- split(rownames(counts), parent)
+    display_members <- split(sub("-collider$","",rownames(counts)), parent)
 
     if (collapse_utr) {
         #mapping <- cumsum(!(peak_info$relation %in% c("3'UTR","Downstrand")) | parent != dplyr::lag(parent,default=""))
@@ -252,6 +255,17 @@ test_end_shift <- function(
 
     result
 }
+
+#' @export
+test_end_shift_nonutr <- function(...) test_end_shift(..., non_utr=TRUE)
+
+#' @export
+test_end_shift_nonutr_antisense <- function(...) test_end_shift(..., non_utr=TRUE, antisense=TRUE)
+
+#' @export
+test_end_shift_nonutr_antisense_collider <- function(...) test_end_shift(..., non_utr=TRUE, antisense=TRUE, colliders=TRUE)
+
+
 
 
 #' @export
