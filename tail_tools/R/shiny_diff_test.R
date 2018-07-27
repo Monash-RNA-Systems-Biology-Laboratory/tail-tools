@@ -148,7 +148,7 @@ shiny_tests <- function(tests, cache_prefix="cache_", title="Differential tests"
         if (!is.null(tests[[i]]$title))
             titles[i] <- tests[[i]]$title
 
-    version <- 7
+    version <- 8
     get <- function(name, func, fdr) {
         filename <- paste0(cache_prefix,name,"_",func,"_fdr",fdr,".rds")
         call <- c(tests[[name]][-1], list(fdr=fdr))
