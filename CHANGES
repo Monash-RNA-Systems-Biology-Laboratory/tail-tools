@@ -1,4 +1,9 @@
 
+1.3  - Long standing bug in extend-sam-basespace did not extend over lower case letters in reference, fixed.
+       Allow up to 60% mismatch on A extension in extend-sam-basespace.
+       Filter out peaks with short average tail length.
+       Use --sensitive-local mode in bowtie2.
+
 1.2  - Allow raw poly(A) lengthh and templated width download from mPAT shiny report.
        Fix bug setting three prime bounds for cumulative read distribution plots (missing dplyr:: for lead and lag)
 

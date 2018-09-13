@@ -62,20 +62,24 @@ Directories are created both using all reads and for reads with a poly-A tail.
 """)
 @config.Bool_flag('consensus', 'Look for SNPs and indels.')
 @config.Bool_flag('discard_multimappers', 'If "yes", multimapping reads are discarded. If "no", multimapping reads are assigned at random.')
+@config.Bool_flag('delete_files', 'Delete files not needed by downstream processing.')
 @config.Section('tags', 'Tags for this sample. (See "nesoni tag:".)')
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
 @config.Section('reads', 'Fastq files containing SOLiD reads.')
 @config.Configurable_section('clip_runs_colorspace', 'Configuration options for clip-runs-colorspace:. Will be used with colorspace reads.')
 @config.Configurable_section('clip_runs_basespace', 'Configuration options for clip-runs-basespace:. Will be used with basespace reads.')
+@config.Float_flag('extension_prop_a', 'Extending alignments over genomic "A"s, what is the lowest proportion of "A"s allowed? (Basespace only.)')
 class Analyse_polya(config.Action_with_output_dir):
     reference = None
     tags = [ ]
     reads = [ ]    
     consensus = False
     discard_multimappers = False
+    delete_files = True
     
     clip_runs_colorspace = clip_runs.Clip_runs_colorspace()
     clip_runs_basespace = clip_runs.Clip_runs_basespace()
+    extension_prop_a = 0.6
     
     _workspace_class = working_directory.Working
     
@@ -153,6 +157,7 @@ class Analyse_polya(config.Action_with_output_dir):
                     'bowtie2', 
                     '--rg-id', '1',
                     '--rg', 'SM:'+working.name,
+                    '--sensitive-local',
                     '-k', '10', #Up to 10 alignments per read
                     '-x', reference.get_bowtie_index_prefix(),
                     '-U', clipped_filename,
@@ -176,6 +181,7 @@ class Analyse_polya(config.Action_with_output_dir):
                 output=extended_filename,
                 clips=[ clipped_prefix+'.clips.gz' ],
                 reference_filenames=[ reference.reference_fasta_filename() ],
+                prop_a = self.extension_prop_a
             ).make()
         
         nesoni.Import(
@@ -205,16 +211,16 @@ class Analyse_polya(config.Action_with_output_dir):
         nesoni.Tag(self.output_dir, tags=self.tags).make()
         #nesoni.Tag(polya_dir, tags=self.tags).make()
         
-        
-        # Delete unneeded files
-        os.unlink(clipped_prefix+'.state')
-        os.unlink(clipped_filename)
-        os.unlink(working/'alignments.bam')
-        os.unlink(working/'alignments_filtered.bam')
-        os.unlink(working/'run_alignment.state')
-        os.unlink(raw_filename)
-        os.unlink(extended_filename)
-        #os.unlink(polya_filename)
+        if self.delete_files:
+            # Delete unneeded files
+            os.unlink(clipped_prefix+'.state')
+            os.unlink(clipped_filename)
+            os.unlink(working/'alignments.bam')
+            os.unlink(working/'alignments_filtered.bam')
+            os.unlink(working/'run_alignment.state')
+            os.unlink(raw_filename)
+            os.unlink(extended_filename)
+            #os.unlink(polya_filename)
 
 
 
@@ -231,6 +237,8 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.Bool_flag('peak_polya', 
     'Call peaks using poly(A) reads only.'
     )
+@config.Int_flag('peak_length', 'Length of peak features, ie how far back a read may be from a peak and still be counted. Should be around read length or a little shorter.')
+@config.Float_flag('peak_min_tail', 'Minimum average tail length required for a peak.')
 @config.Int_flag('extension', 'How far downstrand of the given annotations a read or peak belonging to a gene might be. However tail-tools (with a recently created reference directory) will not extend over coding sequence.')
 @config.String_flag('types', 'Comma separated list of feature types to use as genes. Default is "gene".')
 @config.String_flag('parts', 'Comma separated list of feature types that make up features. Default is "exon". Alternatively you might use "three_prime_utr" for a stricter definition of where we expect reads or "gene" for a broad definition including introns.')
@@ -268,6 +276,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     
     peak_min_depth = 50
     peak_polya = True
+    peak_length = 300
+    peak_min_tail = 15.0
     
     types = "gene"
     parts = "exon"
@@ -544,6 +554,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             extension = self.extension,
             min_depth = self.peak_min_depth,
             polya = self.peak_polya,
+            min_tail = self.peak_min_tail,
+            peak_length = self.peak_length,
             samples = dirs,
             ).make()
 

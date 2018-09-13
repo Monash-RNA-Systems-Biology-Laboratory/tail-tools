@@ -217,6 +217,10 @@ for name, tags in tags:
         # clip_runs_basespace = tail_tools.Clip_runs_basespace(
         #    adaptor='AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC', 
         #    clip_quality=0, length=20),
+        
+        #To allow for looser mispriming, lower this.
+        #To only allow for stricter mispriming, raise this (maximum 1).
+        #extension_prop_a = 0.6
         ))
 
 
@@ -236,6 +240,16 @@ action = tail_tools.Analyse_polya_batch(
         # For yeast use 400, for sparser genomes than yeast use 2000
         # (Left blank since it's easy to forget to change.)
         extension = ... ,
+        
+        # Size of peak features generated
+        # ie how far back from a site a read can end and still be counted towards it
+        # Should be read length or a little shorter
+        peak_length = 300,
+        
+        # Minimum average tail length required to call a peak.
+        # Set higher then 0.0 if there is mispriming.
+        # 15.0 may be reasonable.
+        peak_min_tail = ...,
         
         # Optional: Species to use in GO term analysis, choices are: Sc Ce Mm Hs
         species="Sc",

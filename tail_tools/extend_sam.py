@@ -1,6 +1,6 @@
 
 import nesoni
-from nesoni import config, io
+from nesoni import config, io, annotation
 
 import sys, os, array, itertools
 
@@ -326,10 +326,12 @@ SAM records of reads that have a tail of at least <--tail> bases are tagged with
 The actual tail length is stored in an 'AN' attribute.
 """)
 @config.Int_flag('tail', 'Minimum tail length.')
+@config.Float_flag('prop_a', 'Percent genomic A required to extend.')
 @config.Main_section('reference_filenames', 'Reference sequences in FASTA format.')
 @config.Section('clips', '.clips.gz file produced by "clip-reads-basespace:".')
 class Extend_sam_basespace(config.Action_filter):
     tail = 4
+    prop_a = 0.6
     reference_filenames = [ ]
     clips = [ ]
     
@@ -353,6 +355,10 @@ class Extend_sam_basespace(config.Action_filter):
         in_file = self.begin_input()
         out_file = self.begin_output()
         
+        assert self.prop_a >= 0.0 and self.prop_a <= 1.0
+        a_score = 1-self.prop_a
+        non_a_score = -self.prop_a
+        
         for line in in_file:
             line = line.rstrip()
             if line.startswith('@'):
@@ -364,7 +370,7 @@ class Extend_sam_basespace(config.Action_filter):
             if al.flag & FLAG_UNMAPPED:
                 continue
 
-            ref = references[al.rname]
+            #ref = references[al.rname]
 
             reverse = al.flag & FLAG_REVERSE
             if reverse:
@@ -378,19 +384,53 @@ class Extend_sam_basespace(config.Action_filter):
             
             n_tail = tail_lengths[al.qname]
             
+            #if reverse:
+            #    if al.pos-1-n_tail < 0: continue #TODO: handle tail extending beyond end of reference
+            #    bases_ref = rev_comp(ref[al.pos-1-n_tail:al.pos-1])    
+            #else:
+            #    if al.pos-1+al.length+n_tail > len(ref): continue #TODO: handle tail extending beyond end of reference
+            #    bases_ref = ref[al.pos-1+al.length:al.pos-1+al.length+n_tail] .upper()#upper was missing for a long time. Bug!
+            #
+            #extension = 0
+            #while extension < n_tail and bases_ref[extension] == 'A':
+            #    extension += 1
+            
             if reverse:
-                if al.pos-1-n_tail < 0: continue #TODO: handle tail extending beyond end of reference
-                bases_ref = rev_comp(ref[al.pos-1-n_tail:al.pos-1])    
+                feat = annotation.Annotation(al.rname, start=al.pos-1-n_tail, end=al.pos-1, strand=-1)
             else:
-                if al.pos-1+al.length+n_tail > len(ref): continue #TODO: handle tail extending beyond end of reference
-                bases_ref = ref[al.pos-1+al.length:al.pos-1+al.length+n_tail]
+                feat = annotation.Annotation(al.rname, start=al.pos-1+al.length, end=al.pos-1+al.length+n_tail, strand=1)
+            bases_ref = feat.get_seq(references).upper()
+            
+            # Allow up to 60% mismatch on As
+            # Treat soft clipping as insertion for simplicity
+            cigar = cigar.replace("S","I")
+            assert "H" not in cigar, "Can't handle hard clipping"
             
             extension = 0
-            while extension < n_tail and bases_ref[extension] == 'A':
-                extension += 1
+            best_score = 0.0
+            score = 0.0
+            
+            # Soft clipping treated as a mismatch
+            i = len(cigar)-1
+            while i >= 0 and cigar[i] in "I":
+                score += non_a_score
+                i -= 1
+            
+            for i in xrange(n_tail):
+                if bases_ref[i] == "A":
+                    score += a_score
+                else:
+                    score += non_a_score
+                    
+                if score >= best_score:
+                    extension = i+1
+                    best_score = score
+            #print >> sys.stderr, reverse!=0, n_tail, extension, bases_ref
+                      
             
             if n_tail-extension > 0:
                 al.extra.append('AN:i:%d' % (n_tail-extension))
+                al.extra.append('AG:i:%d' % (extension))
             if adaptor_bases[al.qname]:
                 al.extra.append('AD:i:%d' % adaptor_bases[al.qname])
             if n_tail-extension >= self.tail:
@@ -402,7 +442,7 @@ class Extend_sam_basespace(config.Action_filter):
                 al.extra.append('AA:i:1')
             
             cigar += 'M' * extension
-            read_bases += 'A' * extension
+            read_bases += 'N' * extension #Since mispriming is so common (and loading the original sequence here would be a pain)
             read_qual += chr(33+20) * extension #Arbitrarily give quality 20
             al.length += extension
             if reverse:
@@ -414,7 +454,7 @@ class Extend_sam_basespace(config.Action_filter):
                 al.seq = read_bases
                 al.qual = read_qual
                 al.cigar = cigar_encode(cigar)
-
+                
             print >> out_file, al
     
         self.end_output(out_file)

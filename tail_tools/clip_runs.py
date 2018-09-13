@@ -94,6 +94,7 @@ Reads should be in FASTQ format.
 @config.Int_flag('min_score', 'Minimum score to call a poly(A) tail, essentially number of As+adaptor bases matched.')
 @config.String_flag('adaptor', 'Adaptor sequence expected after poly-A tail (basespace only).')
 @config.Int_flag('length', 'Minimum length.')
+@config.Int_flag('only', 'Only use first NNN reads (for debugging). 0 means use all reads.')
 @config.Bool_flag('debug', 'Show detected poly-A region and adaptor location in each read.')
 @config.Main_section('filenames', 'Input FASTQ files.')
 class Clip_runs_basespace(config.Action_with_prefix):
@@ -104,6 +105,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
     min_score = 10
     length = 20
     debug = False
+    only = 0
     filenames = [ ]
 
     def run(self):
@@ -278,6 +280,10 @@ class Clip_runs_basespace(config.Action_with_prefix):
                     
                     if n%10000 == 0: 
                         grace.status('Clip-runs ' + self.sample + ' ' + grace.pretty_number(n)) # + ' (' + grace.pretty_number(len(dstates)) + ' dstates)')
+                    
+                    # Option to do a quick subsample
+                    if self.only and self.only <= n:
+                        break
         
         grace.status('')
         

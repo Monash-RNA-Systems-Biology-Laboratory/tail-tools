@@ -52,8 +52,10 @@ class Find_peaks(config.Action_with_prefix):
     def run(self):
         spans = collections.defaultdict(list)
         
-        for item in legion.parallel_imap(self._load_bam, self.filenames):
-            for key,value in item.items():
+        #for item in legion.parallel_imap(self._load_bam, self.filenames):
+        #    for key,value in item.items():
+        for filename in self.filenames:
+            for key,value in self._load_bam(filename).items():
                 spans[key].extend(value)
 
         grace.status('Calling peaks')
@@ -64,13 +66,22 @@ class Find_peaks(config.Action_with_prefix):
         n = 0
 
         for (rname, strand), span_list in spans.items():
-            depth = [ 0.0 ] * (1+max( item[1] for item in span_list ))
-            for start, end in span_list:
+            length = 1+max( item[1] for item in span_list )
+            depth = [ 0.0 ] * length
+            AN_total = [ 0.0 ] * length
+            AG_total = [ 0.0 ] * length 
+            for start, end, AN, AG in span_list:
                 depth[start] += 1.0
                 depth[end] -= 1.0
+                AN_total[start] += AN
+                AN_total[end] -= AN
+                AG_total[start] += AG
+                AG_total[end] -= AG
             
-            for i in xrange(1,len(depth)):
+            for i in xrange(1,length):
                 depth[i] += depth[i-1]
+                AN_total[i] += AN_total[i-1]
+                AG_total[i] += AG_total[i-1]
 
             for start, end in self._find_spans(depth):
                 if end-self.lap-start <= 0: continue
@@ -80,16 +91,20 @@ class Find_peaks(config.Action_with_prefix):
                 id = 'peak%d' % n
                 
                 ann = annotation.Annotation()
-                ann.source = 'nesoni'
+                ann.source = 'tailtools'
                 ann.type = self.type
                 ann.seqid = rname
                 ann.start = start
                 ann.end = end - self.lap
+                assert ann.end == ann.start+1
                 ann.strand = strand
                 ann.score = None
                 ann.phase = None
                 ann.attr = { 
                     'id' : id,
+                    'n' : str(depth[start+self.lap//2]),
+                    'mean_tail' : str(AN_total[start+self.lap//2]/depth[start+self.lap//2]),
+                    'mean_genomic' : str(AG_total[start+self.lap//2]/depth[start+self.lap//2]),
                     'color' : '#00ff00' if strand > 0 else '#0000ff' if strand < 0 else '#008080',
                     }
                 print >> f, ann.as_gff()
@@ -114,6 +129,12 @@ class Find_peaks(config.Action_with_prefix):
         
             if self.polya and not any( item.startswith("AA:i:") for item in alignment.extra ):
                 continue
+                
+            AN = 0.0
+            AG = 0.0
+            for item in alignment.extra:
+                if item.startswith("AN:i:"): AN = float(item[5:])
+                if item.startswith("AG:i:"): AG = float(item[5:])
         
             strand = -1 if alignment.flag&sam.FLAG_REVERSE else 1
         
@@ -131,7 +152,7 @@ class Find_peaks(config.Action_with_prefix):
             rname = alignment.reference_name
             if (rname,strand) not in spans: 
                 spans[(rname,strand)] = [ ]          
-            spans[(rname, strand)].append((start,end+self.lap))
+            spans[(rname, strand)].append((start,end+self.lap, AN,AG))
                 
         return spans
 
@@ -179,13 +200,17 @@ def _three_prime(feature):
     result.parents = feature.parents
     return result
 
+
+# Note: this now also does some filtering.
 @config.String_flag('parent')
 @config.String_flag('child')
 @config.Int_flag('extension', 'How far downstrand of the gene can the peak be.')
-class Relate_peaks_to_genes(config.Action_with_prefix):
+@config.Float_flag('min_tail', 'Minimum tail length to retain peak.')
+class Filter_and_relate_peaks_to_genes(config.Action_with_prefix):
     parent = None
     child = None
     extension = None
+    min_tail = 0.0
     
     def run(self):
         items = list(annotation.read_annotations(self.parent))
@@ -204,7 +229,11 @@ class Relate_peaks_to_genes(config.Action_with_prefix):
         exon_index = span_index.index_annotations(exons)
         utr_index = span_index.index_annotations(utrs)
         
-        peaks = list(annotation.read_annotations(self.child))
+        peaks = [ ]
+        for peak in annotation.read_annotations(self.child):
+            if float(peak.attr.get("mean_tail","0.0")) < self.min_tail:
+                continue
+            peaks.append(peak)
         
         for peak in peaks:
             # Query is final base in genome before poly(A) starts
@@ -272,6 +301,7 @@ class Relate_peaks_to_genes(config.Action_with_prefix):
 @config.String_flag('annotations', 'Annotation file. A GFF file containing genes, which contain mRNAs, which contain exons and a three_prime_utr.')
 @config.Int_flag('extension', 'How far downstrand of the gene can the peak be.')
 @config.Bool_flag('polya', 'Only use poly(A) reads.')
+@config.Float_flag('min_tail', 'Minimum average tail length to retain peak.')
 @config.Main_section('samples', 'List of sample directories as produced by "analyse-polya:" or "analyse-polya-batch:".')
 class Call_peaks(config.Action_with_output_dir):
     lap = 10
@@ -279,6 +309,7 @@ class Call_peaks(config.Action_with_output_dir):
     min_depth = 50
     peak_length = 100
     polya = True
+    min_tail = 15.0
     
     annotations = None
     extension = None
@@ -307,11 +338,12 @@ class Call_peaks(config.Action_with_output_dir):
             shift_start = str(-self.peak_length),
             ).make()
         
-        Relate_peaks_to_genes(
+        Filter_and_relate_peaks_to_genes(
             outspace/'relation',
             parent = self.annotations,
             child = working/'peaks.gff',
-            extension = self.extension
+            extension = self.extension,
+            min_tail = self.min_tail,
             ).make()
             
 
