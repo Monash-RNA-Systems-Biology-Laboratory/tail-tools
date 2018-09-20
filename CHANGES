@@ -1,4 +1,6 @@
 
+1.4  - Use STAR aligner, only annotated introns are used. (bowtie2 still supported also.)
+
 1.3  - Long standing bug in extend-sam-basespace did not extend over lower case letters in reference, fixed.
        Allow up to 60% mismatch on A extension in extend-sam-basespace.
        Filter out peaks with short average tail length.

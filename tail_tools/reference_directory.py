@@ -2,7 +2,7 @@
 import os, collections, gzip, re, sys
 
 import nesoni
-from nesoni import reference_directory, workspace, io, config, annotation, annotation_tools, span_index
+from nesoni import reference_directory, workspace, io, config, annotation, annotation_tools, span_index, grace
 
 def natural_sorted(l): 
     convert = lambda text: int(text) if text.isdigit() else text.lower() 
@@ -175,6 +175,18 @@ class Make_tt_reference(config.Action_with_output_dir):
         
         annotation.write_gff3(work/'reference.gff', annotations + mrna_utrs)
         annotation.write_gff3(work/'utr.gff', gene_utrs)
+        
+        if self.index and grace.can_execute("STAR"):
+            star_work = workspace.Workspace(work/'star')
+            io.execute([
+                'STAR','--runMode','genomeGenerate',
+                '--outFileNamePrefix',star_work.working_dir+'/',
+                '--genomeDir',star_work.working_dir,
+                '--genomeFastaFiles',work/'reference.fa',
+                '--sjdbGTFfile',work/'reference.gff',
+                '--sjdbGTFtagExonParentTranscript','Parent',
+                '--sjdbOverhang','100',
+                ])
             
         work.update_param(tail_tools_reference_version=work.VERSION)
         

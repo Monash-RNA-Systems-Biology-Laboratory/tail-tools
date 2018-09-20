@@ -65,9 +65,10 @@ Directories are created both using all reads and for reads with a poly-A tail.
 @config.Bool_flag('delete_files', 'Delete files not needed by downstream processing.')
 @config.Section('tags', 'Tags for this sample. (See "nesoni tag:".)')
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:"')
-@config.Section('reads', 'Fastq files containing SOLiD reads.')
+@config.Section('reads', 'Fastq files containing SOLiD or Illumina reads.')
 @config.Configurable_section('clip_runs_colorspace', 'Configuration options for clip-runs-colorspace:. Will be used with colorspace reads.')
 @config.Configurable_section('clip_runs_basespace', 'Configuration options for clip-runs-basespace:. Will be used with basespace reads.')
+@config.String_flag("aligner", "Aligner to use, basespace only. Options are 'bowtie2' or 'STAR'.")
 @config.Float_flag('extension_prop_a', 'Extending alignments over genomic "A"s, what is the lowest proportion of "A"s allowed? (Basespace only.)')
 class Analyse_polya(config.Action_with_output_dir):
     reference = None
@@ -76,6 +77,8 @@ class Analyse_polya(config.Action_with_output_dir):
     consensus = False
     discard_multimappers = False
     delete_files = True
+    
+    aligner = "star"
     
     clip_runs_colorspace = clip_runs.Clip_runs_colorspace()
     clip_runs_basespace = clip_runs.Clip_runs_basespace()
@@ -125,6 +128,9 @@ class Analyse_polya(config.Action_with_output_dir):
         raw_filename = working/'alignments_raw.sam.gz'
         extended_filename = working/'alignments_extended.sam.gz'
         
+        aligner = self.aligner.lower()
+        assert aligner in ("bowtie2", "star")
+        
         #polya_filename = working/'alignments_filtered_polyA.sam.gz'
 
         if colorspace:
@@ -151,7 +157,7 @@ class Analyse_polya(config.Action_with_output_dir):
                 prefix=working/'run_alignment'
                 ).make()
         
-        else:
+        elif aligner == "bowtie2":
             nesoni.Execute(
                 command = [ 
                     'bowtie2', 
@@ -163,6 +169,35 @@ class Analyse_polya(config.Action_with_output_dir):
                     '-U', clipped_filename,
                     ],
                 execution_options = [ '--threads', str(cores) ],
+                output=raw_filename,
+                cores=cores,
+                prefix=working/'run_alignment'
+                ).make()
+        else:
+            nesoni.Execute(
+                command = [
+                    'STAR',
+                    '--genomeDir', reference/'star',
+                    '--outFileNamePrefix', working/'star',
+                    '--outSAMtype', 'SAM', #'Unsorted',
+                    '--outStd', 'SAM',
+                    '--readFilesIn', clipped_filename,
+                    '--readFilesCommand', 'zcat',
+                    # If we wanted no minimum proportion alignment could use this:
+                    # (reads are clipped, so safe to leave default of 2/3 alignment)
+                    #'--outFilterScoreMinOverLread', '0',
+                    #'--outFilterMatchNminOverLread', '0',
+                    # Require 20 bases match
+                    #'--outFilterMatchNmin', '20',
+                    '--outMultimapperOrder', 'Random',
+                    # Only output 1 alignment for multmappers (NH still set)
+                    #'--outSAMmultNmax', '1',
+                    # Require alignment from start (not needed for clipped reads)
+                    #'--alignEndsType', 'Extend5pOfRead1',
+                    # No de novo introns, annotated introns will still be used
+                    '--alignIntronMax', '20',
+                    ],
+                execution_options = [ '--runThreadN', str(cores) ],
                 output=raw_filename,
                 cores=cores,
                 prefix=working/'run_alignment'
