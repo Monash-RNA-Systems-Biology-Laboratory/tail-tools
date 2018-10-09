@@ -8,7 +8,8 @@ test_variants = list(
        "End shift, including all sense and antisense peaks, not overlapping other genes"="test_end_shift_nonutr_antisense",
        "End shift, including all sense and antisense peaks, including antisense peaks overlapping other genes"="test_end_shift_nonutr_antisense_collider",
        "End shift, UTR only, old quasi-likelihood method"="test_end_shift_ql",
-       "Differential expression"="test_diff_exp")
+       "Differential expression"="test_diff_exp",
+       "Differential tail length"="test_diff_tail")
 )
 # For legacy code
 test_variants$test_end_shift <- test_variants$test_vs
@@ -46,7 +47,7 @@ test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2
     
     effect <- topconfects::effect_contrast(contrast)
 
-    result <- topconfects::limma_nonlinear_confects(voomed, design, effect, step=step, fdr=fdr)
+    result <- topconfects::limma_nonlinear_confects(voomed, design, effect, step=step, fdr=fdr, full=TRUE)
     result$pipeline_dir <- pipeline_dir
     result$title <- paste0(title, " - log2 fold change in expression")
 
@@ -54,9 +55,39 @@ test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2
 }
 
 
-#test_diff_tail <- function(counts_filename, min_reads=10, ...) {
-#
-#}
+test_diff_tail <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2=NULL, min_reads=10, samples=NULL, title=NULL, step=0.001, fdr=0.05) {
+    tc <- read_tail_counts(paste0(pipeline_dir, "/expression/genewise/counts.csv"))
+
+    if (is.null(samples))
+        samples <- tc$samples$sample
+        
+    if (is.null(contrast)) {
+        contrast <- rep(0, ncol(design))
+        names(contrast) <- colnames(design)
+        contrast[coef1] <- -1
+        contrast[coef2] <- 1
+    }
+
+    tc <- tail_counts_subset_samples(tc, samples)
+
+    tail_mat <- tail_counts_get_matrix(tc, "tail")
+    tail_count_mat <- tail_counts_get_matrix(tc, "tail_count")
+
+    elist <- weighted_log2_tails(tail_mat, tail_count_mat, design, gene=select_(tc$features,~-feature), min_reads=min_reads)
+    fit <- limma::lmFit(elist, design)
+    cfit <- limma::contrasts.fit(fit, contrast)
+    result <- topconfects::limma_confects(cfit, 1, trend=FALSE, step=step, fdr=fdr, full=TRUE)
+    result$effect_desc <- "log2 fold change in poly(A) tail length"
+    result$table <- dplyr::rename_(result$table, AveTail=~AveExpr)
+    result$table$AveTail <- 2^result$table$AveTail
+    result$magnitude_column <- "AveTail"
+    result$magnitude_desc <- "Average tail length"
+    result$pipeline_dir <- pipeline_dir
+    result$title <- paste0(title, " - log2 fold tail length")
+    result$technical_var <- elist$technical_var
+
+    result
+}
 
 
 
@@ -245,7 +276,7 @@ test_end_shift <- function(
     group_effect <- topconfects::group_effect_shift_unlog2(coef1, coef2)
 
     result <- topconfects::limma_group_confects(
-        voomed, design, grouping, group_effect, step=step, fdr=fdr)
+        voomed, design, grouping, group_effect, step=step, fdr=fdr, full=TRUE)
 
     result$table <- cbind(result$table, gene_dat$Annotation[result$table$name,,drop=F])
 

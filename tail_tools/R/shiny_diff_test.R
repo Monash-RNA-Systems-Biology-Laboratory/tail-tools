@@ -43,9 +43,12 @@ shiny_test <- function(confects=NULL, prefix="") {
         }
 
         env$output[[ns("description")]] <- renderUI({
+            desc <- topconfects:::confects_description(confects())
+            if (!is.null(confects()$technical_var))
+                desc <- paste0(desc,sprintf("\nPer-read variance is %.1f^2 times per-sample variance", sqrt(confects()$technical_var)))
             shiny::div(
                 shiny::h2( title() ),
-                shiny::pre( topconfects:::confects_description(confects()) ))
+                shiny::pre( desc ))
         })
 
         env$output[[ns("result_description")]] <- renderUI({
@@ -56,7 +59,7 @@ shiny_test <- function(confects=NULL, prefix="") {
             confects()$table %>%
             select_(~-index) %>%
             prioritize_columns(
-                c("rank", "confect", "effect", "logCPM", "AveExpr", 
+                c("rank", "confect", "effect", "logCPM", "AveExpr", "AveTail",
                   "gene", "biotype", "name", "product"))
         })
 
@@ -65,7 +68,7 @@ shiny_test <- function(confects=NULL, prefix="") {
             cols <- as.list(seq_along(col_names)-1)
             names(cols) <- col_names
             
-            if (is.null(confects()$limits)) {
+            if (is.null(confects()$limits) || any(is.na(confects()$limits))) {
                 min_effect <- min(0, confects()$table$effect, na.rm=TRUE)
                 max_effect <- max(0, confects()$table$effect, na.rm=TRUE)
                 if (!is.finite(max_effect)) {
@@ -89,7 +92,14 @@ shiny_test <- function(confects=NULL, prefix="") {
                 columnDefs=list(
                     list(targets=cols$confect, visible=FALSE),
                     confect_coldef(cols$effect, cols$confect, low, high),
-                    fixed_coldef(cols$logCPM,1))) 
+                    fixed_coldef(cols$logCPM,1),
+                    fixed_coldef(cols$AveExpr,1),
+                    fixed_coldef(cols$AveTail,1),
+                    precision_coldef(cols$fdr_zero,2),
+                    precision_coldef(cols$se,2),
+                    fixed_coldef(cols$df,1),
+                    fixed_coldef(cols$`mean-tail`,1),
+                    fixed_coldef(cols$`proportion-with-tail`,2))) 
         })
 
         env[[ns("gene-tc")]] <- reactive(withProgress(message="Loading", {
@@ -148,7 +158,7 @@ shiny_tests <- function(tests, cache_prefix="cache_", title="Differential tests"
         if (!is.null(tests[[i]]$title))
             titles[i] <- tests[[i]]$title
 
-    version <- 8
+    version <- 9
     get <- function(name, func, fdr) {
         filename <- paste0(cache_prefix,name,"_",func,"_fdr",fdr,".rds")
         call <- c(tests[[name]][-1], list(fdr=fdr))
