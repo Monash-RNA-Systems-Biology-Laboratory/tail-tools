@@ -139,133 +139,15 @@ test_end_shift <- function(
     assert_that(length(coef1) == 1)
     assert_that(length(coef2) == 1)
 
-    gene_counts_filename <- paste0(pipeline_dir, "/expression/genewise/counts.csv")
-    gene_dat <- read_grouped_table(gene_counts_filename)
+    gp <- get_grouped_peaks(pipeline_dir=pipeline_dir, samples=samples,  
+        antisense=antisense, colliders=colliders, non_utr=non_utr, collapse_utr=collapse_utr, 
+        min_reads=min_reads, min_group=2)
+    counts <- gp$counts
+    samples <- colnames(counts)
+    grouping <- gp$grouping
+    genes <- gp$genes
 
-    counts_filename <- paste0(pipeline_dir, "/expression/peakwise/counts.csv")
-    dat <- read_grouped_table(counts_filename)
-    
-    counts <- as.matrix(dat$Count)
-    peak_info <- dplyr::as_data_frame(dat$Annotation)
-    peak_info$id <- rownames(counts)
-
-    if (is.null(samples))
-        samples <- colnames(counts)
-
-    assert_that(all(samples %in% colnames(counts)))
     assert_that(nrow(design) == length(samples))
-    
-    for(name in colnames(peak_info))
-        if (is.factor(peak_info[[name]]))
-            peak_info[[name]] <- as.character(peak_info[[name]])
-
-    # A peak may be sense to one gene and antisense to another.
-    #   ( Tail Tools does not consider situations any more complex than this. )
-    # Duplicate peaks antisense to a gene so they can be included in both genes
-    #   ( Peaks not assigned a sense gene may already be labelled antisense to another gene,
-    #     these don't need to be duplicated. )
-    if (antisense && colliders && "antisense_parent" %in% colnames(peak_info)) {
-        anti <- (peak_info$antisense_parent != "") & 
-                (peak_info$relation != "Antisense") &
-                (peak_info$antisense_parent != "")
-        anti_counts <- counts[anti,,drop=F]
-        anti_info <- peak_info[anti,,drop=F]
-        
-        # Incorporate antisense peaks
-        anti_info <- anti_info %>% 
-            dplyr::transmute_(
-                id =~ paste0(id,"-collider"),
-                start =~ start,
-                end =~ end,
-                strand =~ strand,
-                relation =~ "Antisense",
-                gene =~ antisense_gene,
-                product =~ antisense_product,
-                biotype =~ antisense_biotype,
-                parent =~ antisense_parent
-            )
-        rownames(anti_counts) <- anti_info$id
-        
-        peak_info <- peak_info %>% 
-            dplyr::select_(~id,~start,~end,~strand,~relation,~gene,~product,~biotype,~parent)
-                
-        counts <- rbind(counts, anti_counts)
-        peak_info <- dplyr::bind_rows(peak_info, anti_info)
-    }
-
-
-    peak_info$product <- stringr::str_match(peak_info$product, "^[^ ]+ (.*)$")[,2]
-    
-    # Filter by relation to gene
-    keep <- peak_info$parent != ""
-    
-    if (!antisense)
-        keep <- keep & peak_info$relation != "Antisense"
-        
-    if (!non_utr)
-        keep <- keep & peak_info$relation == "3'UTR"
-        
-    counts <- counts[keep,samples,drop=F]
-    peak_info <- peak_info[keep,,drop=F]
-
-
-    # Minimum read count filter
-    keep2 <- rowSums(counts) >= min_reads
-    counts <- counts[keep2,,drop=F]
-    peak_info <- peak_info[keep2,,drop=F]
-
-
-    # Order by position within gene
-    position <- ifelse(peak_info$strand>0, peak_info$end, peak_info$start)
-    strand <- peak_info$strand
-    anti <- peak_info$relation == "Antisense"
-    strand[anti] <- strand[anti] * -1
-    
-    ord <- order(peak_info$parent, strand*position)
-    counts <- counts[ord,,drop=F]
-    peak_info <- peak_info[ord,,drop=F]
-
-    parent <- peak_info$parent
-
-    display_members <- split(sub("-collider$","",rownames(counts)), parent)
-
-    if (collapse_utr) {
-        #mapping <- cumsum(!(peak_info$relation %in% c("3'UTR","Downstrand")) | parent != dplyr::lag(parent,default=""))
-        prev_parent <- ""
-        in_utr <- FALSE
-        mapping <- rep(NA, nrow(counts))
-        j <- 0
-        for(i in seq_len(nrow(counts))) {
-            if (parent[i] != prev_parent) {
-                prev_parent <- parent[i]
-                in_utr <- FALSE
-            }
-
-            if (!in_utr)
-                j <- j + 1
-            mapping[i] <- j
-
-            if (peak_info$relation[i] %in% c("3'UTR","Downstrand"))
-                in_utr <- TRUE
-        }
-
-
-        n <- mapping[length(mapping)]
-        new_parent <- rep("",n)
-        new_counts <- matrix(0, nrow=n, ncol=ncol(counts))
-        for(i in seq_along(mapping)) {
-            j <- mapping[i]
-            new_parent[j] <- parent[i]
-            new_counts[j,] <- new_counts[j,] + counts[i,]
-        }
-        parent <- new_parent
-        counts <- new_counts
-    }
-    
-    grouping <- dplyr::data_frame(group=parent, name=rownames(counts)) %>%
-        dplyr::group_by_(~group) %>%
-        dplyr::filter_(~n() >= 2) %>%
-        dplyr::ungroup()
 
     # Perform test
     voomed <- 
@@ -278,11 +160,11 @@ test_end_shift <- function(
     result <- topconfects::limma_group_confects(
         voomed, design, grouping, group_effect, step=step, fdr=fdr, full=TRUE)
 
-    result$table <- cbind(result$table, gene_dat$Annotation[result$table$name,,drop=F])
+    result$table <- cbind(result$table, genes[result$table$name,,drop=F])
 
     result$pipeline_dir <- pipeline_dir
     result$title <- paste0(title, " - end shift")
-    result$display_members <- display_members
+    result$display_members <- split(sub("-collider$","",grouping$name), grouping$group)
 
     result
 }
