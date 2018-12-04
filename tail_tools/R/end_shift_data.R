@@ -175,6 +175,8 @@ weighted_shift <- function(mat, min_reads=1) {
 # produces new EList with weights based on technical variance plus biological variance
 # Biological variance assumed constant across genes
 #
+# Weights may be taken as 1/variance (although this doesn't allow for different variabilities between genes). 
+#
 # If design is not given, a model with only an intercept term is used.
 #
 biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
@@ -217,6 +219,11 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
 
     elist$weights <- tv_weights / (1-param+param/bio_weights*tv_weights)
     elist$biovar <- param
+    
+    # Allow weights to be used directly as precisions
+    fit <- lmFit(elist, design) %>% eBayes()
+    elist$weights <- elist$weights / fit$s2.prior
+    
     elist
 }
 

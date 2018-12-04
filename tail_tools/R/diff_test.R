@@ -49,6 +49,7 @@ test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2
 
     result <- topconfects::limma_nonlinear_confects(voomed, design, effect, step=step, fdr=fdr, full=TRUE)
     result$pipeline_dir <- pipeline_dir
+    result$effect_desc <- "log2 fold change in expression"
     result$title <- paste0(title, " - log2 fold change in expression")
 
     result
@@ -84,7 +85,7 @@ test_diff_tail <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef
     result$magnitude_desc <- "Average tail length"
     result$pipeline_dir <- pipeline_dir
     result$title <- paste0(title, " - log2 fold tail length")
-    result$technical_var <- elist$technical_var
+    result$biovar <- elist$biovar
 
     result
 }

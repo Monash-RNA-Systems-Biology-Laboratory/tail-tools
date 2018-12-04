@@ -177,6 +177,8 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
         return legion.coordinator().get_cores()
          
     def run(self):
+        assert len(self.pickles) > 0, "No samples to count."
+        
         work = self.get_workspace()
         
         data = [ ]
@@ -873,6 +875,8 @@ class Analyse_tail_counts(config.Action_with_output_dir):
 
                 for sample in state.samples:
                     working_dirs.append(os.path.join(item,'samples',sample.output_dir))
+
+        assert len(working_dirs)>0, "No samples to count."
 
         work = self.get_workspace()
         

@@ -1,4 +1,7 @@
 
+1.5  - Shiny app supports differential tail length and differential expression.
+       R code to produce matrix and weights for shift, tail length. 
+
 1.4  - Use STAR aligner, only annotated introns are used. (bowtie2 still supported also.)
 
 1.3  - Long standing bug in extend-sam-basespace did not extend over lower case letters in reference, fixed.
