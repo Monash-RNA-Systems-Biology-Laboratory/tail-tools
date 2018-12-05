@@ -12,7 +12,7 @@
 #' Returns an EList of weighted log2 tail lengths.
 #'
 #' @export
-weighted_log2_tails <- function(tails, tail_counts, design, genes=NULL, min_reads=10, max_weight=10000, biovar=TRUE) {
+weighted_log2_tails <- function(tails, tail_counts, design, genes=NULL, min_reads=10, biovar=TRUE) {
     tails <- as.matrix(tails)
     tail_counts <- as.matrix(tail_counts)
     

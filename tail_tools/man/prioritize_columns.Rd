@@ -9,4 +9,3 @@ prioritize_columns(df, columns)
 \description{
 Put most important columns first in a data frame, for display
 }
-

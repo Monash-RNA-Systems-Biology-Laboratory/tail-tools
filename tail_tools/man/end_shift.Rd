@@ -5,9 +5,9 @@
 \title{End shift statistics, generic function}
 \usage{
 end_shift(counts, peak_info, condition, group = NULL,
-  gene_info_columns = c("gene", "product", "biotype"), ci = 0.95, fdr = T,
-  edger = T, limma = T, min_reads = 10, title = "End-shift test",
-  fdr_max_permute = 1000)
+  gene_info_columns = c("gene", "product", "biotype"), ci = 0.95,
+  fdr = T, edger = T, limma = T, min_reads = 10,
+  title = "End-shift test", fdr_max_permute = 1000)
 }
 \arguments{
 \item{peak_info}{should be a data frame containing columns: id, position, strand (+/-1), parent. position is position in chromosome of transcription stop site. strand should be the strand of the *gene*, if including antisense features.}
@@ -33,4 +33,3 @@ end_shift(counts, peak_info, condition, group = NULL,
 \description{
 End shift statistics, generic function
 }
-

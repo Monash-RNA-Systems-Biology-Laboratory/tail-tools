@@ -9,4 +9,3 @@ plot_genome(features, samples, pos, marks = c())
 \description{
 Produce a depth of coverage plot of a set of samples.
 }
-

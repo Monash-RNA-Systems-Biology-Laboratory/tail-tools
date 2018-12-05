@@ -5,7 +5,8 @@
 \title{Interface to multiple RNA-Seq end-shift tests.}
 \usage{
 shiny_end_shift_rnaseq_multiple(samples, tests, references,
-  cache_prefix = "cache", prefix = "", title = "RNA-Seq end-shift test")
+  cache_prefix = "cache", prefix = "",
+  title = "RNA-Seq end-shift test")
 }
 \arguments{
 \item{samples}{A data frame of samples. Should have columns: name = name of sample, bigwig files: cover_fwd, cover_rev, span_fwd, span_rev.}
@@ -17,4 +18,3 @@ shiny_end_shift_rnaseq_multiple(samples, tests, references,
 \description{
 Interface to multiple RNA-Seq end-shift tests.
 }
-

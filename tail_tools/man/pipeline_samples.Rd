@@ -9,4 +9,3 @@ pipeline_samples(pipeline_dir)
 \description{
 Get sample information from a Tail Tools pipeline output directory
 }
-

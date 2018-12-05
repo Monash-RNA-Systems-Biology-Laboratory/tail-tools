@@ -19,4 +19,3 @@ end_shift_rnaseq(samples, utrs, extended_utrs = NULL, exons = NULL,
 \description{
 End-shift test for RNA-Seq data
 }
-

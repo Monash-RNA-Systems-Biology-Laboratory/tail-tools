@@ -10,4 +10,3 @@ shiny_featureset(tc, fs = NULL, species = NULL, is_peaks = FALSE,
 \description{
 Display information about a subset of rows in a counts file
 }
-

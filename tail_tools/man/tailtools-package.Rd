@@ -8,4 +8,10 @@
 \description{
 This is the R library for Tail Tools, and is mostly to do with presenting the output of the Tail Tools python-based pipeline.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/Victorian-Bioinformatics-Consortium/tail-tools}
+}
 
+}

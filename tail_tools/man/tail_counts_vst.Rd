@@ -9,4 +9,3 @@ tail_counts_vst(tc)
 \description{
 Augment a tail_counts by performing varistran's vst on the counts
 }
-

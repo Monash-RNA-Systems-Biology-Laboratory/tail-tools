@@ -4,8 +4,8 @@
 \alias{shiny_tests}
 \title{Present a collection of differential tests}
 \usage{
-shiny_tests(tests, cache_prefix = "cache_", title = "Differential tests",
-  prefix = "")
+shiny_tests(tests, cache_prefix = "cache_",
+  title = "Differential tests", prefix = "")
 }
 \arguments{
 \item{tests}{A named list of tests. Each item is a list("function_name", ...arguments...).}
@@ -13,4 +13,3 @@ shiny_tests(tests, cache_prefix = "cache_", title = "Differential tests",
 \description{
 Present a collection of differential tests
 }
-

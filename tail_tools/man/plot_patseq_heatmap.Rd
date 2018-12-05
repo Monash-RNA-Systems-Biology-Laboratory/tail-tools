@@ -32,7 +32,9 @@ plot_patseq_heatmap(matf1, matf2, gmatf, clusterby = 1,
 
 \item{tail_relative}{Tail lengths are relative to average for feature}
 }
+\description{
+Printable heatmap grob
+}
 \details{
 Produces a print-able heatmap grob
 }
-

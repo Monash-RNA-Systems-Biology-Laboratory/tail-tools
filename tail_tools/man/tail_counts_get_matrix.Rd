@@ -9,4 +9,3 @@ tail_counts_get_matrix(tc, column_name)
 \description{
 Extract a column from tail_counts$obs as a matrix
 }
-

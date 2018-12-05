@@ -12,4 +12,3 @@ shiny_end_shift(result)
 \description{
 Show a report about an end shift analysis.
 }
-

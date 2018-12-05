@@ -9,4 +9,3 @@ load_genome_features(reference_dir)
 \description{
 Load features needed by plot_genome().
 }
-

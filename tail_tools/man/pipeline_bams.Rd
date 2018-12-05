@@ -9,4 +9,3 @@ pipeline_bams(pipeline_dir)
 \description{
 Get BAM filenames from a Tail Tools pipeline output directory
 }
-

@@ -9,4 +9,3 @@ tail_counts_subset_features(tc, features)
 \description{
 Subset features in a tail_counts
 }
-

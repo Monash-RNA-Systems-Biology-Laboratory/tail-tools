@@ -9,4 +9,3 @@ tail_counts_subset_samples(tc, samples)
 \description{
 Subset samples in a tail_counts
 }
-

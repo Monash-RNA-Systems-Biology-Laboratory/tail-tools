@@ -4,8 +4,8 @@
 \alias{shiny_tailtools_report}
 \title{Shiny report based on pipeline output}
 \usage{
-shiny_tailtools_report(path, species = NULL, title = "Tail Tools report",
-  prefix = "")
+shiny_tailtools_report(path, species = NULL,
+  title = "Tail Tools report", prefix = "")
 }
 \arguments{
 \item{path}{Directory containing pipeline output.}
@@ -17,4 +17,3 @@ shiny_tailtools_report(path, species = NULL, title = "Tail Tools report",
 \description{
 Shiny report based on pipeline output
 }
-

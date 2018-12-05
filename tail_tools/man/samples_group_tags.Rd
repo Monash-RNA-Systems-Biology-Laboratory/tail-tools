@@ -9,4 +9,3 @@ samples_group_tags(samples, group_name, tags, treatment = TRUE)
 \description{
 If treatment=FALSE, contrasts is set to "contr.sum".
 }
-

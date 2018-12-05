@@ -52,4 +52,4 @@ Imports:
     readr,
     tidyr,
     varistran
-RoxygenNote: 5.0.1
+RoxygenNote: 6.1.0

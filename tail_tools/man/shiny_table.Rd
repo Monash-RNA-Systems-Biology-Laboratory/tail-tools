@@ -10,4 +10,3 @@ shiny_table(df = NULL, options = NULL, title = "Table",
 \description{
 Shiny dataTable with download button
 }
-

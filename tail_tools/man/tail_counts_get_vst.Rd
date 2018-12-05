@@ -9,4 +9,3 @@ tail_counts_get_vst(tc)
 \description{
 Extract the vst values from a tail_counts
 }
-

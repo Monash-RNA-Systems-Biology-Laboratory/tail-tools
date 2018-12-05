@@ -4,8 +4,9 @@
 \alias{shiny_patseq_heatmap}
 \title{Produces detailed heatmap}
 \usage{
-shiny_patseq_heatmap(datfr, sample_labels = NULL, sample_labels2 = NULL,
-  feature_labels = NULL, prefix = "", species = NULL)
+shiny_patseq_heatmap(datfr, sample_labels = NULL,
+  sample_labels2 = NULL, feature_labels = NULL, prefix = "",
+  species = NULL)
 }
 \arguments{
 \item{datfr}{List of dataframes 
@@ -30,7 +31,9 @@ Now optional. Not entering this disables GO term analysis}
 \value{
 Returns a composable shiny app object
 }
+\description{
+Produces detailed heatmap
+}
 \details{
 Workhorse function for this package.
 }
-

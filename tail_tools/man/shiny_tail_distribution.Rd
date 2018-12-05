@@ -11,4 +11,3 @@ shiny_tail_distribution(peak_names = NULL, sample_normalizer = NULL,
 \description{
 Display information about a genomic region
 }
-

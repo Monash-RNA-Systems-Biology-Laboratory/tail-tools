@@ -27,8 +27,10 @@ shiny_patseq_heatmap_inner(callback, width = 500, height = 500,
 
 \item{goenabl}{Whether GO Term analysis is enabled. TRUE by default. This might need changing in future}
 }
+\description{
+Integrates heatmap into shiny
+}
 \details{
 Shiny wrapper for sh_hmap_detailed
 Uses gridBase to produce brush for interactivity with plot
 }
-

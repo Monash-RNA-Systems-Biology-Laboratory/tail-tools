@@ -12,4 +12,3 @@ shiny_end_shift_pipeline(tests, cache_prefix = "cache_")
 \description{
 Perform end shift analyses on pipeline output and report results.
 }
-

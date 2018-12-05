@@ -27,4 +27,3 @@ A shiny appobj. Printing it runs the app.
 \description{
 Shiny report for mPAT results
 }
-
