@@ -1,6 +1,7 @@
 
 # Utility functions for processing peak information into easily usable data.
 
+#' @export
 get_grouped_peaks <- function(
         pipeline_dir, samples=NULL,  
         antisense=F, colliders=F, non_utr=F, collapse_utr=F,
@@ -179,6 +180,7 @@ weighted_shift <- function(mat, min_reads=1) {
 #
 # If design is not given, a model with only an intercept term is used.
 #
+#' @export
 biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
     E <- elist$E
     tv_weights <- elist$weights
@@ -241,6 +243,7 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
 #
 # Rows containing less than two samples with enough reads are discarded.
 #
+#' @export
 weighted_shifts <- function(counts, grouping, design=NULL, biovar=TRUE, min_reads=1, genes=NULL) {
     groups <- split(grouping$name, grouping$group)
     
