@@ -56,6 +56,9 @@ test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2
 }
 
 
+#' Test for differential tail length
+#'
+#' @export
 test_diff_tail <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2=NULL, min_reads=10, samples=NULL, title=NULL, step=0.001, fdr=0.05) {
     tc <- read_tail_counts(paste0(pipeline_dir, "/expression/genewise/counts.csv"))
 
