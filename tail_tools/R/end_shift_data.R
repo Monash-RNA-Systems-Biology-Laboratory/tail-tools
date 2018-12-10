@@ -199,10 +199,25 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
     
     if (is.null(design)) {
         # Blind, robust residual variance estimation based on median singular value
+        
+        warning("Estimating biological variance without design matrix.")
+        
+        # Estimate median singular value if variance is 1
+        n <- nrow(ap_E)
+        m <- ncol(ap_E)
+        samples <- replicate(10, {
+            mat <- matrix(rnorm(n*m),nrow=n)
+            mat <- mat / mean(mat*mat)
+            median(svd(mat)$d^2)
+        })
+        unit_median <- mean(samples)
+        #print(samples)
+        #print(unit_median)
+        
         ap_E_centered <- ap_E - rowMeans(ap_E)
         calc_var <- function(ap_weights) {
             d <- svd(sqrt(ap_weights) * ap_E_centered)$d
-            median(d^2)/max(nrow(ap_E),ncol(ap_E))
+            median(d^2)/unit_median
         }
     } else {
         # Conventional residual variance estimation
