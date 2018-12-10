@@ -89,6 +89,7 @@ test_diff_tail <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef
     result$pipeline_dir <- pipeline_dir
     result$title <- paste0(title, " - log2 fold tail length")
     result$biovar <- elist$biovar
+    result$techvar <- elist$techvar
 
     result
 }

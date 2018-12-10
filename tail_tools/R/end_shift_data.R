@@ -178,16 +178,12 @@ weighted_shift <- function(mat, min_reads=1) {
 #
 # Weights may be taken as 1/variance (although this doesn't allow for different variabilities between genes). 
 #
-# If design is not given, a model with only an intercept term is used.
+# If design is not given, there is a hack to estimate the residual variance based on the median singular value.
 #
 #' @export
 biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
     E <- elist$E
     tv_weights <- elist$weights
-    
-    if (is.null(design))
-        design <- cbind(rep(1,ncol(E)))
-    stopifnot(nrow(design) == ncol(E))
     
     if (length(bio_weights) == 1)
         bio_weights <- rep(bio_weights, nrow(E))
@@ -201,10 +197,24 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
     ap_tv_weights <- tv_weights[all_present,,drop=F]
     ap_bio_weights <- bio_weights[all_present]
     
-    # Calculate Ordinary Least Squares residuals
-    residulator <- diag(nrow(design)) - design %*% MASS::ginv(design)
-    resids2 <- t(residulator %*% t(ap_E)) ^ 2
-    n <- length(resids2)
+    if (is.null(design)) {
+        # Blind, robust residual variance estimation based on median singular value
+        ap_E_centered <- ap_E - rowMeans(ap_E)
+        calc_var <- function(ap_weights) {
+            d <- svd(sqrt(ap_weights) * ap_E_centered)$d
+            median(d^2)/max(nrow(ap_E),ncol(ap_E))
+        }
+    } else {
+        # Conventional residual variance estimation
+        stopifnot(nrow(design) == ncol(E))
+    
+        # Calculate Ordinary Least Squares residuals
+        residulator <- diag(nrow(design)) - design %*% MASS::ginv(design)
+        resids2 <- t(residulator %*% t(ap_E)) ^ 2
+        calc_var <- function(ap_weights) {
+            sum(resids2*ap_weights) / (nrow(resids2)*(ncol(resids2)-ncol(design)))
+        }
+    }
 
     # Choose optimium weight for technical variance component
     #
@@ -215,16 +225,21 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
     # The ML overall_variance given the weights can be directly found and substituted in, yielding this optimization: 
     score_weights <- function(param) {
         weights <- ap_tv_weights/(1-param + param/ap_bio_weights*ap_tv_weights)
-        n*log(mean(resids2*weights)) - sum(log(weights))
+        #n*log(mean(resids2*weights)) - sum(log(weights))
+        length(weights)*log(calc_var(weights)) - sum(log(weights))
     }
     param <- optimize(score_weights, c(0, 1))$minimum
 
     elist$weights <- tv_weights / (1-param+param/bio_weights*tv_weights)
-    elist$biovar <- param
     
     # Allow weights to be used directly as precisions
-    fit <- lmFit(elist, design) %>% eBayes()
-    elist$weights <- elist$weights / fit$s2.prior
+    ap_weights <- elist$weights[all_present,,drop=F]
+    residual_var <- calc_var(ap_weights)
+    elist$techvar <- residual_var*(1-param)
+    elist$biovar <- residual_var*param
+    elist$weights <- elist$weights / residual_var
+    #fit <- lmFit(elist, design) %>% eBayes()
+    #elist$weights <- elist$weights / fit$s2.prior
     
     elist
 }
@@ -238,7 +253,7 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
 # "name" corresponding to rownames of counts
 #
 # Biological variance estimation:
-# If design is not given, a model with only an intercept term is used.
+# If design is not given, there is a hack to esimtate residual variance based on the median singular value.
 # If biovar is FALSE, this step is skipped, and weights represent 1/(technical variance).
 #
 # Rows containing less than two samples with enough reads are discarded.
