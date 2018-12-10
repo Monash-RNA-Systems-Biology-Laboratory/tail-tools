@@ -198,26 +198,11 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
     ap_bio_weights <- bio_weights[all_present]
     
     if (is.null(design)) {
-        # Blind, robust residual variance estimation based on median singular value
-        
-        warning("Estimating biological variance without design matrix.")
-        
-        # Estimate median singular value if variance is 1
-        n <- nrow(ap_E)
-        m <- ncol(ap_E)
-        samples <- replicate(10, {
-            mat <- matrix(rnorm(n*m),nrow=n)
-            mat <- mat / mean(mat*mat)
-            median(svd(mat)$d^2)
-        })
-        unit_median <- mean(samples)
-        #print(samples)
-        #print(unit_median)
-        
+        # Blind, robust residual variance estimation based on median singular value     
         ap_E_centered <- ap_E - rowMeans(ap_E)
         calc_var <- function(ap_weights) {
             d <- svd(sqrt(ap_weights) * ap_E_centered)$d
-            median(d^2)/unit_median
+            median(d^2)/max(nrow(ap_E),ncol(ap_E))
         }
     } else {
         # Conventional residual variance estimation
@@ -226,7 +211,7 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
         # Calculate Ordinary Least Squares residuals
         residulator <- diag(nrow(design)) - design %*% MASS::ginv(design)
         resids2 <- t(residulator %*% t(ap_E)) ^ 2
-        calc_var <- function(ap_weights) {
+        calc_var <- function(weights) {
             sum(resids2*ap_weights) / (nrow(resids2)*(ncol(resids2)-ncol(design)))
         }
     }
