@@ -254,6 +254,10 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
 #' @export
 weighted_shifts <- function(counts, grouping, design=NULL, biovar=TRUE, min_reads=1, genes=NULL) {
     groups <- split(grouping$name, grouping$group)
+
+    # Only use groups of 2 or more peaks
+    good <- map_int(groups, length) >= 2
+    groups <- groups[good]
     
     results <- purrr::map(groups, function(members) 
         weighted_shift(counts[members,,drop=FALSE], min_reads=min_reads))
@@ -281,7 +285,8 @@ weighted_shifts <- function(counts, grouping, design=NULL, biovar=TRUE, min_read
         E=shifts, 
         weights=weights,
         total_counts=totals,
-        genes=genes[rownames(shifts),,drop=F]
+        genes=genes[rownames(shifts),,drop=F],
+        bio_weights=bio_weights
     ))
     
     if (biovar)
