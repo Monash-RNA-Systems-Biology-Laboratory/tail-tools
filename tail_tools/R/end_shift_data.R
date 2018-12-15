@@ -197,23 +197,16 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
     ap_tv_weights <- tv_weights[all_present,,drop=F]
     ap_bio_weights <- bio_weights[all_present]
     
-    if (is.null(design)) {
-        # Blind, robust residual variance estimation based on median singular value     
-        ap_E_centered <- ap_E - rowMeans(ap_E)
-        calc_var <- function(ap_weights) {
-            d <- svd(sqrt(ap_weights) * ap_E_centered)$d
-            median(d^2)/max(nrow(ap_E),ncol(ap_E))
-        }
-    } else {
-        # Conventional residual variance estimation
-        stopifnot(nrow(design) == ncol(E))
-    
-        # Calculate Ordinary Least Squares residuals
-        residulator <- diag(nrow(design)) - design %*% MASS::ginv(design)
-        resids2 <- t(residulator %*% t(ap_E)) ^ 2
-        calc_var <- function(weights) {
-            sum(resids2*ap_weights) / (nrow(resids2)*(ncol(resids2)-ncol(design)))
-        }
+    if (is.null(design)) 
+        design <- cbind(rep(1,nrow(E))
+        
+    stopifnot(nrow(design) == ncol(E))
+
+    # Calculate Ordinary Least Squares residuals
+    residulator <- diag(nrow(design)) - design %*% MASS::ginv(design)
+    ap_resids2 <- t(residulator %*% t(ap_E)) ^ 2
+    calc_var <- function(ap_weights) {
+        sum(ap_resids2*ap_weights) / (nrow(ap_resids2)*(ncol(ap_resids2)-ncol(design)))
     }
 
     # Choose optimium weight for technical variance component
