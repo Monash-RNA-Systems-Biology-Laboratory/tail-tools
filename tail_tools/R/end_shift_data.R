@@ -162,7 +162,7 @@ weighted_shift <- function(mat, min_reads=1) {
     # Note: sum(pos_score * mid) == 0, sum(mid) == 1
     per_read_var <- sum(pos_score^2 * mid)
 
-    shifts <- rep(0, length(good))
+    shifts <- rep(NA_real_, length(good))
     shifts[good] <- colSums(props * pos_score)
     
     weights <- rep(0, length(good))
@@ -185,6 +185,10 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
     E <- elist$E
     tv_weights <- elist$weights
     
+    # Ensure NAs have weight 0, then remove them
+    tv_weights[is.na(E)] <- 0
+    E[tv_weights == 0] <- 0
+    
     if (length(bio_weights) == 1)
         bio_weights <- rep(bio_weights, nrow(E))
     stopifnot(length(bio_weights) == nrow(E))
@@ -198,7 +202,7 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
     ap_bio_weights <- bio_weights[all_present]
     
     if (is.null(design)) 
-        design <- cbind(rep(1,nrow(E))
+        design <- cbind(rep(1,ncol(E)))
         
     stopifnot(nrow(design) == ncol(E))
 
@@ -233,6 +237,9 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
     elist$weights <- elist$weights / residual_var
     #fit <- lmFit(elist, design) %>% eBayes()
     #elist$weights <- elist$weights / fit$s2.prior
+    
+    # Ensure weight 0 encoded as NA
+    elist$E[elist$weights == 0] <- NA
     
     elist
 }

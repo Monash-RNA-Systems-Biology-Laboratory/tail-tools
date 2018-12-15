@@ -17,7 +17,7 @@ weighted_log2_tails <- function(tails, tail_counts, design, genes=NULL, min_read
     tail_counts <- as.matrix(tail_counts)
     
     log2_tails <- log2(tails)
-    log2_tails[tail_counts == 0] <- 0.0 #Remove NAs, will be weighted zero
+    log2_tails[tail_counts == 0] <- NA
     
     #all_present <- apply(tail_counts >= min_reads, 1, all)
     #if (!any(all_present)) 
