@@ -15,7 +15,7 @@ fit_all <- function(x,y,w) {
 
 
 #' @export
-elist_factors <- function(elist, p=2, design=NULL, iters=10, use_varimax=TRUE, verbose=TRUE) {
+elist_factors <- function(elist, p=2, design=NULL, iters=20, use_varimax=TRUE, verbose=TRUE) {
     y <- elist$E
     weights <- elist$weights
     rownames(y) <- NULL
