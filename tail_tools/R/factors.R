@@ -32,9 +32,8 @@ elist_factors <- function(elist, p=2, design=NULL, iters=10, verbose=TRUE) {
         design <- cbind(intercept=rep(1,m))
     p_design <- ncol(design)
 
-    n_param <- n*p+m*(p+p_design)
     df_null <- sum(weights>0)-n*p_design
-    df <- df_null-n_param
+    df <- df_null-n*p-m*p
 
     col_mat <- matrix(rnorm(m*p), ncol=p)
     col_mat <- cbind(design, col_mat)
