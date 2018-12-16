@@ -4,8 +4,10 @@ fit_all <- function(x,y,w) {
     n <- ncol(y)
 
     result <- lapply(seq_len(n), function(i) {
-        swi <- sqrt(w[,i])
-        qr.solve(x*swi,y[,i]*swi)
+        wi <- w[,i]
+        present <- wi > 0
+        swpi <- sqrt(wi[present])
+        qr.solve(x[present,,drop=F]*swpi,y[present,i]*swpi)
     })
 
     do.call(rbind, result)
