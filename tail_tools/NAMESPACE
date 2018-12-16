@@ -3,6 +3,7 @@
 export(bigwig_get)
 export(biovar_reweight)
 export(cached)
+export(elist_factors)
 export(end_shift)
 export(end_shift_rnaseq)
 export(get_grouped_peaks)

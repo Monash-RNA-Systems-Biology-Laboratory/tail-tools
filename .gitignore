@@ -1,5 +1,6 @@
 *.pyc
 *.sublime-*
+*.Rproj
 MANIFEST
 tailtools.pdf
 build/
