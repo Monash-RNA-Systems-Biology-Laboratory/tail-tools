@@ -15,7 +15,7 @@ fit_all <- function(x,y,w) {
 
 
 #' @export
-elist_factors <- function(elist, p=2, design=NULL, iters=10, verbose=TRUE) {
+elist_factors <- function(elist, p=2, design=NULL, iters=10, use_varimax=TRUE, verbose=TRUE) {
     y <- elist$E
     weights <- elist$weights
     rownames(y) <- NULL
@@ -34,6 +34,9 @@ elist_factors <- function(elist, p=2, design=NULL, iters=10, verbose=TRUE) {
         design <- cbind(intercept=rep(1,m))
     p_design <- ncol(design)
 
+    ind_design <- seq_len(p_design)
+    ind_factors <- p_design+seq_len(p)
+
     df_null <- sum(weights>0)-n*p_design
     df <- df_null-n*p-m*p
 
@@ -45,11 +48,11 @@ elist_factors <- function(elist, p=2, design=NULL, iters=10, verbose=TRUE) {
         row_mat <- fit_all(col_mat, t(y), t(weights))
 
         # Make sure factors are orthogonal, sensibly ordered
-        part <- row_mat[,p_design+seq_len(p),drop=F]
-        scaling <- sqrt(colMeans(col_mat[,p_design+seq_len(p),drop=F]^2))
+        part <- row_mat[,ind_factors,drop=F]
+        scaling <- sqrt(colMeans(col_mat[,ind_factors,drop=F]^2))
         part <- t(t(part)*scaling)
         decomp <- svd(part)
-        row_mat <- cbind(row_mat[,seq_len(p_design),drop=F], decomp$u)
+        row_mat[,ind_factors] <- decomp$u
         
         # Update col_mat
         centered <- y - row_mat[,seq_len(p_design),drop=F] %*% t(design)
@@ -65,6 +68,13 @@ elist_factors <- function(elist, p=2, design=NULL, iters=10, verbose=TRUE) {
         if (verbose) {
             cat("Iteration",i,"R^2:",R2,"Adjusted R^2:",R2adj,"\n")
         }
+    }
+
+    if (use_varimax) {
+        scaling <- sqrt(colMeans(col_mat[,ind_factors,drop=F]^2))
+        rotation <- varimax(t(t(row_mat[,ind_factors,drop=FALSE])*scaling), normalize=FALSE)
+        row_mat[,ind_factors] <- row_mat[,ind_factors] %*% rotation$rotmat
+        col_mat[,ind_factors] <- col_mat[,ind_factors] %*% rotation$rotmat
     }
 
     rownames(row_mat) <- rownames(elist)
