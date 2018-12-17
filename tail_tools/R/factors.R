@@ -15,7 +15,7 @@ fit_all <- function(x,y,w) {
 
 
 #' @export
-elist_factors <- function(elist, p=2, design=NULL, iters=20, use_varimax=TRUE, verbose=TRUE) {
+elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=100, tol=1e-5, verbose=TRUE) {
     y <- elist$E
     weights <- elist$weights
     rownames(y) <- NULL
@@ -43,7 +43,9 @@ elist_factors <- function(elist, p=2, design=NULL, iters=20, use_varimax=TRUE, v
     col_mat <- matrix(rnorm(m*p), ncol=p)
     col_mat <- cbind(design, col_mat)
 
-    for(i in seq_len(iters)) {
+    R2 <- -Inf
+
+    for(i in seq_len(max_iter)) {
         # Update row_mat
         row_mat <- fit_all(col_mat, t(y), t(weights))
 
@@ -63,11 +65,15 @@ elist_factors <- function(elist, p=2, design=NULL, iters=20, use_varimax=TRUE, v
         ss_resid <- sum(resid^2*weights) 
         ss_total <- sum(centered^2*weights)
         ratio <- ss_resid/ss_total
+        last_R2 <- R2
         R2 <- 1-ratio
         R2adj <- 1-ratio*(df_null)/(df)
         if (verbose) {
             cat("Iteration",i,"R^2:",R2,"Adjusted R^2:",R2adj,"\n")
         }
+
+        if (i >= 5 && R2 - last_R2 <= tol) 
+            break
     }
 
     if (use_varimax) {
@@ -82,5 +88,5 @@ elist_factors <- function(elist, p=2, design=NULL, iters=20, use_varimax=TRUE, v
     colnames(row_mat) <- c(colnames(design), paste0("factor",seq_len(p)))
     colnames(col_mat) <- colnames(row_mat)
 
-    list(row=row_mat, col=col_mat, R2=R2, R2adj=R2adj)
+    list(row=row_mat, col=col_mat, R2=R2, R2adj=R2adj, iters=i)
 }

@@ -184,33 +184,37 @@ weighted_shift <- function(mat, min_reads=1) {
 biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
     E <- elist$E
     tv_weights <- elist$weights
-    
-    # Ensure NAs have weight 0, then remove them
-    tv_weights[is.na(E)] <- 0
-    E[tv_weights == 0] <- 0
+    n <- nrow(E)
+    m <- ncol(E)
     
     if (length(bio_weights) == 1)
         bio_weights <- rep(bio_weights, nrow(E))
     stopifnot(length(bio_weights) == nrow(E))
-    
-    all_present <- apply(tv_weights > 0, 1, all)
-    if (!any(all_present)) 
-        stop("No features with all weights present, while applying biological variation reweighting.")
-    
-    ap_E <- E[all_present,,drop=F]
-    ap_tv_weights <- tv_weights[all_present,,drop=F]
-    ap_bio_weights <- bio_weights[all_present]
-    
+        
     if (is.null(design)) 
         design <- cbind(rep(1,ncol(E)))
         
-    stopifnot(nrow(design) == ncol(E))
+    stopifnot(nrow(design) == m)
+    p <- ncol(design)
+    
+    # Ensure NAs have weight 0, then remove them
+    tv_weights[is.na(E)] <- 0
+    present <- tv_weights > 0
+    n_present <- sum(present)
+    df <- n_present - n*p
+    E[!present] <- 0
 
     # Calculate Ordinary Least Squares residuals
-    residulator <- diag(nrow(design)) - design %*% MASS::ginv(design)
-    ap_resids2 <- t(residulator %*% t(ap_E)) ^ 2
-    calc_var <- function(ap_weights) {
-        sum(ap_resids2*ap_weights) / (nrow(ap_resids2)*(ncol(ap_resids2)-ncol(design)))
+    residuals2 <- map(seq_len(nrow(E)), function(i) {
+        presenti <- present[i,]
+        result <- rep(0, m)
+        result[presenti] <- lm.fit(design[presenti,,drop=F], E[i,presenti])$residuals^2
+        result
+    })
+    residuals2 <- do.call(rbind, residuals2)
+
+    calc_var <- function(weights) {
+        sum(residuals2*weights) / df
     }
 
     # Choose optimium weight for technical variance component
@@ -221,22 +225,18 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
     # This is based on Maximum Likelihood for the residuals (assumed normally distributed).
     # The ML overall_variance given the weights can be directly found and substituted in, yielding this optimization: 
     score_weights <- function(param) {
-        weights <- ap_tv_weights/(1-param + param/ap_bio_weights*ap_tv_weights)
-        #n*log(mean(resids2*weights)) - sum(log(weights))
-        length(weights)*log(calc_var(weights)) - sum(log(weights))
+        weights <- tv_weights/(1-param + param/bio_weights*tv_weights)
+        n_present*log(calc_var(weights)) - sum(log(weights[present]))
     }
     param <- optimize(score_weights, c(0, 1))$minimum
 
     elist$weights <- tv_weights / (1-param+param/bio_weights*tv_weights)
     
     # Allow weights to be used directly as precisions
-    ap_weights <- elist$weights[all_present,,drop=F]
-    residual_var <- calc_var(ap_weights)
+    residual_var <- calc_var(elist$weights)
     elist$techvar <- residual_var*(1-param)
     elist$biovar <- residual_var*param
     elist$weights <- elist$weights / residual_var
-    #fit <- lmFit(elist, design) %>% eBayes()
-    #elist$weights <- elist$weights / fit$s2.prior
     
     # Ensure weight 0 encoded as NA
     elist$E[elist$weights == 0] <- NA
