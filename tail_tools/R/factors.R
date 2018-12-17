@@ -76,7 +76,7 @@ elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=10
             break
     }
 
-    if (use_varimax) {
+    if (p > 1 && use_varimax) {
         scaling <- sqrt(colMeans(col_mat[,ind_factors,drop=F]^2))
         rotation <- varimax(t(t(row_mat[,ind_factors,drop=FALSE])*scaling), normalize=FALSE)
         row_mat[,ind_factors] <- row_mat[,ind_factors] %*% rotation$rotmat
