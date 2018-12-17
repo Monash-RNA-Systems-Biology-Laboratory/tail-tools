@@ -82,9 +82,17 @@ elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=10
         row_mat[,ind_factors] <- row_mat[,ind_factors] %*% rotation$rotmat
         col_mat[,ind_factors] <- col_mat[,ind_factors] %*% rotation$rotmat
     }
+    
+    # Ensure largest factor first
+    scaling <- sqrt(colMeans(col_mat[,ind_factors,drop=F]^2))
+    reordering <- ind_factors[order(scaling, decreasing=TRUE)]
+    row_mat[,ind_factors] <- row_mat[,reordering,drop=F]
+    col_mat[,ind_factors] <- col_mat[,reordering,drop=F]   
 
     rownames(row_mat) <- rownames(elist)
     rownames(col_mat) <- colnames(elist)
+    if (is.null(colnames(design)))
+        colnames(design) <- paste0("design", seq_len(p_design))
     colnames(row_mat) <- c(colnames(design), paste0("factor",seq_len(p)))
     colnames(col_mat) <- colnames(row_mat)
 
