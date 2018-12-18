@@ -49,12 +49,12 @@ elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=10
         # Update row_mat
         row_mat <- fit_all(col_mat, t(y), t(weights))
 
-        # Make sure factors are orthogonal, sensibly ordered
+        # Make sure row factors are orthogonal, sensibly ordered, scaled to have unit variance
         part <- row_mat[,ind_factors,drop=F]
         scaling <- sqrt(colMeans(col_mat[,ind_factors,drop=F]^2))
         part <- t(t(part)*scaling)
         decomp <- svd(part)
-        row_mat[,ind_factors] <- decomp$u
+        row_mat[,ind_factors] <- decomp$u * sqrt(n)
         
         # Update col_mat
         centered <- y - row_mat[,seq_len(p_design),drop=F] %*% t(design)
@@ -76,6 +76,7 @@ elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=10
             break
     }
 
+    # Apply varimax rotation
     if (p > 1 && use_varimax) {
         scaling <- sqrt(colMeans(col_mat[,ind_factors,drop=F]^2))
         rotation <- varimax(t(t(row_mat[,ind_factors,drop=FALSE])*scaling), normalize=FALSE)
@@ -87,8 +88,15 @@ elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=10
     scaling <- sqrt(colMeans(col_mat[,ind_factors,drop=F]^2))
     reordering <- ind_factors[order(scaling, decreasing=TRUE)]
     row_mat[,ind_factors] <- row_mat[,reordering,drop=F]
-    col_mat[,ind_factors] <- col_mat[,reordering,drop=F]   
+    col_mat[,ind_factors] <- col_mat[,reordering,drop=F]
 
+    # Ensure positive skew (outliers positive)
+    flips <- ind_factors[colSums(col_mat[,ind_factors,drop=F]^3) < 0]
+    row_mat[,flips] <- -row_mat[,flips,drop=F]
+    col_mat[,flips] <- -col_mat[,flips,drop=F]
+
+    # Use original row and column names
+    # Give factors in the decomposition meaningful names
     rownames(row_mat) <- rownames(elist)
     rownames(col_mat) <- colnames(elist)
     if (is.null(colnames(design)))
