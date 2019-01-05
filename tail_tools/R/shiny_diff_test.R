@@ -38,12 +38,12 @@ shiny_test <- function(confects=NULL, prefix="") {
         })
 
         env[[ns("me_plot-callback")]] <- function() {
-            topconfects::confects_plot_me(confects()) %>% 
+            topconfectswald::confects_plot_me(confects()) %>% 
             print
         }
 
         env$output[[ns("description")]] <- renderUI({
-            desc <- topconfects:::confects_description(confects())
+            desc <- topconfectswald:::confects_description(confects())
             if (!is.null(confects()$technical_var))
                 desc <- paste0(desc,sprintf("\nPer-read variance is %.1f^2 times per-sample variance", sqrt(confects()$technical_var)))
             shiny::div(

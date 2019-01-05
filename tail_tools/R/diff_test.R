@@ -45,9 +45,9 @@ test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2
         edgeR::calcNormFactors() %>%
         limma::voom(design)
     
-    effect <- topconfects::effect_contrast(contrast)
+    effect <- topconfectswald::effect_contrast(contrast)
 
-    result <- topconfects::limma_nonlinear_confects(voomed, design, effect, step=step, fdr=fdr, full=TRUE)
+    result <- topconfectswald::limma_nonlinear_confects(voomed, design, effect, step=step, fdr=fdr, full=TRUE)
     result$pipeline_dir <- pipeline_dir
     result$effect_desc <- "log2 fold change in expression"
     result$title <- paste0(title, " - log2 fold change in expression")
@@ -80,7 +80,7 @@ test_diff_tail <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef
     elist <- weighted_log2_tails(tail_mat, tail_count_mat, design, gene=select_(tc$features,~-feature), min_reads=min_reads)
     fit <- limma::lmFit(elist, design)
     cfit <- limma::contrasts.fit(fit, contrast)
-    result <- topconfects::limma_confects(cfit, 1, trend=FALSE, step=step, fdr=fdr, full=TRUE)
+    result <- topconfectswald::limma_confects(cfit, 1, trend=FALSE, step=step, fdr=fdr, full=TRUE)
     result$effect_desc <- "log2 fold change in poly(A) tail length"
     result$table <- dplyr::rename_(result$table, AveTail=~AveExpr)
     result$table$AveTail <- 2^result$table$AveTail
@@ -160,9 +160,9 @@ test_end_shift <- function(
         edgeR::calcNormFactors() %>%
         limma::voom(design)
     
-    group_effect <- topconfects::group_effect_shift_unlog2(coef1, coef2)
+    group_effect <- topconfectswald::group_effect_shift_unlog2(coef1, coef2)
 
-    result <- topconfects::limma_group_confects(
+    result <- topconfectswald::limma_group_confects(
         voomed, design, grouping, group_effect, step=step, fdr=fdr, full=TRUE)
 
     result$table <- cbind(result$table, genes[result$table$name,,drop=F])
