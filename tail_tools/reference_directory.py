@@ -45,12 +45,18 @@ def _max_extension(exon, exon_index, mrna_end_index):
     'See the requirements for this in the README, they are quite strict.',
     'You need a FASTA file containing sequences and a GFF file containing annotations.'
     )
-@config.Bool_flag('index', 'Generate bowtie2 and shrimp indexes. Only disable if re-building reference directory.')
+@config.Bool_flag('index', 'Generate indexes. Only disable if re-building reference directory.')
+@config.Bool_flag('shrimp', 'Generate SHRiMP colorspace index.')
+@config.Bool_flag('bowtie', 'Generate bowtie2 index.')
+@config.Bool_flag('star', 'Generate STAR index.')
 @config.Main_section('filenames', 'Sequence and annotation files.')
 class Make_tt_reference(config.Action_with_output_dir):
     _workspace_class = Tailtools_reference
 
-    index = True    
+    index = True
+    shrimp = False
+    bowtie = True
+    star = True
     filenames = [ ]
     
     def run(self):    
@@ -61,9 +67,9 @@ class Make_tt_reference(config.Action_with_output_dir):
             self.output_dir,
             filenames = self.filenames,
             snpeff = False,
-            cs = 'ifavailable' if self.index else False,
+            cs = 'ifavailable' if self.index and self.shrimp else False,
             ls = False,
-            bowtie = 'ifavailable' if self.index else False,
+            bowtie = 'ifavailable' if self.index and self.bowtie else False,
             ).run()
             
         annotations = list(annotation.read_annotations(work/'reference.gff'))
@@ -176,7 +182,7 @@ class Make_tt_reference(config.Action_with_output_dir):
         annotation.write_gff3(work/'reference.gff', annotations + mrna_utrs)
         annotation.write_gff3(work/'utr.gff', gene_utrs)
         
-        if self.index and grace.can_execute("STAR"):
+        if self.index and self.star and grace.can_execute("STAR"):
             star_work = workspace.Workspace(work/'star')
             io.execute([
                 'STAR','--runMode','genomeGenerate',

@@ -358,6 +358,9 @@ ftp://ftp.ensembl.org/pub/release-82/gff3/homo_sapiens/Homo_sapiens.GRCh38.82.gf
 
 """)
 @config.Bool_flag('index', 'Generate bowtie2 and shrimp indexes. Only disable if re-building reference directory.')
+@config.Bool_flag('shrimp', 'Generate SHRiMP colorspace index.')
+@config.Bool_flag('bowtie', 'Generate bowtie2 index.')
+@config.Bool_flag('star', 'Generate STAR index.')
 @config.String_flag('genes',
     'Comma separated list of gene_type/gene_biotype/transcript_type/transcript_biotype. Any of these can be left blank. Regular expressions can be used.'
     )
@@ -366,15 +369,20 @@ ftp://ftp.ensembl.org/pub/release-82/gff3/homo_sapiens/Homo_sapiens.GRCh38.82.gf
     )
 @config.Positional('genome', 'Genome FASTA file.')
 @config.Positional('annotation', 'Genome annotation in GFF3 format.')
+@config.Section('extra', 'Extra genomes and annotations, as for nesoni make-reference.')
 class Make_ensembl_reference(config.Action_with_output_dir):
     _workspace_class = reference_directory.Tailtools_reference
     
     index = True
+    shrimp = False
+    bowtie = True
+    star = True
     rename = ''    
     genes = '///'
     
     genome = None
     annotation = None
+    extra = [ ]
     
     def run(self):
         extractions = [ ]
@@ -406,8 +414,9 @@ class Make_ensembl_reference(config.Action_with_output_dir):
             
             reference_directory.Make_tt_reference(
                 self.output_dir,
-                filenames = [ temp/'temp.fa', temp/'temp.gff' ],
-                index = self.index,
+                filenames = [ temp/'temp.fa', temp/'temp.gff' ] + self.extra,
+                index = self.index, shrimp = self.shrimp, 
+                bowtie = self.bowtie, star = self.star
                 ).run()
         
         
