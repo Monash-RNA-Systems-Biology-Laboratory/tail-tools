@@ -5,7 +5,7 @@
 \title{Progressively produce factor analyses with increasing numbers of factors}
 \usage{
 elist_factors_seq(elist, p = 2, design = NULL, use_varimax = TRUE,
-  max_iter = 100, tol = 1e-05, verbose = TRUE)
+  max_iter = 100, tol = 1e-06, verbose = TRUE)
 }
 \description{
 Progressively produce factor analyses with increasing numbers of factors

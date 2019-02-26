@@ -207,6 +207,7 @@ elist_permute <- function(elist, design=NULL) {
 #' Generate a random normally distributed version of an EList object.
 #' Weights are used to choose the standard deviation of values generated.
 #'
+#' @export
 elist_randomize <- function(elist) {
     elist$E <- 
         matrix(rnorm(nrow(elist)*ncol(elist)), nrow=nrow(elist)) /
