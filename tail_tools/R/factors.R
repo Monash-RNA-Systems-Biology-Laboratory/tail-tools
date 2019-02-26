@@ -116,7 +116,7 @@ elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=10
         #gc()
 
         # Esure col_mat[,ind_factors] are orthogonal col_mat[,ind_design]
-        #col_mat[,ind_factors] <- qr.Q(qr(col_mat))[,ind_factors,drop=F]
+        col_mat[,ind_factors] <- qr.Q(qr(col_mat))[,ind_factors,drop=F]
 
         # Update row_mat
         row_mat <- fit_all_rows(col_mat, y, weights)
