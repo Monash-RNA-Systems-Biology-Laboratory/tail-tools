@@ -8,11 +8,11 @@ scale_cols <- function(A,s) {
 # Least squares
 # Where multiple solutions exist, one should be chosen arbitrarily
 least_squares <- function(A,w,b) {
-    # sw <- sqrt(w)
+    #sw <- sqrt(w)
     # qr.solve(A*sw,b*sw)
 
-    # decomp <- float::svd(A*sw)
-    # as.vector( decomp$v %*% ((t(decomp$u) %*% (b*sw))/decomp$d) )
+    #decomp <- svd(A*sw)
+    #as.vector( decomp$v %*% ((t(decomp$u) %*% (b*sw))/decomp$d) )
 
     WA <- A*w
     good <- apply(WA != 0, 2, any)
@@ -88,13 +88,14 @@ elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=10
 
     if (is.null(design))
         design <- cbind(intercept=rep(1,m))
-    if (is.null(colnames(design)))
-        colnames(design) <- paste0("design", seq_len(p_design))
+
     p_design <- ncol(design)
     p_total <- p_design+p
-
     ind_design <- seq_len(p_design)
     ind_factors <- p_design+seq_len(p)
+
+    if (is.null(colnames(design)))
+        colnames(design) <- paste0("design", seq_len(p_design))
 
     col_mat <- design
     if (!is.null(initial))
@@ -102,13 +103,20 @@ elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=10
     col_mat <- cbind(col_mat, 
         matrix(rnorm(m*(p_total-ncol(col_mat))), nrow=m))
 
+    # Centering to compare against
+    row_mat_center <- fit_all_rows(design, y, weights)
+    centered <- y - row_mat_center %*% t(design)
+    ss_total <- sum(centered^2*weights)
+
     R2 <- -Inf
 
     for(i in seq_len(max_iter)) {
         start <- proc.time()["elapsed"]
 
+        #gc()
+
         # Esure col_mat[,ind_factors] are orthogonal col_mat[,ind_design]
-        col_mat[,ind_factors] <- qr.Q(qr(col_mat))[,ind_factors,drop=F]
+        #col_mat[,ind_factors] <- qr.Q(qr(col_mat))[,ind_factors,drop=F]
 
         # Update row_mat
         row_mat <- fit_all_rows(col_mat, y, weights)
@@ -126,7 +134,7 @@ elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=10
         # Check R^2
         resid <- y - row_mat %*% t(col_mat)
         ss_resid <- sum(resid^2*weights) 
-        ss_total <- sum(centered^2*weights)
+        #ss_total <- sum(centered^2*weights)
         ratio <- ss_resid/ss_total
         last_R2 <- R2
         R2 <- 1-ratio
@@ -136,14 +144,14 @@ elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=10
             cat("Iteration",i,"R^2:",R2,"seconds:",end-start,"\n")
         }
 
-        if (i >= 5 && R2 - last_R2 <= tol) 
+        if (R2 - last_R2 <= tol) 
             break
     }
 
     # Apply varimax rotation
     if (p > 1 && use_varimax) {
         scaling <- sqrt(colMeans(col_mat[,ind_factors,drop=F]^2))
-        rotation <- varimax(t(t(row_mat[,ind_factors,drop=FALSE])*scaling), normalize=FALSE)
+        rotation <- varimax(scale_cols(row_mat[,ind_factors,drop=FALSE],scaling), normalize=FALSE)
         row_mat[,ind_factors] <- row_mat[,ind_factors] %*% rotation$rotmat
         col_mat[,ind_factors] <- col_mat[,ind_factors] %*% rotation$rotmat
     }
@@ -196,11 +204,21 @@ elist_permute <- function(elist, design=NULL) {
     elist 
 }
 
+#' Generate a random normally distributed version of an EList object.
+#' Weights are used to choose the standard deviation of values generated.
+#'
+elist_randomize <- function(elist) {
+    elist$E <- 
+        matrix(rnorm(nrow(elist)*ncol(elist)), nrow=nrow(elist)) /
+        sqrt(elist$weights)
+    elist
+}
+
 
 #' Progressively produce factor analyses with increasing numbers of factors
 #'
 #' @export
-elist_factors_seq <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=100, tol=1e-5, verbose=TRUE) {
+elist_factors_seq <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=100, tol=1e-6, verbose=TRUE) {
     result <- vector("list",p)
 
     if (verbose)
@@ -215,8 +233,9 @@ elist_factors_seq <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_ite
 
         n <- ncol(result[[i-1]]$col)
         result[[i]] <- elist_factors(elist, p=i, 
-            design=design, use_varimax=use_varimax, max_iter=max_iter, tol=tol, verbose=verbose,
-            initial=result[[i-1]]$col[,n-(i-1)+seq_len(i-1),drop=F])
+            design=design, use_varimax=use_varimax, max_iter=max_iter, tol=tol, verbose=verbose) #,
+            #This may actually produce worse results:
+            #initial=result[[i-1]]$col[,n-(i-1)+seq_len(i-1),drop=F])
     }
 
     result
