@@ -28,6 +28,9 @@ least_squares <- function(A,w,b) {
 }
 
 fit_all_cols <- function(x,y,w) {
+    if (ncol(x) == 0)
+        return(matrix(0, nrow=ncol(y), ncol=0))
+
     result <- lapply(seq_len(ncol(y)), function(i) {
         wi <- w[,i]
         present <- wi > 0
@@ -38,6 +41,9 @@ fit_all_cols <- function(x,y,w) {
 }
 
 fit_all_rows <- function(x,y,w) {
+    if (ncol(x) == 0)
+        return(matrix(0, nrow=nrow(y), ncol=0))
+
     result <- lapply(seq_len(nrow(y)), function(i) {
         wi <- w[i,]
         present <- wi > 0
@@ -50,6 +56,9 @@ fit_all_rows <- function(x,y,w) {
 # Turn decomposition rows %*% t(cols) into an orthogonal version
 # Furthermore, the columns of rows will have unit variance
 orthogonalize_decomp <- function(rows,cols) {
+    if (ncol(rows) == 0)
+        return(list(rows=rows,cols=cols))
+
     n <- nrow(rows)
     decomp <- svd(rows)
     rows <- decomp$u * sqrt(n)
@@ -150,8 +159,9 @@ elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=10
 
     # Apply varimax rotation
     if (p > 1 && use_varimax) {
-        scaling <- sqrt(colMeans(col_mat[,ind_factors,drop=F]^2))
-        rotation <- varimax(scale_cols(row_mat[,ind_factors,drop=FALSE],scaling), normalize=FALSE)
+        #scaling <- sqrt(colMeans(col_mat[,ind_factors,drop=F]^2))
+        #rotation <- varimax(scale_cols(row_mat[,ind_factors,drop=FALSE],scaling), normalize=FALSE)
+        rotation <- varimax(row_mat[,ind_factors,drop=FALSE], normalize=FALSE)
         row_mat[,ind_factors] <- row_mat[,ind_factors] %*% rotation$rotmat
         col_mat[,ind_factors] <- col_mat[,ind_factors] %*% rotation$rotmat
     }
@@ -171,7 +181,8 @@ elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=10
     # Give factors in the decomposition meaningful names
     rownames(row_mat) <- rownames(elist)
     rownames(col_mat) <- colnames(elist)
-    colnames(row_mat) <- c(colnames(design), paste0("factor",seq_len(p)))
+    colnames(row_mat) <- c(colnames(design), 
+        purrr::map_chr(seq_len(p), ~paste0("factor",.)))
     colnames(col_mat) <- colnames(row_mat)
 
     list(row=row_mat, col=col_mat, R2=R2, iters=i)
