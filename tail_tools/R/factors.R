@@ -173,7 +173,7 @@ elist_factors <- function(elist, p=2, design=NULL, use_varimax=TRUE, max_iter=10
     col_mat[,ind_factors] <- col_mat[,reordering,drop=F]
 
     # Ensure positive skew (outliers positive)
-    flips <- ind_factors[colSums(col_mat[,ind_factors,drop=F]^3) < 0]
+    flips <- ind_factors[colSums(row_mat[,ind_factors,drop=F]^3) < 0]
     row_mat[,flips] <- -row_mat[,flips,drop=F]
     col_mat[,flips] <- -col_mat[,flips,drop=F]
 
