@@ -274,6 +274,7 @@ class Analyse_polya(config.Action_with_output_dir):
     )
 @config.Int_flag('peak_length', 'Length of peak features, ie how far back a read may be from a peak and still be counted. Should be around read length or a little shorter.')
 @config.Float_flag('peak_min_tail', 'Minimum average tail length required for a peak.')
+@config.Bool_flag('peak_pair_utr', 'For the older peak-pair tests, consider only peaks in the 3\'UTR?')
 @config.Int_flag('extension', 'How far downstrand of the given annotations a read or peak belonging to a gene might be. However tail-tools (with a recently created reference directory) will not extend over coding sequence.')
 @config.String_flag('types', 'Comma separated list of feature types to use as genes. Default is "gene".')
 @config.String_flag('parts', 'Comma separated list of feature types that make up features. Default is "exon". Alternatively you might use "three_prime_utr" for a stricter definition of where we expect reads or "gene" for a broad definition including introns.')
@@ -313,6 +314,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     peak_polya = True
     peak_length = 300
     peak_min_tail = 15.0
+    peak_pair_utr = True
     
     types = "gene"
     parts = "exon"
@@ -608,7 +610,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             shiftspace/'individual',
             norm_file=expressionspace/('peakwise','norm.csv'),
             utrs=reference/'utr.gff',
-            utr_only=True,
+            utr_only=self.peak_pair_utr,
             top=2,
             reference=reference/'reference.fa',
             parents=workspace/('peaks','relation-parent.gff'),

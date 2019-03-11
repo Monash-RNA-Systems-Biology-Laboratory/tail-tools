@@ -96,7 +96,10 @@ class Find_peaks(config.Action_with_prefix):
                 ann.seqid = rname
                 ann.start = start
                 ann.end = end - self.lap
-                assert ann.end == ann.start+1
+                
+                if ann.end != ann.start+1:
+                    self.log.log("%s odd: start %d end %d\n" % (id, ann.start, ann.end))
+
                 ann.strand = strand
                 ann.score = None
                 ann.phase = None

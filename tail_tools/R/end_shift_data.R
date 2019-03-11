@@ -263,7 +263,7 @@ weighted_shifts <- function(counts, grouping, design=NULL, biovar=TRUE, min_read
     groups <- split(grouping$name, grouping$group)
 
     # Only use groups of 2 or more peaks
-    good <- map_int(groups, length) >= 2
+    good <- purrr::map_int(groups, length) >= 2
     groups <- groups[good]
     
     results <- purrr::map(groups, function(members) 
