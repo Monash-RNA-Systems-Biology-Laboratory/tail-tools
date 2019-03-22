@@ -50,13 +50,12 @@ class Find_peaks(config.Action_with_prefix):
     radius = 20
     
     def run(self):
-        spans = collections.defaultdict(list)
+        spans = { }
         
         #for item in legion.parallel_imap(self._load_bam, self.filenames):
         #    for key,value in item.items():
         for filename in self.filenames:
-            for key,value in self._load_bam(filename).items():
-                spans[key].extend(value)
+            self._load_bam(filename, spans)
 
         grace.status('Calling peaks')
 
@@ -65,18 +64,18 @@ class Find_peaks(config.Action_with_prefix):
         
         n = 0
 
-        for (rname, strand), span_list in spans.items():
-            length = 1+max( item[1] for item in span_list )
+        for (rname, strand), span_counts in spans.items():
+            length = 1+max( item[1] for item in span_counts )
             depth = [ 0.0 ] * length
             AN_total = [ 0.0 ] * length
             AG_total = [ 0.0 ] * length 
-            for start, end, AN, AG in span_list:
-                depth[start] += 1.0
-                depth[end] -= 1.0
-                AN_total[start] += AN
-                AN_total[end] -= AN
-                AG_total[start] += AG
-                AG_total[end] -= AG
+            for (start, end, AN, AG), count in span_counts.iteritems():
+                depth[start] += 1.0*count
+                depth[end] -= 1.0*count
+                AN_total[start] += AN*count
+                AN_total[end] -= AN*count
+                AG_total[start] += AG*count
+                AG_total[end] -= AG*count
             
             for i in xrange(1,length):
                 depth[i] += depth[i-1]
@@ -120,8 +119,8 @@ class Find_peaks(config.Action_with_prefix):
         grace.status('')
 
 
-    def _load_bam(self, filename):
-        spans = { }
+    def _load_bam(self, filename, spans):
+        #spans = { }
 
         if os.path.isdir(filename):
             filename = os.path.join(filename, "alignments_filtered_sorted.bam")
@@ -152,12 +151,17 @@ class Find_peaks(config.Action_with_prefix):
             
             if end+self.lap-start <= 0: continue
             
-            rname = alignment.reference_name
-            if (rname,strand) not in spans: 
-                spans[(rname,strand)] = [ ]          
-            spans[(rname, strand)].append((start,end+self.lap, AN,AG))
+            spans_key = (alignment.reference_name, strand)
+            if spans_key not in spans: 
+                spans[spans_key] = { }
+            key = (start,end+self.lap, AN,AG)
+            if key not in spans[spans_key]:
+                spans[spans_key][key] = 1
+            else:
+                spans[spans_key][key] += 1
+            #spans[(rname, strand)].append((start,end+self.lap, AN,AG))
                 
-        return spans
+        #return spans
 
 
     def _find_spans(self, depth):

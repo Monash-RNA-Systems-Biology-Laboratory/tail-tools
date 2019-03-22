@@ -2,6 +2,7 @@
 1.5  - Shiny app supports differential tail length and differential expression.
        R code to produce matrix and weights for shift, tail length. 
        Option to produce peak pairs including non-utr peaks.
+       Reduced memory usage in call-peaks.
 
 1.4  - Use STAR aligner, only annotated introns are used. (bowtie2 still supported also.)
 
