@@ -8,6 +8,9 @@ from nesoni import config, workspace, working_directory, reference_directory, io
 import tail_tools
 from . import clip_runs, extend_sam, proportions, tail_lengths, web, alternative_tails, bigwig, web, peaks
 
+def _do_nothing():
+    pass
+
 def _make_each(actions):
     for item in actions:
         item.make()
@@ -266,6 +269,7 @@ class Analyse_polya(config.Action_with_output_dir):
 """)
 @config.String_flag('title', 'Analysis report title.')
 @config.String_flag('file_prefix', 'Prefix for report filenames.')
+@config.Bool_flag('do_fragile', 'Do steps that might fail? Some steps fail if too few peaks are called.')
 @config.Int_flag('peak_min_depth', 
     'Number of poly(A) reads ending at nearly the same position required in order to call a peak.'
     )
@@ -309,6 +313,8 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     title = 'PAT-Seq analysis'
     
     extension = 1000
+    
+    do_fragile = True
     
     peak_min_depth = 50
     peak_polya = True
@@ -425,7 +431,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             self.reference,
             self.output_dir,
             extension=self.extension
-            ).make
+            ).make if self.do_fragile else _do_nothing
             
         job_primpeak_counts = analyse_template(
             expressionspace/'primarypeakwise',
@@ -435,7 +441,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             parts='peak',
             title='Primary-peakwise expression - ' + self.title,
             file_prefix=file_prefix+'primarypeakwise-',
-            ).make
+            ).make if self.do_fragile else _do_nothing
         
         job_primpeak = _call(_serial, job_utrs, job_primpeak_counts)
         
@@ -510,17 +516,17 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         io.symbolic_link(source=expressionspace/('peakwise','report'),link_name=r.workspace/'peakwise')
         r.p('<a href="peakwise/index.html">&rarr; Peakwise expression</a>')
 
+        if self.do_fragile:
+            r.subheading('Primary-peakwise expression')
+            
+            r.p("This is based on the most prominent peak in the 3'UTR for each gene. (Peak can be up to %d bases downstrand of the annotated 3'UTR end, but not inside another gene on the same strand.)" % self.extension)
+            
+            io.symbolic_link(source=expressionspace/('primarypeakwise','report'),link_name=r.workspace/'primarypeakwise')
+            r.p('<a href="primarypeakwise/index.html">&rarr; Primary-peakwise expression</a>')
 
-        r.subheading('Primary-peakwise expression')
-        
-        r.p("This is based on the most prominent peak in the 3'UTR for each gene. (Peak can be up to %d bases downstrand of the annotated 3'UTR end, but not inside another gene on the same strand.)" % self.extension)
-        
-        io.symbolic_link(source=expressionspace/('primarypeakwise','report'),link_name=r.workspace/'primarypeakwise')
-        r.p('<a href="primarypeakwise/index.html">&rarr; Primary-peakwise expression</a>')
-
-        r.p(r.get(workspace/('peaks','primary-peak-peaks.gff')) + ' - primary peaks for each gene.')
-        r.p(r.get(workspace/('peaks','primary-peak-utrs.gff')) + ' - 3\' UTR regions, based on primary peak call.')
-        r.p(r.get(workspace/('peaks','primary-peak-genes.gff')) + ' - full extent of gene, based on primary peak call.')
+            r.p(r.get(workspace/('peaks','primary-peak-peaks.gff')) + ' - primary peaks for each gene.')
+            r.p(r.get(workspace/('peaks','primary-peak-utrs.gff')) + ' - 3\' UTR regions, based on primary peak call.')
+            r.p(r.get(workspace/('peaks','primary-peak-genes.gff')) + ' - full extent of gene, based on primary peak call.')
 
 
         if self.tests:
@@ -605,18 +611,19 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             title='Peakwise expression - ' + self.title,
             file_prefix=file_prefix+'peakwise-',
             ).make()
-            
-        alternative_tails.Compare_peaks(
-            shiftspace/'individual',
-            norm_file=expressionspace/('peakwise','norm.csv'),
-            utrs=reference/'utr.gff',
-            utr_only=self.peak_pair_utr,
-            top=2,
-            reference=reference/'reference.fa',
-            parents=workspace/('peaks','relation-parent.gff'),
-            children=workspace/('peaks','relation-child.gff'),
-            counts=expressionspace/('peakwise','counts.csv'),
-            ).make()
+        
+        if self.do_fragile:    
+            alternative_tails.Compare_peaks(
+                shiftspace/'individual',
+                norm_file=expressionspace/('peakwise','norm.csv'),
+                utrs=reference/'utr.gff',
+                utr_only=self.peak_pair_utr,
+                top=2,
+                reference=reference/'reference.fa',
+                parents=workspace/('peaks','relation-parent.gff'),
+                children=workspace/('peaks','relation-child.gff'),
+                counts=expressionspace/('peakwise','counts.csv'),
+                ).make()
         
         if self.groups:
             tail_lengths.Collapse_counts(
@@ -659,6 +666,10 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                     work/('peak-shift','individual-pairs-norm.csv'),
                     ),
                 ]:
+            
+            if not self.do_fragile and name in ('primarypeakwise','pairwise'):
+                continue
+            
             nesoni.Vst(
                 raw/(name+'-mlog2-RPM'),
                 counts,

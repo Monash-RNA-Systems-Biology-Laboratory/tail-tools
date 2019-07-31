@@ -244,6 +244,10 @@ action = tail_tools.Analyse_polya_batch(
         # (Left blank since it's easy to forget to change.)
         extension = ... ,
         
+        # The pipeline can crash on some steps if few or weird peaks are called.
+        # Setting this to False will disable some of the fragile stages.
+        do_fragile = True,
+        
         # Size of peak features generated
         # ie how far back from a site a read can end and still be counted towards it
         # Should be read length or a little shorter

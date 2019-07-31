@@ -152,8 +152,8 @@ class Make_tt_reference(config.Action_with_output_dir):
                     )
                 max_ext = _max_extension(utr, exon_index, mrna_end_index)
                 utr.attr["max_extension"] = str(max_ext)
-                #Only include if there is an annotated 3' UTR or end is not in the middle of some other isoform's exon
-                if utr_end-utr_start+max_ext > 1:
+                #Only include if there is an annotated 3' UTR or end is not in the middle of some other isoform's exon, and it has position > 0
+                if utr_end-utr_start+max_ext > 1 and utr_start >= 0:
                     mrna_utrs.append(utr)
             
             if gene.strand >= 0:

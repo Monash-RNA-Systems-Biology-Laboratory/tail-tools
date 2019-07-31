@@ -3,6 +3,7 @@
        R code to produce matrix and weights for shift, tail length. 
        Option to produce peak pairs including non-utr peaks.
        Reduced memory usage in call-peaks.
+       do_fragile option for pipeline, to avoid crashes on weird datasets.
 
 1.4  - Use STAR aligner, only annotated introns are used. (bowtie2 still supported also.)
 
