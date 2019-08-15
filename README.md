@@ -10,7 +10,6 @@ Please feel free to email Paul any questions you have about getting Tail Tools u
 
 Links
 
-* [Tail-tools in the PYthon Package Index](https://pypi.python.org/pypi/tail-tools/)
 * [RNA Systems Biology Laboratory](http://rnasystems.erc.monash.edu)
 * [Monash Bioinformatics Platform](http://monash.edu/bioinformatics)
 
@@ -33,13 +32,16 @@ Requirements
 
 Use of PyPy is recommened for speed.
 
-- [nesoni](https://github.com/Victorian-Bioinformatics-Consortium/nesoni), most easy installed with pip:
+- [nesoni](https://github.com/Victorian-Bioinformatics-Consortium/nesoni), most easy installed with pip in Python and BiocManager in R:
 
-    pip install nesoni
+    pip install 'git+https://github.com/Victorian-Bioinformatics-Consortium/nesoni.git#egg=nesoni'
+    
+    R
+    BiocManager::install("Victorian-Bioinformatics-Consortium/nesoni", subdir="nesoni/nesoni-r")
 
   You don't need to install all of nesoni's dependencies, just Python 2.7 or later or PyPy. Do be sure to install the R component of nesoni.
 
-- bowtie2 for Illumina reads or SHRiMP for SOLiD reads
+- STAR or bowtie2 for Illumina reads, or SHRiMP for SOLiD reads
 
 - samtools
 
@@ -66,11 +68,7 @@ Installation
 
 Easy way:
 
-    pip install --upgrade tail-tools
-
-Bleeding edge github version with pip:
-
-    pip install --upgrade 'git+https://github.com/Victorian-Bioinformatics-Consortium/tail-tools.git#egg=tail-tools'
+    pip install --upgrade 'git+https://github.com/Monash-RNA-Systems-Biology-Laboratory/tail-tools.git#egg=tail-tools'
 
 From source:
 
@@ -79,7 +77,7 @@ From source:
 For PyPy it seems to be currently easiest to set up in a virtualenv:
 
     virtualenv -p pypy myenv
-    pip install --upgrade 'git+https://github.com/Victorian-Bioinformatics-Consortium/tail-tools.git#egg=tail-tools'
+    pip install --upgrade 'git+https://github.com/Monash-RNA-Systems-Biology-Laboratory/tail-tools.git#egg=tail-tools'
 
 
 ### R library installation
@@ -89,7 +87,7 @@ Tail Tools includes an R package. This isn't essential to run the pipeline, but 
 Easy way:
 
     R
-    devtools::install_github("Victorian-Bioinformatics-Consortium/tail-tools", subdir="tail_tools")
+    BiocManager::install("Monash-RNA-Systems-Biology-Laboratory/tail-tools", subdir="tail_tools")
 
 From source:
 
@@ -129,15 +127,20 @@ Reference format
 
 Before processing any reads, you need to create a "tail-tools reference directory".
 
-References are most easily downloaed from the UCSC browser or the Ensembl genome browser.
+References are most easily downloaed from the UCSC browser or the Ensembl genome browser. Recent development has focussed on using the Ensembl references.
 
-References can be downloaded from the UCSC browser using:
+References can be downloaded from Ensembl by downloading the "primary_assembly" version of the genome and a gene annotationn gff3 file from ftp://ftp.ensembl.org/pub/ and running:
+
+    tail-tools make-ensembl-reference: \
+        <output_dir> \
+        <assembly_file.fa.gz> \
+        <gff3_file.gff3.gz>
+
+References can also be downloaded from the UCSC browser using:
 
     tail-tools make-ucsc-reference: \
         <output_dir> \
         <ucsc_reference_name>
-
-References can also be downloaded from the Ensembl genome browser using "tail-tools make-ensembl-reference". The Ensembl genome annotations are more comprehensive, but using them requires specifying more parameters. Type "tail-tools make-ensembl-reference" for more instructions, or email Paul.
 
 If creating your own reference, it needs to consist of:
 
@@ -170,7 +173,7 @@ exon
 * Parent  - mRNA ID
 
 
-The pipeline assumes that genes do not have overlapping exons on the same strand. Is this too much to ask for in a reasonable genome annotation? Apparently the answer is yes. The UCSC and Ensemble genome downloaders merge genes with overlapping exons -- ids and names are concatenated with "/" as a separator. This can complicate downstream analysis, and Paul apologises for the pain this causes.
+The pipeline assumes that genes do not have overlapping exons on the same strand. Is this too much to ask for in a reasonable genome annotation? Apparently the answer is yes. The UCSC and Ensemble genome downloaders merge genes with overlapping exons -- ids and names are concatenated with "/" as a separator. (In the case of Ensemble, an attempt is made to prioritize higher confidence transcripts in order to avoid merging genes.) This can complicate downstream analysis, and Paul apologises for the pain this causes.
 
 
 
