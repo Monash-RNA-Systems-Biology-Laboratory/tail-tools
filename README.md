@@ -45,7 +45,7 @@ Use of PyPy is recommened for speed.
 
 - samtools
 
-- The "convert" tool from ImageMagick.
+- The "convert" tool from ImageMagick. Ubuntu users may need to further install `libmagickcore*-extra`.
 
 - rsync (for downloads from UCSC browser)
 

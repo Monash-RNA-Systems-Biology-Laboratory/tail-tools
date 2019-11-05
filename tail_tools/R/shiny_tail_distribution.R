@@ -192,7 +192,7 @@ shiny_tail_distribution <- function(
                      sample=factor(this_samples, this_samples),
                      info=lapply(bam_filenames[this_samples], read_info, ranges[peak])
                  ) %>%
-                 tidyr::unnest_(~info)
+                 tidyr::unnest("info")
             ) %>%
             bind_rows
         }))
@@ -201,6 +201,9 @@ shiny_tail_distribution <- function(
         read_info_full <- reactive({
             this_samples <- i("samples")
             read_info <- read_info_basic()
+            
+            if (nrow(read_info) == 0)
+                stop("Nothing to show.")
             
             if (i("tail_tail"))
                 read_info <- read_info %>%
@@ -267,7 +270,7 @@ shiny_tail_distribution <- function(
         })
         
         
-        env[[ns("tail_distribution-callback")]] <- function(env) withProgress(message="Plotting tail distribution", {                
+        env[[ns("tail_distribution-callback")]] <- function(env) withProgress(message="Plotting tail distribution", {             
             tail_bin <- max(1,i("tail_bin"))
             tail_max <- max(1,i("tail_max"))
             

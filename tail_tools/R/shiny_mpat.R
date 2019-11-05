@@ -510,7 +510,7 @@ shiny_mpat <- function(
                     sample=factor(this_samples, this_samples),
                     info=lapply(bam_filenames[this_samples], read_info, query)
                 ) %>%
-                tidyr::unnest_(~info)
+                tidyr::unnest("info")
             }))
 
             env$read_info <- reactive({

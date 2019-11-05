@@ -1,4 +1,4 @@
-VERSION = '1.5'
+VERSION = '1.6dev'
 #^ Note: this first line is read by the setup.py script to get the version
 
 import nesoni
