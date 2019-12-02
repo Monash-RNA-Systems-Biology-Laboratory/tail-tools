@@ -15,8 +15,11 @@ shiny_test <- function(confects=NULL, prefix="") {
     overview_panel <- function(request)
         shiny::tabPanel("Overview", 
             shiny::uiOutput(ns("description")),
+            shiny::fluidRow(
+                shiny::column(3, shiny::numericInput(ns("ymin"), "y-axis min", value=NA)),
+                shiny::column(3, shiny::numericInput(ns("ymax"), "y-axis max", value=NA))),
             me_plot$component_ui(request),
-            shiny::p("Grey dots show estimated effect size -- these estimates tend to be noisy when there are few reads. Black dots show confident effect size, a confident smallest bound on the effect size at the specified FDR."))
+            shiny::p("Grey dots show estimated effect size -- these estimates tend to be noisy when there are few reads. Black dots show confident effect size, a confident smallest bound on the effect size at the specified FDR. Each black dot has a corresponding grey dot. Grey dots without a corresponding black dot are not significantly different from zero."))
 
     results_panel <- function(request)
         shiny::tabPanel("Results",
@@ -38,8 +41,15 @@ shiny_test <- function(confects=NULL, prefix="") {
         })
 
         env[[ns("me_plot-callback")]] <- function() {
-            topconfectswald::confects_plot_me(confects()) %>% 
-            print
+            ymin <- env$input[[ns("ymin")]]
+            if (is.na(ymin))
+                ymin <- min(confects()$table$effect,na.rm=T)
+            ymax <- env$input[[ns("ymax")]]
+            if (is.na(ymax))
+                ymax <- max(confects()$table$effect,na.rm=T)
+            result <- topconfectswald::confects_plot_me(confects()) +
+                coord_cartesian(ylim=c(ymin,ymax))
+            print(result)
         }
 
         env$output[[ns("description")]] <- renderUI({
