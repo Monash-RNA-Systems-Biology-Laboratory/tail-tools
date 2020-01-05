@@ -47,6 +47,8 @@ Use of PyPy is recommened for speed.
 
 - The "convert" tool from ImageMagick. Ubuntu users may need to further install `libmagickcore*-extra`.
 
+- The "wigToBigWig" tool from the [UCSC Genome Browser utilities](http://hgdownload.soe.ucsc.edu/admin/exe/).
+
 - rsync (for downloads from UCSC browser)
 
 - R, with package "seriation" and BioConductor packages "limma" and "edgeR", and ["varistran"](https://github.com/MonashBioinformaticsPlatform/varistran)
