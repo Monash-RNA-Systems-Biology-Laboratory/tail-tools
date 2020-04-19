@@ -8,8 +8,16 @@ test_variants = list(
        "End shift, including all sense and antisense peaks, not overlapping other genes"="test_end_shift_nonutr_antisense",
        "End shift, including all sense and antisense peaks, including antisense peaks overlapping other genes"="test_end_shift_nonutr_antisense_collider",
        "End shift, UTR only, old quasi-likelihood method"="test_end_shift_ql",
-       "Differential expression"="test_diff_exp",
-       "Differential tail length"="test_diff_tail")
+       "Differential expression (min reads 10 in 1 sample)"="test_diff_exp",
+       "Differential expression (min reads 20 in 1 sample)"="test_diff_exp_20",
+       "Differential expression (min reads 50 in 1 sample)"="test_diff_exp_50",
+       "Differential tail length (min reads 10 in enough samples)"="test_diff_tail",
+       "Differential tail length (min reads 20 in enough samples)"="test_diff_tail_20",
+       "Differential tail length (min reads 50 in enough samples)"="test_diff_tail_50",
+       "Differential tail length (min reads 100 in enough samples)"="test_diff_tail_100",
+       "Differential tail length (min reads 200 in enough samples)"="test_diff_tail_200",
+       "Differential tail length (min reads 500 in enough samples)"="test_diff_tail_500"
+    )
 )
 # For legacy code
 test_variants$test_end_shift <- test_variants$test_vs
@@ -55,6 +63,8 @@ test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2
     result
 }
 
+test_diff_exp_20 <- function(...) test_diff_exp(..., min_reads=20)
+test_diff_exp_50 <- function(...) test_diff_exp(..., min_reads=50)
 
 #' Test for differential tail length
 #'
@@ -93,6 +103,12 @@ test_diff_tail <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef
 
     result
 }
+
+test_diff_tail_20 <- function(...) test_diff_tail(..., min_reads=20)
+test_diff_tail_50 <- function(...) test_diff_tail(..., min_reads=50)
+test_diff_tail_100 <- function(...) test_diff_tail(..., min_reads=100)
+test_diff_tail_200 <- function(...) test_diff_tail(..., min_reads=200)
+test_diff_tail_500 <- function(...) test_diff_tail(..., min_reads=500)
 
 
 

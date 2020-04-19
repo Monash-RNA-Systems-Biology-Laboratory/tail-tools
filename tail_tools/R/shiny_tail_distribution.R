@@ -1,5 +1,35 @@
 
 
+
+# Convert annotation information from read_tail_counts()$features into form usable with read_info()
+features_to_queries <- function(peaks) { 
+    # Create relevant genomic ranges
+    ranges <- GenomicRanges::GRanges(
+        peaks$chromosome, 
+        IRanges::IRanges(peaks$start, peaks$end),
+        ifelse(peaks$strand < 0, "-","+"))
+    names(ranges) <- peaks$feature
+    
+    ranges$three_prime <- ifelse(BiocGenerics::strand(ranges) == "+", BiocGenerics::end(ranges), BiocGenerics::start(ranges))
+    
+    bounds <- ranges %>% as.data.frame
+    bounds$name <- names(ranges)
+    bounds <- bounds %>% 
+        arrange_(~seqnames,~strand,~three_prime) %>% 
+        group_by_(~seqnames,~strand) %>%
+        mutate_(
+    	    three_prime_min =~ pmax(-Inf, (three_prime + dplyr::lag(three_prime))*0.5, na.rm=T),
+    	    three_prime_max =~ pmin(Inf, (three_prime + dplyr::lead(three_prime))*0.5, na.rm=T)
+        ) %>%
+        ungroup()
+    matching <- match(names(ranges), bounds$name)
+    ranges$three_prime_min <- bounds$three_prime_min[matching]
+    ranges$three_prime_max <- bounds$three_prime_max[matching]        
+    
+    ranges
+}
+
+
 read_info <- function(bam_filename, query) {
     sbp <- Rsamtools::ScanBamParam(
         what=c("qname","pos","cigar","strand"),
@@ -74,32 +104,7 @@ shiny_tail_distribution <- function(
     bam_filenames <- pipeline_bams(pipeline_dir)
     samples <- names(bam_filenames)
 
-
-    # Create relevant genomic ranges
-    ranges <- GenomicRanges::GRanges(
-        peaks$chromosome, 
-        IRanges::IRanges(peaks$start, peaks$end),
-        ifelse(peaks$strand < 0, "-","+"))
-    names(ranges) <- peaks$feature
-    
-    ranges$three_prime <- ifelse(BiocGenerics::strand(ranges) == "+", BiocGenerics::end(ranges), BiocGenerics::start(ranges))
-    
-    bounds <- ranges %>% as.data.frame
-    bounds$name <- names(ranges)
-    bounds <- bounds %>% 
-        arrange_(~seqnames,~strand,~three_prime) %>% 
-        group_by_(~seqnames,~strand) %>%
-        mutate_(
-    	    three_prime_min =~ pmax(-Inf, (three_prime + dplyr::lag(three_prime))*0.5, na.rm=T),
-    	    three_prime_max =~ pmin(Inf, (three_prime + dplyr::lead(three_prime))*0.5, na.rm=T)
-        ) %>%
-        ungroup()
-    matching <- match(names(ranges), bounds$name)
-    ranges$three_prime_min <- bounds$three_prime_min[matching]
-    ranges$three_prime_max <- bounds$three_prime_max[matching]        
-    
-
-
+    ranges <- features_to_queries(peaks)
 
     # Tail lengths
     tail_distribution <- shiny_plot(prefix=ns("tail_distribution"), dlname="tail-distribution", width=800)
