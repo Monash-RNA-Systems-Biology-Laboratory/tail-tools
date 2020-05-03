@@ -126,7 +126,9 @@ shiny_test <- function(confects=NULL, prefix="") {
             rows_selected <- env$input[[ns("results-table_rows_selected")]]
             if (length(rows_selected) != 1)
                 NULL
-            else 
+            else if ("parent" %in% colnames(confects()$table))
+                as.character(confects()$table$parent[rows_selected])
+            else
                 confects()$table$name[rows_selected]
         })
         

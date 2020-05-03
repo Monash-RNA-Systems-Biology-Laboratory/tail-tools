@@ -16,7 +16,16 @@ test_variants = list(
        "Differential tail length (min reads 50 in enough samples)"="test_diff_tail_50",
        "Differential tail length (min reads 100 in enough samples)"="test_diff_tail_100",
        "Differential tail length (min reads 200 in enough samples)"="test_diff_tail_200",
-       "Differential tail length (min reads 500 in enough samples)"="test_diff_tail_500"
+       "Differential tail length, peakwise (min reads 10 in enough samples)"="test_diff_tail_peak_10",
+       "Differential tail length, peakwise (min reads 20 in enough samples)"="test_diff_tail_peak_20",
+       "Differential tail length, peakwise (min reads 50 in enough samples)"="test_diff_tail_peak_50",
+       "Differential tail length, peakwise (min reads 100 in enough samples)"="test_diff_tail_peak_100",
+       "Differential tail length, peakwise (min reads 200 in enough samples)"="test_diff_tail_peak_200",
+       "Differential tail length, primary peakwise (min reads 10 in enough samples)"="test_diff_tail_primary_peak_10",
+       "Differential tail length, primary peakwise (min reads 20 in enough samples)"="test_diff_tail_primary_peak_20",
+       "Differential tail length, primary peakwise (min reads 50 in enough samples)"="test_diff_tail_primary_peak_50",
+       "Differential tail length, primary peakwise (min reads 100 in enough samples)"="test_diff_tail_primary_peak_100",
+       "Differential tail length, primary peakwise (min reads 200 in enough samples)"="test_diff_tail_primary_peak_200"
     )
 )
 # For legacy code
@@ -28,8 +37,8 @@ test_variants$test_end_shift <- test_variants$test_vs
 #' @param min_reads There must be this many reads for an item to be included in the test, summing over all relevant samples.
 #'
 #' @export
-test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2=NULL, min_reads=10, samples=NULL, title=NULL, step=0.001, fdr=0.05) {
-    tc <- read_tail_counts(paste0(pipeline_dir, "/expression/genewise/counts.csv"))
+test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2=NULL, min_reads=10, samples=NULL, title=NULL, step=0.001, fdr=0.05, what="genewise") {
+    tc <- read_tail_counts(paste0(pipeline_dir, "/expression/", what, "/counts.csv"))
 
     if (is.null(samples))
         samples <- tc$samples$sample
@@ -58,7 +67,7 @@ test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2
     result <- topconfectswald::limma_nonlinear_confects(voomed, design, effect, step=step, fdr=fdr, full=TRUE)
     result$pipeline_dir <- pipeline_dir
     result$effect_desc <- "log2 fold change in expression"
-    result$title <- paste0(title, " - log2 fold change in expression")
+    result$title <- paste0(title, " - log2 fold change in expression - ", what, " - at least ", min_reads, " reads")
 
     result
 }
@@ -69,8 +78,8 @@ test_diff_exp_50 <- function(...) test_diff_exp(..., min_reads=50)
 #' Test for differential tail length
 #'
 #' @export
-test_diff_tail <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2=NULL, min_reads=10, samples=NULL, title=NULL, step=0.001, fdr=0.05) {
-    tc <- read_tail_counts(paste0(pipeline_dir, "/expression/genewise/counts.csv"))
+test_diff_tail <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2=NULL, min_reads=10, samples=NULL, title=NULL, step=0.001, fdr=0.05, what="genewise") {
+    tc <- read_tail_counts(paste0(pipeline_dir, "/expression/", what, "/counts.csv"))
 
     if (is.null(samples))
         samples <- tc$samples$sample
@@ -97,7 +106,7 @@ test_diff_tail <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef
     result$magnitude_column <- "AveTail"
     result$magnitude_desc <- "Average tail length"
     result$pipeline_dir <- pipeline_dir
-    result$title <- paste0(title, " - log2 fold tail length")
+    result$title <- paste0(title, " - log2 fold tail length - ", what," - at least ",min_reads," reads in enough samples")
     result$biovar <- elist$biovar
     result$techvar <- elist$techvar
 
@@ -108,8 +117,18 @@ test_diff_tail_20 <- function(...) test_diff_tail(..., min_reads=20)
 test_diff_tail_50 <- function(...) test_diff_tail(..., min_reads=50)
 test_diff_tail_100 <- function(...) test_diff_tail(..., min_reads=100)
 test_diff_tail_200 <- function(...) test_diff_tail(..., min_reads=200)
-test_diff_tail_500 <- function(...) test_diff_tail(..., min_reads=500)
 
+test_diff_tail_primary_peak_10 <- function(...) test_diff_tail(..., min_reads=10, what="primarypeakwise")
+test_diff_tail_primary_peak_20 <- function(...) test_diff_tail(..., min_reads=20, what="primarypeakwise")
+test_diff_tail_primary_peak_50 <- function(...) test_diff_tail(..., min_reads=50, what="primarypeakwise")
+test_diff_tail_primary_peak_100 <- function(...) test_diff_tail(..., min_reads=100, what="primarypeakwise")
+test_diff_tail_primary_peak_200 <- function(...) test_diff_tail(..., min_reads=200, what="primarypeakwise")
+
+test_diff_tail_peak_10 <- function(...) test_diff_tail(..., min_reads=10, what="peakwise")
+test_diff_tail_peak_20 <- function(...) test_diff_tail(..., min_reads=20, what="peakwise")
+test_diff_tail_peak_50 <- function(...) test_diff_tail(..., min_reads=50, what="peakwise")
+test_diff_tail_peak_100 <- function(...) test_diff_tail(..., min_reads=100, what="peakwise")
+test_diff_tail_peak_200 <- function(...) test_diff_tail(..., min_reads=200, what="peakwise")
 
 
 #test_shiftexp <- function(pipeline_dir, subset="", min_reads=10, design, coef1, coef2) {
