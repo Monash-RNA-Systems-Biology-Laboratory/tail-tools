@@ -38,14 +38,14 @@ DATA TITLE
       <input type="checkbox" id="bam"> BAM files (all reads)
       
       <p>
-      <input type="checkbox" checked id="span"> Depth of all reads
+      <input type="checkbox" checked id="cover"> Depth of all reads
       <br>
       <input type="checkbox" id="polya3p"> Depth of 3' ends of poly(A) reads      
       
       <div style="font-size: 66%">
         Less useful:
         <br>
-        <input type="checkbox" id="polyaspan"> Depth of poly(A) reads
+        <input type="checkbox" id="polyacover"> Depth of poly(A) reads
         <br>
         <input type="checkbox" id="3p"> Depth of 3' ends of all reads
       </div>
@@ -114,7 +114,7 @@ function is_checked(id) {
 }
 
 function refresh() {
-    if (is_checked("span") || is_checked("polyaspan") || is_checked("3p") || is_checked("polya3p"))
+    if (is_checked("cover") || is_checked("polyacover") || is_checked("3p") || is_checked("polya3p"))
         $("#plots_options").show();
     else
         $("#plots_options").hide();
@@ -143,11 +143,11 @@ function refresh() {
         });
     }
     
-    ["span","polyaspan","3p","polya3p"].forEach(function(region) {
+    ["cover","polyacover","3p","polya3p"].forEach(function(region) {
         if (!is_checked(region)) return;
         var region_name = {
-            "span" : "", 
-            "polyaspan" : " poly(A)",
+            "cover" : "", 
+            "polyacover" : " poly(A)",
             "3p": " 3' all",
             "polya3p" : " 3' poly(A)"}[region];
         

@@ -412,8 +412,6 @@ def make_ambiguity_bigwig_by_readname(prefix, bam_filenames, stop_after=None, su
 
 
 @config.help("Produce various bigwig depth of coverage files from a BAM file.", """\
-This tool uses PySam, so can not currently be used with PyPy.
-
 Bigwig files produced:
 
 cover - Depth of coverage by actually sequenced bases.
@@ -425,9 +423,6 @@ end - Fragment end locations (5' end of read 2).
 polyaspan - Depth of coverage spanned by reads with AA:i:... tag.
 polya3p - Read end location of reads with AA:i:... tag.
 ambiguity - What proportion of reads are multi-mappers at each base, using NH attribute in BAM file.
-
-Note: "cover" alone requires the pysam library. 
-
 """)
 @config.Main_section("bam_files")
 @config.String_flag("what", "What bigwig files to actually produce. Comma separated list.")
@@ -460,6 +455,9 @@ class Bam_to_bigwig(config.Action_with_prefix):
                 elif item == "3p":
                     stage.process(make_bigwig,
                         self.prefix + "-3p", self.bam_files, read_ends, False, scale=self.scale)
+                elif item == "polyacover":
+                    stage.process(make_bigwig,
+                        self.prefix + "-polyacover", self.bam_files, fragment_split_coverage, True, scale=self.scale, polya=True)
                 elif item == "polyaspan":
                     stage.process(make_bigwig,
                         self.prefix + "-polyaspan", self.bam_files, fragment_coverage, True, scale=self.scale, polya=True)
@@ -538,14 +536,14 @@ class Polya_bigwigs(config.Action_with_output_dir):
             io.symbolic_link(bams[i]+".bai", workspace/(sample_names[i]+".bam.bai"))
         
         io.symbolic_link(peaks_file, workspace/"peaks.gff")
-
+        subprocess.check_call(["igvtools","index",workspace/"peaks.gff"])
                 
         if self.norm_file:
             mults = io.read_grouped_table(self.norm_file)['All']
             norm_mult = [ float(mults[name]['Normalizing.multiplier']) for name in sample_names ]
         
         with nesoni.Stage() as stage:
-            Bam_to_bigwig(workspace/"total", bam_files=bams, what="ambiguity,span,3p,polyaspan,polya3p",
+            Bam_to_bigwig(workspace/"total", bam_files=bams, what="ambiguity,cover,3p,polyaspan,polya3p",
                 ).process_make(stage)
             
             for i in xrange(len(sample_names)):
@@ -555,7 +553,7 @@ class Polya_bigwigs(config.Action_with_output_dir):
                     Bam_to_bigwig(
                         workspace/(sample_names[i]+"-"+scale_desc), 
                         bam_files=[bams[i]], 
-                        what='span,3p,polyaspan,polya3p', scale=scale
+                        what='cover,3p,polyacover,polya3p', scale=scale
                         ).process_make(stage)
 
 
