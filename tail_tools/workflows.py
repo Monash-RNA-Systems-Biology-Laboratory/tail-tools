@@ -72,6 +72,7 @@ Directories are created both using all reads and for reads with a poly-A tail.
 @config.Configurable_section('clip_runs_colorspace', 'Configuration options for clip-runs-colorspace:. Will be used with colorspace reads.')
 @config.Configurable_section('clip_runs_basespace', 'Configuration options for clip-runs-basespace:. Will be used with basespace reads.')
 @config.String_flag("aligner", "Aligner to use, basespace only. Options are 'bowtie2' or 'STAR'.")
+@config.Int_flag("min_match", "STAR only: minimum number of matches required for alignment.")
 @config.Float_flag('extension_prop_a', 'Extending alignments over genomic "A"s, what is the lowest proportion of "A"s allowed? (Basespace only.)')
 class Analyse_polya(config.Action_with_output_dir):
     reference = None
@@ -82,6 +83,7 @@ class Analyse_polya(config.Action_with_output_dir):
     delete_files = True
     
     aligner = "star"
+    min_match = 0
     
     clip_runs_colorspace = clip_runs.Clip_runs_colorspace()
     clip_runs_basespace = clip_runs.Clip_runs_basespace()
@@ -190,8 +192,6 @@ class Analyse_polya(config.Action_with_output_dir):
                     # (reads are clipped, so safe to leave default of 2/3 alignment)
                     #'--outFilterScoreMinOverLread', '0',
                     #'--outFilterMatchNminOverLread', '0',
-                    # Require 20 bases match
-                    #'--outFilterMatchNmin', '20',
                     '--outMultimapperOrder', 'Random',
                     # Only output 1 alignment for multmappers (NH still set)
                     #'--outSAMmultNmax', '1',
@@ -199,7 +199,8 @@ class Analyse_polya(config.Action_with_output_dir):
                     #'--alignEndsType', 'Extend5pOfRead1',
                     # No de novo introns, annotated introns will still be used
                     '--alignIntronMax', '20',
-                    ],
+                    ] +
+                    ([ '--outFilterMatchNmin', str(self.min_match) ] if self.min_match else [ ]),
                 execution_options = [ '--runThreadN', str(cores) ],
                 output=raw_filename,
                 cores=cores,

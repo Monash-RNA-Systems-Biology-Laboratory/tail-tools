@@ -218,13 +218,16 @@ for name, tags in tags:
         reads = reads,
         tags = tags,
         
-        #To use bowtie2 rather than STAR
-        #aligner="bowtie2",
-        
         #To adjust clipping prior to alignment, modify these defaults:
         # clip_runs_basespace = tail_tools.Clip_runs_basespace(
         #    adaptor='AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC', 
         #    clip_quality=0, length=20),
+
+        #To use bowtie2 rather than STAR
+        #aligner="bowtie2",
+        
+        # Only use alignments with this many matching bases (STAR aligner only) 
+        #min_match=30
         
         #To allow for looser mispriming, lower this.
         #To only allow for stricter mispriming, raise this (maximum 1).
