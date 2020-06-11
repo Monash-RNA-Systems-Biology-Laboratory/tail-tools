@@ -260,6 +260,8 @@ biovar_reweight <- function(elist, design=NULL, bio_weights=1) {
 #
 #' @export
 weighted_shifts <- function(counts, grouping, design=NULL, biovar=TRUE, min_reads=1, genes=NULL) {
+    warning("Depricated. Use weitrix-based functions instead.")
+
     groups <- split(grouping$name, grouping$group)
 
     # Only use groups of 2 or more peaks

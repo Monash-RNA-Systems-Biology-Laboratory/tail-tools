@@ -52,7 +52,7 @@ shiny_featureset <- function(tc, fs=NULL, species=NULL, is_peaks=FALSE, prefix="
                 tc$features,
                 "feature") %>%
             dplyr::select_(~-one_of(c("Length","product","antisense_product"))) %>%
-            dplyr::rename_(chr="chromosome")
+            dplyr::rename(chr="chromosome")
         })
         
         env[[ns("table-options")]] <- reactive({

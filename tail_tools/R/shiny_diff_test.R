@@ -28,7 +28,15 @@ shiny_test <- function(confects=NULL, prefix="") {
             gene_view$component_ui(request)
             )
 
-    panels <- list(overview_panel, results_panel)
+    diagnostic_plot <- shiny_plot(prefix=ns("diagnostic_plot"))
+
+    diagnostics_panel <- function(request)
+        shiny::tabPanel("Diagnostics",
+            shiny::uiOutput(ns("diagnostic_ui")),
+            shiny::uiOutput(ns("diagnostic_text")),
+            diagnostic_plot$component_ui(request))
+
+    panels <- list(overview_panel, results_panel, diagnostics_panel)
 
     server <- function(env) {
         confects <- ensure_reactive(confects, ns("confects"), env)
@@ -69,7 +77,7 @@ shiny_test <- function(confects=NULL, prefix="") {
             confects()$table %>%
             select_(~-index) %>%
             prioritize_columns(
-                c("rank", "confect", "effect", "logCPM", "AveExpr", "AveTail",
+                c("rank", "confect", "effect", "AveTail", "logCPM", "AveExpr", 
                   "gene", "biotype", "name", "product"))
         })
 
@@ -148,9 +156,31 @@ shiny_test <- function(confects=NULL, prefix="") {
             rownames(confects()$edger_fit)[ confects()$members[[feature]] ]
         })
 
+        env$output[[ns("diagnostic_ui")]] <- renderUI({
+            diagnostics <- names(confects()$diagnostics)            
+            selectizeInput(ns("diagnostic_wanted"), "Diagnostic", choices=diagnostics, width="100%")
+        })
+
+        env$output[[ns("diagnostic_text")]] <- renderUI({
+            wanted <- env$input[[ns("diagnostic_wanted")]]
+            shiny::req(wanted)
+            text <- confects()$diagnostics[[wanted]]$text
+            shiny::req(text)
+            shiny::pre(paste(text, collapse="\n"))
+        })
+
+        env[[ns("diagnostic_plot-callback")]] <- function() {
+            wanted <- env$input[[ns("diagnostic_wanted")]]
+            shiny::req(wanted)
+
+            diagnostic <- confects()$diagnostics[[wanted]]
+            diagnostic$plot
+        }
+
         me_plot$component_server(env)
         results_table$component_server(env)
         gene_view$component_server(env)
+        diagnostic_plot$component_server(env)
     }
 
     composable_shiny_panels_app(panels, server, prefix=prefix)
@@ -203,8 +233,11 @@ shiny_tests <- function(tests, cache_prefix="cache_", title="Differential tests"
             uiOutput(ns("test_variant_control")),
             
             numericInput(ns("fdr"), "False Discovery Rate", 0.05),
-            div(style="height: 4em") #,
+            div(style="height: 4em"), #,
             #actionButton(ns("cache_all"), "Ensure all tests are cached") 
+
+            shiny::p("Paul says: As you can see, there are now a lot of variants of the different tests. I would like to focus on using the weitrix-based tests going forward, so please use these. Weitrix methods are supported by the weitrix package which is made available in Bioconductor, and match the methods documented in the weitrix package vignettes (weitrix version 1.1.2 and higher)."),
+            shiny::p("Also note the weitrix-based poly(A) tail length test is no longer log2 tail length, it's untransformed tail length.")
         )
     )
     
@@ -223,8 +256,9 @@ shiny_tests <- function(tests, cache_prefix="cache_", title="Differential tests"
         
         env$output[[ns("test_variant_control")]] <- renderUI({
             variants <- test_variants[[ tests[[env$input[[ns("test")]]]][[1]] ]]
+            selected <- isolate( env$input[[ns("variant")]] )
             
-            selectizeInput(ns("variant"), "Test variant", choices=variants, width="100%")
+            selectizeInput(ns("variant"), "Test variant", choices=variants, selected=selected, width="100%")
         })
     
         env[[ns("test-confects")]] <- reactive({

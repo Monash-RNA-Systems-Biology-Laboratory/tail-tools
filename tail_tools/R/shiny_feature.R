@@ -105,7 +105,7 @@ shiny_feature <- function(tc=NULL, feature=NULL, is_peak=FALSE, peak_tc=NULL, pe
                 clear <- df$parent == feature() & df$antisense_parent == feature()
                 df$parent[clear] <- ""
                 df$relation[clear] <- ""
-                dplyr::rename_(df, peak="feature", gene="parent", antisense_gene="antisense_parent") 
+                dplyr::rename(df, peak="feature", gene="parent", antisense_gene="antisense_parent") 
             })
 
             env[[ns("peak_table-options")]] <- reactive({
@@ -126,14 +126,15 @@ shiny_feature <- function(tc=NULL, feature=NULL, is_peak=FALSE, peak_tc=NULL, pe
             cols <- as.list(seq_along(col_names)-1)
             names(cols) <- col_names
 
-            maximum <- max(1, e("table-df")$norm_count)
+            maximum_norm_count <- max(1, e("table-df")$norm_count)
+            maximum_tail <- 100 #max(1, e("table-df")$tail, na.rm=TRUE)
             
             list(
                 dom="t",
                 paging=FALSE,
                 columnDefs=list(
-                    fixed_coldef(cols$tail, 1),
-                    n_coldef(cols$norm_count, maximum, 1),
+                    bar_coldef(cols$tail, maximum_tail, 1, color="#6a6"),
+                    n_coldef(cols$norm_count, maximum_norm_count, 1),
                     fixed_coldef(cols$log2_norm_count, 1)))
         })
         

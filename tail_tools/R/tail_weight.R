@@ -13,6 +13,8 @@
 #'
 #' @export
 weighted_log2_tails <- function(tails, tail_counts, design, genes=NULL, min_reads=10, biovar=TRUE) {
+    warning("Deprecated. Use weitrix-based functions instead.")
+
     tails <- as.matrix(tails)
     tail_counts <- as.matrix(tail_counts)
     

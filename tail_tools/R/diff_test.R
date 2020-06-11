@@ -3,31 +3,51 @@
 
 test_variants = list(
     "test_vs" = c(
-       "End shift, UTR only"="test_end_shift", 
-       "End shift, including all sense peaks"="test_end_shift_nonutr",
-       "End shift, including all sense and antisense peaks, not overlapping other genes"="test_end_shift_nonutr_antisense",
-       "End shift, including all sense and antisense peaks, including antisense peaks overlapping other genes"="test_end_shift_nonutr_antisense_collider",
-       "End shift, UTR only, old quasi-likelihood method"="test_end_shift_ql",
+       "End shift, UTR only, weitrix method"="test_end_shift_weitrix_twocoef",
+       "End shift, including all sense peaks, weitrix method"="test_end_shift_weitrix_nonutr_twocoef",
+       "Differential tail length (min reads 50 in enough samples), weitrix method"="test_diff_tail_weitrix_twocoef",
+       "Differential tail length (min reads 100 in enough samples), weitrix method"="test_diff_tail_weitrix_100_twocoef",
+       "Differential tail length (min reads 200 in enough samples), weitrix method"="test_diff_tail_weitrix_200_twocoef",
+       "Differential tail length, primary peakwise (min reads 50 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_50_twocoef",
+       "Differential tail length, primary peakwise (min reads 100 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_100_twocoef",
+       "Differential tail length, primary peakwise (min reads 200 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_200_twocoef",
        "Differential expression (min reads 10 in 1 sample)"="test_diff_exp",
        "Differential expression (min reads 20 in 1 sample)"="test_diff_exp_20",
        "Differential expression (min reads 50 in 1 sample)"="test_diff_exp_50",
-       "Differential tail length (min reads 10 in enough samples)"="test_diff_tail",
-       "Differential tail length (min reads 20 in enough samples)"="test_diff_tail_20",
+       "End shift, UTR only, Wald test method"="test_end_shift", 
+       "End shift, including all sense peaks, Wald test method"="test_end_shift_nonutr",
+       #"End shift, including all sense and antisense peaks, not overlapping other genes, Wald test method"="test_end_shift_nonutr_antisense",
+       #"End shift, including all sense and antisense peaks, including antisense peaks overlapping other genes, Wald test method"="test_end_shift_nonutr_antisense_collider",
+       "End shift, UTR only, old quasi-likelihood method"="test_end_shift_ql",
+       #"Differential tail length (min reads 10 in enough samples)"="test_diff_tail",
+       #"Differential tail length (min reads 20 in enough samples)"="test_diff_tail_20",
        "Differential tail length (min reads 50 in enough samples)"="test_diff_tail_50",
        "Differential tail length (min reads 100 in enough samples)"="test_diff_tail_100",
        "Differential tail length (min reads 200 in enough samples)"="test_diff_tail_200",
-       "Differential tail length, peakwise (min reads 10 in enough samples)"="test_diff_tail_peak_10",
-       "Differential tail length, peakwise (min reads 20 in enough samples)"="test_diff_tail_peak_20",
-       "Differential tail length, peakwise (min reads 50 in enough samples)"="test_diff_tail_peak_50",
-       "Differential tail length, peakwise (min reads 100 in enough samples)"="test_diff_tail_peak_100",
-       "Differential tail length, peakwise (min reads 200 in enough samples)"="test_diff_tail_peak_200",
-       "Differential tail length, primary peakwise (min reads 10 in enough samples)"="test_diff_tail_primary_peak_10",
-       "Differential tail length, primary peakwise (min reads 20 in enough samples)"="test_diff_tail_primary_peak_20",
+       #"Differential tail length, peakwise (min reads 10 in enough samples)"="test_diff_tail_peak_10",
+       #"Differential tail length, peakwise (min reads 20 in enough samples)"="test_diff_tail_peak_20",
+       #"Differential tail length, peakwise (min reads 50 in enough samples)"="test_diff_tail_peak_50",
+       #"Differential tail length, peakwise (min reads 100 in enough samples)"="test_diff_tail_peak_100",
+       #"Differential tail length, peakwise (min reads 200 in enough samples)"="test_diff_tail_peak_200",
+       #"Differential tail length, primary peakwise (min reads 10 in enough samples)"="test_diff_tail_primary_peak_10",
+       #"Differential tail length, primary peakwise (min reads 20 in enough samples)"="test_diff_tail_primary_peak_20",
        "Differential tail length, primary peakwise (min reads 50 in enough samples)"="test_diff_tail_primary_peak_50",
        "Differential tail length, primary peakwise (min reads 100 in enough samples)"="test_diff_tail_primary_peak_100",
-       "Differential tail length, primary peakwise (min reads 200 in enough samples)"="test_diff_tail_primary_peak_200"
-    )
-)
+       "Differential tail length, primary peakwise (min reads 200 in enough samples)"="test_diff_tail_primary_peak_200"),
+
+    "test_contrast" = c(
+       "End shift, UTR only, weitrix method"="test_end_shift_weitrix",
+       "End shift, including all sense peaks, weitrix method"="test_end_shift_weitrix_nonutr",
+       "Differential tail length (min reads 50 in enough samples), weitrix method"="test_diff_tail_weitrix",
+       "Differential tail length (min reads 100 in enough samples), weitrix method"="test_diff_tail_weitrix_100",
+       "Differential tail length (min reads 200 in enough samples), weitrix method"="test_diff_tail_weitrix_200",
+       "Differential tail length, primary peakwise (min reads 50 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_50",
+       "Differential tail length, primary peakwise (min reads 100 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_100",
+       "Differential tail length, primary peakwise (min reads 200 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_200",
+       "Differential expression (min reads 10 in 1 sample)"="test_diff_exp",
+       "Differential expression (min reads 20 in 1 sample)"="test_diff_exp_20",
+       "Differential expression (min reads 50 in 1 sample)"="test_diff_exp_50"))
+
 # For legacy code
 test_variants$test_end_shift <- test_variants$test_vs
 
@@ -69,6 +89,25 @@ test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2
     result$effect_desc <- "log2 fold change in expression"
     result$title <- paste0(title, " - log2 fold change in expression - ", what, " - at least ", min_reads, " reads")
 
+    text <- capture.output({
+        cat("Samples\n")
+        print(colnames(mat))
+        cat("\nContrast\n")
+        print(contrast)
+        cat("\nDesign matrix\n")
+        print(design)
+    })
+
+    result$diagnostics <- list()
+    result$diagnostics[["Details"]] <- list(
+        text=text)
+
+    result$diagnostics[["Calibration vs sample"]] <- list(
+        plot=weitrix::weitrix_calplot(voomed, design, cat=col))
+
+    result$diagnostics[["Calibration vs expression"]] <- list(
+        plot=weitrix::weitrix_calplot(voomed, design, covar=mu))
+
     result
 }
 
@@ -101,7 +140,7 @@ test_diff_tail <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef
     cfit <- limma::contrasts.fit(fit, contrast)
     result <- topconfectswald::limma_confects(cfit, 1, trend=FALSE, step=step, fdr=fdr, full=TRUE)
     result$effect_desc <- "log2 fold change in poly(A) tail length"
-    result$table <- dplyr::rename_(result$table, AveTail=~AveExpr)
+    result$table <- dplyr::rename(result$table, AveTail="AveExpr")
     result$table$AveTail <- 2^result$table$AveTail
     result$magnitude_column <- "AveTail"
     result$magnitude_desc <- "Average tail length"

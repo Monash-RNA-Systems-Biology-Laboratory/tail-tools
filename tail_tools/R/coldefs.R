@@ -52,21 +52,39 @@ r_coldef <- function(target, r_low, r_high) {
     )
 }
 
-n_coldef <- function(targets, maximum, digits=0) {
+n_coldef <- function(targets, maximum, digits=0, color="#88f") {
     list(
         targets=targets,
-        render=htmlwidgets::JS('
+        render=htmlwidgets::JS(paste0('
         function(data,type,row,meta) {
             var max = ',maximum,';
             var digits = ',digits,';
             var val = parseFloat(data);
-            var size = 21*Math.sqrt(val/max);
+            var size = 21*Math.sqrt((isNaN(val)?0:val)/max);
             var pos = (21-size)/2;
-            return "<tt>" + val.toFixed(digits) + "</tt> " +
+            return "<tt>" + (isNaN(val) ? "" : val.toFixed(digits)) + "</tt> " +
                 "<svg width=21 height=21 style=\\"vertical-align: middle\\">" +
-                "<rect x="+pos+" y="+pos+" width="+size+" height="+size+" style=\\"fill: #88f;\\" />"+
+                "<rect x="+pos+" y="+pos+" width="+size+" height="+size+" style=\\"fill: ',color,';\\" />"+
                 "</svg>";
-        }')
+        }'))
+    )
+}
+
+
+bar_coldef <- function(targets, maximum, digits=0, color="#88f") {
+    list(
+        targets=targets,
+        render=htmlwidgets::JS(paste0('
+        function(data,type,row,meta) {
+            var max = ',maximum,';
+            var digits = ',digits,';
+            var val = parseFloat(data);
+            var size = 42*((isNaN(val)?0:val)/max);
+            return "<tt>" + (isNaN(val) ? "" : val.toFixed(digits)) + "</tt> " +
+                "<svg width=42 height=21 style=\\"vertical-align: middle\\">" +
+                "<rect x=0 y=0 width="+size+" height=21 style=\\"fill: ',color,';\\" />"+
+                "</svg>";
+        }'))
     )
 }
 
