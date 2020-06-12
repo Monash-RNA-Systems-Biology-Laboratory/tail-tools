@@ -14,7 +14,8 @@ as_two_coef_test <- function(func) {
 
 as_contrast <- function(contrast, design) {
    if (is.character(contrast)) {
-       contrast <- limma::makeContrasts(contrasts=contrasts, levels=colnames(design))
+       stopifnot( contrast %in% colnames(design) )
+       contrast <- as.numeric( colnames(design) == contrast )
    }
 
    contrast <- as.matrix(contrast)

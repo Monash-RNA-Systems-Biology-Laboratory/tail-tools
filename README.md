@@ -281,17 +281,18 @@ action = tail_tools.Analyse_polya_batch(
         # specify sets of samples.
         groups = [ 'wt', 'mutA', 'mutB' ],
         
-        # (Advanced)
-        # Perform differential tests
-        tests = [
-            tail_tools.Test(
-                'mutA-wt',
-                title = 'Mutant A vs wildtype',
-                null  = ['wt/mutA'],
-                alt   = ['mutA'],
-                ),
-            #etc
-            ],
+        # (Deprecated)
+        # Perform differential tests, old method
+        # tests = [
+        #     tail_tools.Test(
+        #         'mutA-wt',
+        #         title = 'Mutant A vs wildtype',
+        #         null  = ['wt/mutA'],
+        #         alt   = ['mutA'],
+        #         ),
+        #     #etc
+        #     ],
+
         )
 
 
@@ -319,6 +320,64 @@ if __name__ == '__main__':
 #
 
 ```
+
+Testing
+-------
+
+Differential testing is most conveniently performed using a Shiny app in R.
+
+Create a directory for a Shiny app containing an app.R file with something like:
+
+```
+library(tailtools)
+library(tidyverse)
+
+pipeline_dir <- "...full path to.../pipeline"
+
+# Construct a data frame of samples
+# The tailtools package provides convenience functions for this, based on existing tags:
+samples <- 
+    pipeline_samples(pipeline_dir) %>%
+    samples_group_tags("strain", c("wt","mutA","mutB")) %>%
+    samples_group_tags("rep", c("rep1","rep2","rep3"))
+
+
+# Construct a named list which defines the desired tests
+tests <- list()
+
+# Define desired tests in terms of samples to use, design matrix, and contrast.
+tests[["mutA_to_mutB"]] <- list(
+    "test_contrast",
+    title="mutA to mutB",
+    pipeline_dir=pipeline_dir,
+    samples=samples$name,
+    design=model.matrix(~ strain + rep, data=samples),
+    contrast=c(0,-1,1,0,0))
+
+# A subset of samples may be used. 
+# For example we could drop groups irrelevant to the test.
+# Statistically this is safer but less powerful.
+# Do this if samples are different enough that 
+# noise levels won't be uniform across them.
+keep <- 
+    filter(samples, strain %in% c("wt","mutA")) %>% 
+    droplevels()
+
+tests[["wt_to_mutA"]] <- list(
+    "test_contrast",
+    title="wt to mutA",
+    pipeline_dir=pipeline_dir,
+    samples=keep$name,
+    design=model.matrix(~ strain + rep, data=keep),
+    contrast=c(0,1,0,0))
+
+
+app <- shiny_tests(tests, title="My shiny test app")
+app
+```
+
+The app can be run from within R with `shiny::runApp("app-dir")` or using Shiny Server.
+
 
 BAM-file alignment attributes
 ---

@@ -44,9 +44,9 @@ test_variants = list(
        "Differential tail length, primary peakwise (min reads 50 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_50",
        "Differential tail length, primary peakwise (min reads 100 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_100",
        "Differential tail length, primary peakwise (min reads 200 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_200",
-       "Differential expression (min reads 10 in 1 sample)"="test_diff_exp",
-       "Differential expression (min reads 20 in 1 sample)"="test_diff_exp_20",
-       "Differential expression (min reads 50 in 1 sample)"="test_diff_exp_50"))
+       "Differential expression (min reads 10 in 1 sample), voom-limma method"="test_diff_exp",
+       "Differential expression (min reads 20 in 1 sample), voom-limma method"="test_diff_exp_20",
+       "Differential expression (min reads 50 in 1 sample), voom-limma method"="test_diff_exp_50"))
 
 # For legacy code
 test_variants$test_end_shift <- test_variants$test_vs
@@ -69,6 +69,9 @@ test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2
         contrast[coef1] <- -1
         contrast[coef2] <- 1
     }
+
+    # If contrast is character, covert using limma::makeContrasts
+    contrast <- as.numeric(as_contrast(contrast, design))
 
     tc <- tail_counts_subset_samples(tc, samples)
 
