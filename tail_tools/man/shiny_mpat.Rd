@@ -4,9 +4,16 @@
 \alias{shiny_mpat}
 \title{Shiny report for mPAT results}
 \usage{
-shiny_mpat(filename, normalizing_gene = NULL, title = "mPAT results",
-  pipeline_dir = NULL, max_tail = 300, grouping = NULL,
-  plot_count = NULL, plot_tail = NULL)
+shiny_mpat(
+  filename,
+  normalizing_gene = NULL,
+  title = "mPAT results",
+  pipeline_dir = NULL,
+  max_tail = 300,
+  grouping = NULL,
+  plot_count = NULL,
+  plot_tail = NULL
+)
 }
 \arguments{
 \item{filename}{A counts.csv file as produced by "tail-tools analyse-tail-lengths:".}

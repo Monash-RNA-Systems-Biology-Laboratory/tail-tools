@@ -4,9 +4,19 @@
 \alias{shiny_patseq_heatmap_inner}
 \title{Integrates heatmap into shiny}
 \usage{
-shiny_patseq_heatmap_inner(callback, width = 500, height = 500,
-  dlname = "plot", prefix = "", selin, rorder, spp, hgc = 0.05,
-  otype = 1, goenabl = TRUE)
+shiny_patseq_heatmap_inner(
+  callback,
+  width = 500,
+  height = 500,
+  dlname = "plot",
+  prefix = "",
+  selin,
+  rorder,
+  spp,
+  hgc = 0.05,
+  otype = 1,
+  goenabl = TRUE
+)
 }
 \arguments{
 \item{callback}{Heatmap Grob from plot_patseq_heatmap}

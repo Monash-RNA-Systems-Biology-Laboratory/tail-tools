@@ -4,9 +4,19 @@
 \alias{test_diff_exp}
 \title{Test for differential expression}
 \usage{
-test_diff_exp(pipeline_dir, design, contrast = NULL, coef1 = NULL,
-  coef2 = NULL, min_reads = 10, samples = NULL, title = NULL,
-  step = 0.001, fdr = 0.05)
+test_diff_exp(
+  pipeline_dir,
+  design,
+  contrast = NULL,
+  coef1 = NULL,
+  coef2 = NULL,
+  min_reads = 10,
+  samples = NULL,
+  title = NULL,
+  step = 0.001,
+  fdr = 0.05,
+  what = "genewise"
+)
 }
 \arguments{
 \item{min_reads}{There must be this many reads for an item to be included in the test, summing over all relevant samples.}

@@ -4,10 +4,19 @@
 \alias{plot_patseq_heatmap}
 \title{Printable heatmap grob}
 \usage{
-plot_patseq_heatmap(matf1, matf2, gmatf, clusterby = 1,
-  sample_labels = NULL, sample_labels2 = NULL, feature_labels = NULL,
-  gene_labels = NULL, product_labels = NULL, row_ord = 1,
-  tail_relative = TRUE)
+plot_patseq_heatmap(
+  matf1,
+  matf2,
+  gmatf,
+  clusterby = 1,
+  sample_labels = NULL,
+  sample_labels2 = NULL,
+  feature_labels = NULL,
+  gene_labels = NULL,
+  product_labels = NULL,
+  row_ord = 1,
+  tail_relative = TRUE
+)
 }
 \arguments{
 \item{matf1}{Data frame of Tail length}

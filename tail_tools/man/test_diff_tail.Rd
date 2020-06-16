@@ -4,9 +4,19 @@
 \alias{test_diff_tail}
 \title{Test for differential tail length}
 \usage{
-test_diff_tail(pipeline_dir, design, contrast = NULL, coef1 = NULL,
-  coef2 = NULL, min_reads = 10, samples = NULL, title = NULL,
-  step = 0.001, fdr = 0.05)
+test_diff_tail(
+  pipeline_dir,
+  design,
+  contrast = NULL,
+  coef1 = NULL,
+  coef2 = NULL,
+  min_reads = 10,
+  samples = NULL,
+  title = NULL,
+  step = 0.001,
+  fdr = 0.05,
+  what = "genewise"
+)
 }
 \description{
 Test for differential tail length

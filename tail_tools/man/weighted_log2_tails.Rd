@@ -4,8 +4,14 @@
 \alias{weighted_log2_tails}
 \title{Weight tail lengths}
 \usage{
-weighted_log2_tails(tails, tail_counts, design, genes = NULL,
-  min_reads = 10, biovar = TRUE)
+weighted_log2_tails(
+  tails,
+  tail_counts,
+  design,
+  genes = NULL,
+  min_reads = 10,
+  biovar = TRUE
+)
 }
 \description{
 Tail lengths are log2 transformed, and given weights based on read counts.

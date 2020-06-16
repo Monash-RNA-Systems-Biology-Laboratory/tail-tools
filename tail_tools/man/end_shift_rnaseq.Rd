@@ -4,8 +4,14 @@
 \alias{end_shift_rnaseq}
 \title{End-shift test for RNA-Seq data}
 \usage{
-end_shift_rnaseq(samples, utrs, extended_utrs = NULL, exons = NULL,
-  ci = 0.95, min_min_reads = 20)
+end_shift_rnaseq(
+  samples,
+  utrs,
+  extended_utrs = NULL,
+  exons = NULL,
+  ci = 0.95,
+  min_min_reads = 20
+)
 }
 \arguments{
 \item{samples}{should be a data frame with columns: name = name of sample, condition = logical vector with NA for samples to ignore, bigwig filenames giving depth of coverage cover_fwd, cover_rev.}

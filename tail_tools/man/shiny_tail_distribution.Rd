@@ -4,9 +4,15 @@
 \alias{shiny_tail_distribution}
 \title{Display information about a genomic region}
 \usage{
-shiny_tail_distribution(peak_names = NULL, sample_normalizer = NULL,
-  pipeline_dir, peaks = NULL, max_tail = 300, grouping = NULL,
-  prefix = "")
+shiny_tail_distribution(
+  peak_names = NULL,
+  sample_normalizer = NULL,
+  pipeline_dir,
+  peaks = NULL,
+  max_tail = 300,
+  grouping = NULL,
+  prefix = ""
+)
 }
 \description{
 Display information about a genomic region

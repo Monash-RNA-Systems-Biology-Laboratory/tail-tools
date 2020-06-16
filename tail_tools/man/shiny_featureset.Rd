@@ -4,8 +4,7 @@
 \alias{shiny_featureset}
 \title{Display information about a subset of rows in a counts file}
 \usage{
-shiny_featureset(tc, fs = NULL, species = NULL, is_peaks = FALSE,
-  prefix = "")
+shiny_featureset(tc, fs = NULL, species = NULL, is_peaks = FALSE, prefix = "")
 }
 \description{
 Display information about a subset of rows in a counts file

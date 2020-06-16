@@ -4,8 +4,13 @@
 \alias{shiny_table}
 \title{Shiny dataTable with download button}
 \usage{
-shiny_table(df = NULL, options = NULL, title = "Table",
-  filename = "table.csv", prefix = "")
+shiny_table(
+  df = NULL,
+  options = NULL,
+  title = "Table",
+  filename = "table.csv",
+  prefix = ""
+)
 }
 \description{
 Shiny dataTable with download button

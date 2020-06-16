@@ -4,9 +4,21 @@
 \alias{test_end_shift}
 \title{Test for 3' end shift}
 \usage{
-test_end_shift(pipeline_dir, design, coef1, coef2, min_reads = 10,
-  samples = NULL, fdr = 0.05, step = 0.001, antisense = F,
-  colliders = F, non_utr = F, collapse_utr = F, title = NULL)
+test_end_shift(
+  pipeline_dir,
+  design,
+  coef1,
+  coef2,
+  min_reads = 10,
+  samples = NULL,
+  fdr = 0.05,
+  step = 0.001,
+  antisense = F,
+  colliders = F,
+  non_utr = F,
+  collapse_utr = F,
+  title = NULL
+)
 }
 \arguments{
 \item{pipeline_dir}{Pipeline directory.}
