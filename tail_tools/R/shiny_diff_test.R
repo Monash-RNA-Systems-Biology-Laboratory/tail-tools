@@ -34,13 +34,21 @@ shiny_test <- function(confects=NULL, prefix="") {
                 label="Put at the top of the list",
                 selected=c("abs"),
                 choices=c(
-                    "top absolute confects"="abs",
-                    "top positive confects"="up",
-                    "top negative confects"="down",
-                    "highest significance (fdr_zero)"="fdr_zero")),
+                    "top confects"="abs",
+                    "top confects positive"="up",
+                    "top confects negative"="down",
+                    "most \"significant\""="fdr_zero",
+                    "most \"significant\" positive"="fdr_zero_up",
+                    "most \"significant\" negative"="fdr_zero_down")),
             shiny::p(
                 "These lists can be pasted into web-based enrichment tools, for example", 
                 shiny::a("gProfiler",href="https://biit.cs.ut.ee/gprofiler/gost", target="_blank")),
+            shiny::p(
+                "Gene expression and poly(A)-tail length tests, signed or unsigned ranking: recommend using the all-genes list as an ordered query and also as the background set of genes."),
+            shiny::p(
+                "Shift tests, unsigned ranking: recommend using the all-genes list as an ordered query, and not providing a background set of genes."),
+            shiny::p(
+                "Shift tests, signed ranking: recommend using the significant genes list as an ordered query, and not providing a background set of genes."),
             shiny::p(
                 "Note that confect ranking falls back to ranking by p-value for non-significant results."),
             shiny::uiOutput(ns("enrichment_out")))
@@ -184,18 +192,22 @@ shiny_test <- function(confects=NULL, prefix="") {
                 df <- arrange(df, sign(.data$effect)*.data$rev_rank)
             } else if (ranking == "fdr_zero") {
                 df <- arrange(df, .data$fdr_zero)
+            } else if (ranking == "fdr_zero_up") {
+                df <- arrange(df, -sign(.data$effect)*-log(.data$fdr_zero), -sign(.data$effect)*.data$rev_rank)
+            } else if (ranking == "fdr_zero_down") {
+                df <- arrange(df, sign(.data$effect)*-log(.data$fdr_zero), sign(.data$effect)*.data$rev_rank)
             } else {
                 stop("Unknown ranking")
             }
             sig <- df[!is.na(df$confect),]
 
-            if (ranking == "up")
+            if (ranking == "up" || ranking == "fdr_zero_up")
                 sig <- sig[sig$effect>0,]
-            else if (ranking == "down")
+            else if (ranking == "down" || ranking == "fdr_zero_down")
                 sig <- sig[sig$effect<0,]
 
             shiny::verticalLayout(
-                shiny::h3("All ", nrow(df), " genes: use as a background set or a ranked list"),
+                shiny::h3("All ", nrow(df), " genes"),
                 shiny::tags$textarea( 
                     onfocus="this.select();this.scrollTop=0;", rows="10", cols="30",
                     paste(df$name, collapse="\n") ),
