@@ -31,13 +31,13 @@ shiny_test <- function(confects=NULL, prefix="") {
     enrichment_panel <- function(request)
         shiny::tabPanel("Enrichment lists",
             shiny::selectInput(ns("enrichment_ranking"),
-                label="Ranking",
+                label="Put at the top of the list",
                 selected=c("abs"),
                 choices=c(
-                    "absolute confects"="abs",
+                    "top absolute confects"="abs",
                     "top positive confects"="up",
                     "top negative confects"="down",
-                    "significance (fdr_zero)"="fdr_zero")),
+                    "highest significance (fdr_zero)"="fdr_zero")),
             shiny::p(
                 "These lists can be pasted into web-based enrichment tools, for example", 
                 shiny::a("gProfiler",href="https://biit.cs.ut.ee/gprofiler/gost", target="_blank")),
