@@ -28,6 +28,23 @@ shiny_test <- function(confects=NULL, prefix="") {
             gene_view$component_ui(request)
             )
 
+    enrichment_panel <- function(request)
+        shiny::tabPanel("Enrichment lists",
+            shiny::selectInput(ns("enrichment_ranking"),
+                label="Ranking",
+                selected=c("abs"),
+                choices=c(
+                    "absolute confect"="abs",
+                    "positive to negative confect"="up",
+                    "negative to positive confect"="down",
+                    "significance (fdr_zero)"="fdr_zero")),
+            shiny::p(
+                "These lists can be pasted into web-based enrichment tools, for example", 
+                shiny::a("gProfiler",href="https://biit.cs.ut.ee/gprofiler/gost", target="_blank")),
+            shiny::p(
+                "Note that confect ranking falls back to ranking by p-value for non-significant results. Positive-to-negative confect ranking will also use this fall-back, giving a list containing [ranked genes with positive estimated effect][ranked genes with negative estimated effect, reversed]. Similarly for negative-to-positive confect ranking."),
+            shiny::uiOutput(ns("enrichment_out")))
+
     diagnostic_plot <- shiny_plot(prefix=ns("diagnostic_plot"))
 
     diagnostics_panel <- function(request)
@@ -36,7 +53,7 @@ shiny_test <- function(confects=NULL, prefix="") {
             shiny::uiOutput(ns("diagnostic_text")),
             diagnostic_plot$component_ui(request))
 
-    panels <- list(overview_panel, results_panel, diagnostics_panel)
+    panels <- list(overview_panel, results_panel, enrichment_panel, diagnostics_panel)
 
     server <- function(env) {
         confects <- ensure_reactive(confects, ns("confects"), env)
@@ -78,7 +95,7 @@ shiny_test <- function(confects=NULL, prefix="") {
             select_(~-index) %>%
             prioritize_columns(
                 c("rank", "confect", "effect", "AveTail", "logCPM", "AveExpr", 
-                  "gene", "biotype", "name", "product"))
+                  "fdr_zero", "gene", "biotype", "name", "product"))
         })
 
         env[[ns("results-options")]] <- reactive({ 
@@ -154,6 +171,38 @@ shiny_test <- function(confects=NULL, prefix="") {
 
             # Awfully hacky fallback
             rownames(confects()$edger_fit)[ confects()$members[[feature]] ]
+        })
+
+        env$output[[ns("enrichment_out")]] <- renderUI({
+            df <- confects()$table
+            df$rev_rank <- nrow(df) - df$rank
+            ranking <- env$input[[ns("enrichment_ranking")]]
+            if (ranking == "abs") {
+            } else if (ranking == "up") {
+                df <- arrange(df, -sign(.data$effect)*.data$rev_rank)
+            } else if (ranking == "down") {
+                df <- arrange(df, sign(.data$effect)*.data$rev_rank)
+            } else if (ranking == "fdr_zero") {
+                df <- arrange(df, .data$fdr_zero)
+            } else {
+                stop("Unknown ranking")
+            }
+            sig <- df[!is.na(df$confect),]
+
+            if (ranking == "up")
+                sig <- sig[sig$effect>0,]
+            else if (ranking == "down")
+                sig <- sig[sig$effect<0,]
+
+            shiny::verticalLayout(
+                shiny::h3("All ", nrow(df), " genes: use as a background set or a ranked list"),
+                shiny::tags$textarea( 
+                    onfocus="this.select();this.scrollTop=0;", rows="10", cols="30",
+                    paste(df$name, collapse="\n") ),
+                shiny::h3(nrow(sig), "significant genes"),
+                shiny::tags$textarea( 
+                    onfocus="this.select();this.scrollTop=0;", rows="10", cols="30",
+                    paste(sig$name, collapse="\n")))
         })
 
         env$output[[ns("diagnostic_ui")]] <- renderUI({
@@ -236,6 +285,7 @@ shiny_tests <- function(tests, cache_prefix="cache_", title="Differential tests"
             div(style="height: 4em"), #,
             #actionButton(ns("cache_all"), "Ensure all tests are cached") 
 
+            shiny::p("Results are ranked by FDR-adjusted confident effect size (confect) (see Bioconductor package topconfects). If you prefer ranking by \"significance\", rank results by the fdr_zero column, which is the traditional FDR adjusted p-value for the null hypothesis of zero effect."),
             shiny::p("Paul says: As you can see, there are now a lot of variants of the different tests. I would like to focus on using the weitrix-based tests going forward, so please use these. Weitrix methods are supported by the weitrix package which is made available in Bioconductor, and match the methods documented in the weitrix package vignettes (weitrix version 1.1.2 and higher)."),
             shiny::p("Also note the weitrix-based poly(A) tail length test is no longer log2 tail length, it's untransformed tail length.")
         )
