@@ -34,15 +34,15 @@ shiny_test <- function(confects=NULL, prefix="") {
                 label="Ranking",
                 selected=c("abs"),
                 choices=c(
-                    "absolute confect"="abs",
-                    "positive to negative confect"="up",
-                    "negative to positive confect"="down",
+                    "absolute confects"="abs",
+                    "top positive confects"="up",
+                    "top negative confects"="down",
                     "significance (fdr_zero)"="fdr_zero")),
             shiny::p(
                 "These lists can be pasted into web-based enrichment tools, for example", 
                 shiny::a("gProfiler",href="https://biit.cs.ut.ee/gprofiler/gost", target="_blank")),
             shiny::p(
-                "Note that confect ranking falls back to ranking by p-value for non-significant results. Positive-to-negative confect ranking will also use this fall-back, giving a list containing [ranked genes with positive estimated effect][ranked genes with negative estimated effect, reversed]. Similarly for negative-to-positive confect ranking."),
+                "Note that confect ranking falls back to ranking by p-value for non-significant results."),
             shiny::uiOutput(ns("enrichment_out")))
 
     diagnostic_plot <- shiny_plot(prefix=ns("diagnostic_plot"))
