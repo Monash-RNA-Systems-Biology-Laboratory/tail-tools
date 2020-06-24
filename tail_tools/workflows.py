@@ -284,6 +284,7 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.String_flag('types', 'Comma separated list of feature types to use as genes. Default is "gene".')
 @config.String_flag('parts', 'Comma separated list of feature types that make up features. Default is "exon". Alternatively you might use "three_prime_utr" for a stricter definition of where we expect reads or "gene" for a broad definition including introns.')
 @config.String_flag("species", 'Species for GO analysis. Currently supports Human ("Hs"), Saccharomyces cerevisiae ("Sc"), Caenorhabditis elegans ("Ce"), Mus musculus ("Mm")')
+@config.String_flag("shiny_report_url", 'The main report contains a link to a shiny-app section. What URL will the shiny-app be served from?')
 #@config.String_flag('blurb', 'Introductory HTML text for report')
 #@config.String_flag('genome', 'IGV .genome file, to produce IGV plots')
 #@config.String_flag('genome_dir', 'IGV directory of reference sequences to go with .genome file')
@@ -326,6 +327,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     types = "gene"
     parts = "exon"
     species = ""
+    shiny_report_url = "shiny/"
     
     reference = None
     samples = [ ]
@@ -479,7 +481,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.write('<div style="font-size: 150%; margin-top: 1em; margin-bottom: 1em;"><a href="bigwigs/index.html">&rarr; Load tracks into IGV</a></div>')
 
         tail_tools.Shiny(workspace/('report','shiny'), self.output_dir, title=self.title, species=self.species).run()
-        r.write('<div style="font-size: 150%; margin-top: 1em; margin-bottom: 1em;"><a href="shiny/" target="_blank">&rarr; Interactive report (shiny)</a></div>')
+        r.write('<div style="font-size: 150%; margin-top: 1em; margin-bottom: 1em;"><a href="'+self.shiny_report_url+'" target="_blank">&rarr; Interactive report (shiny)</a></div>')
         
         r.heading('Alignment to reference')
         

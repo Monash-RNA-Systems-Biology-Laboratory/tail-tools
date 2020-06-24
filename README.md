@@ -244,7 +244,11 @@ action = tail_tools.Analyse_polya_batch(
         
         # Reference directory you created earlier
         reference = '/path/to/reference/directories/S_cerevisiae_82',
-        
+
+        # Where will the shiny part of the html report be served from?
+        # (In the output this part is pipeline/report/shiny)
+        #shiny_report_url = "http://myserver:3838/..."
+
         # Allow reads/peaks this far downstrand of 
         # the annotated transcript end point
         # (however extension will not continue into CDS on the same strand)
