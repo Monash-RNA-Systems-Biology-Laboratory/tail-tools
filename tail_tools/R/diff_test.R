@@ -215,7 +215,7 @@ test_end_shift_ql <- function(
     dat <- read_grouped_table(counts_filename)
     
     counts <- as.matrix(dat$Count)
-    peak_info <- dplyr::as_data_frame(dat$Annotation)
+    peak_info <- dplyr::as_tibble(dat$Annotation)
     peak_info$id <- rownames(counts)
 
     if (is.null(samples))
