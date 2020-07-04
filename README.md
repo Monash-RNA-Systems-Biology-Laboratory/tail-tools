@@ -35,8 +35,12 @@ Use of PyPy is recommened for speed.
 - [nesoni](https://github.com/Victorian-Bioinformatics-Consortium/nesoni), most easy installed with pip in Python and BiocManager in R:
 
 ```
-pip install 'git+https://github.com/Victorian-Bioinformatics-Consortium/nesoni.git#egg=nesoni'
-    
+# Install into standard python2:
+pip install --user 'git+https://github.com/Victorian-Bioinformatics-Consortium/nesoni.git#egg=nesoni'
+
+# Install into pypy:
+pypy -m pip install --user 'git+https://github.com/Victorian-Bioinformatics-Consortium/nesoni.git#egg=nesoni'
+
 R
 install.packages("BiocManager")
 BiocManager::install("Victorian-Bioinformatics-Consortium/nesoni", subdir="nesoni/nesoni-r")
@@ -44,30 +48,32 @@ BiocManager::install("Victorian-Bioinformatics-Consortium/nesoni", subdir="neson
 
   You don't need to install all of nesoni's dependencies, just Python 2.7 or later or PyPy. Do be sure to install the R component of nesoni.
 
-- STAR aligner. (Optionally can also use bowtie2 for Illumina reads, or SHRiMP for SOLiD reads.)
+- [STAR aligner](https://github.com/alexdobin/STAR)
 
-- samtools
+- [samtools](http://www.htslib.org/)
 
-- The "convert" tool from ImageMagick. Ubuntu users may need to further install `libmagickcore*-extra`.
+- The "convert" tool from [ImageMagick](https://imagemagick.org/). Ubuntu users may need to further install `libmagickcore*-extra`.
 
 - The "wigToBigWig" tool from the [UCSC Genome Browser utilities](http://hgdownload.soe.ucsc.edu/admin/exe/).
 
-- R
+- [R](https://www.r-project.org/) 3.6 or higher.
 
-- My R package ["varistran"](https://github.com/MonashBioinformaticsPlatform/varistran).
+- My R package [varistran](https://github.com/MonashBioinformaticsPlatform/varistran).
 
 ```
 BiocManager::install("MonashBioinformaticsPlatform/varistran")
 ```
 
-- My R package ["topconfects"](https://github.com/pfh/topconfects). Topconfects is in Bioconductor, but Tail Tools will often depend on "devel" features, so may need the github version.
+- My R package [topconfects](https://github.com/pfh/topconfects). Topconfects is in Bioconductor, but Tail Tools will often depend on "devel" features, so may need the github version.
 
 ```
 BiocManager::install("pfh/topconfects", dependencies=TRUE)
 ```
 
 
-### Optional, needed to support deprecated features:
+### Optional, to support deprecated features:
+
+- Optionally can also use bowtie2 instead of STAR for Illumina reads, or SHRiMP for SOLiD reads.
 
 - [SplitsTree](http://www.splitstree.org/)
   Note: v4.13.1 seems to be broken, v4.11.3 works
