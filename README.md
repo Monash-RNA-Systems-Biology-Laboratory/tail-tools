@@ -34,14 +34,17 @@ Use of PyPy is recommened for speed.
 
 - [nesoni](https://github.com/Victorian-Bioinformatics-Consortium/nesoni), most easy installed with pip in Python and BiocManager in R:
 
-    pip install 'git+https://github.com/Victorian-Bioinformatics-Consortium/nesoni.git#egg=nesoni'
+```
+pip install 'git+https://github.com/Victorian-Bioinformatics-Consortium/nesoni.git#egg=nesoni'
     
-    R
-    BiocManager::install("Victorian-Bioinformatics-Consortium/nesoni", subdir="nesoni/nesoni-r")
+R
+install.packages("BiocManager")
+BiocManager::install("Victorian-Bioinformatics-Consortium/nesoni", subdir="nesoni/nesoni-r")
+```
 
   You don't need to install all of nesoni's dependencies, just Python 2.7 or later or PyPy. Do be sure to install the R component of nesoni.
 
-- STAR or bowtie2 for Illumina reads, or SHRiMP for SOLiD reads
+- STAR aligner. (Optionally can also use bowtie2 for Illumina reads, or SHRiMP for SOLiD reads.)
 
 - samtools
 
@@ -49,52 +52,78 @@ Use of PyPy is recommened for speed.
 
 - The "wigToBigWig" tool from the [UCSC Genome Browser utilities](http://hgdownload.soe.ucsc.edu/admin/exe/).
 
-- rsync (for downloads from UCSC browser)
+- R
 
-- R, with package "seriation" and BioConductor packages "limma" and "edgeR", and ["varistran"](https://github.com/MonashBioinformaticsPlatform/varistran)
+- My R package ["varistran"](https://github.com/MonashBioinformaticsPlatform/varistran).
 
-- [Fitnoise](https://github.com/pfh/fitnoise) for differential testing.
+```
+BiocManager::install("MonashBioinformaticsPlatform/varistran")
+```
 
-- [degust.py](https://victorian-bioinformatics-consortium.github.io/degust/dist/latest/degust.py)
+- My R package ["topconfects"](https://github.com/pfh/topconfects). Topconfects is in Bioconductor, but Tail Tools will often depend on "devel" features, so may need the github version.
+
+```
+BiocManager::install("pfh/topconfects", dependencies=TRUE)
+```
 
 
-
-Optional:
+### Optional, needed to support deprecated features:
 
 - [SplitsTree](http://www.splitstree.org/)
   Note: v4.13.1 seems to be broken, v4.11.3 works
+
+- rsync (for downloads from UCSC browser)
+
+- [Fitnoise](https://github.com/pfh/fitnoise) for old-style differential testing.
+
+- [degust.py](https://victorian-bioinformatics-consortium.github.io/degust/dist/latest/degust.py) for old-style differential testing.
+
+- topconfects branches to support alternative versions of differential tests (no longer recommended):
+
+```
+BiocManager::install("pfh/topconfects@wald", dependencies=TRUE)
+BiocManager::install("pfh/topconfects@ql", dependencies=TRUE)
+```
 
 
 Installation
 ------------
 
-Easy way:
-
-    pip install --upgrade 'git+https://github.com/Monash-RNA-Systems-Biology-Laboratory/tail-tools.git#egg=tail-tools'
-
-From source:
-
-    python setup.py install
-
-For PyPy it seems to be currently easiest to set up in a virtualenv:
-
-    virtualenv -p pypy myenv
-    pip install --upgrade 'git+https://github.com/Monash-RNA-Systems-Biology-Laboratory/tail-tools.git#egg=tail-tools'
-
-
-### R library installation
-
-Tail Tools includes an R package. This isn't essential to run the pipeline, but contains functions to produce various Shiny reports. It can be installed from R with:
+### Python part
 
 Easy way:
 
-    R
-    BiocManager::install("Monash-RNA-Systems-Biology-Laboratory/tail-tools", subdir="tail_tools")
+```
+pip install --user --upgrade 'git+https://github.com/Monash-RNA-Systems-Biology-Laboratory/tail-tools.git#egg=tail-tools'
+```
 
 From source:
 
-    R
-    devtools::install("tail_tools")
+```
+python setup.py install
+```
+
+For PyPy, you can use pip by invoking the module:
+
+```
+pypy -m pip install --user --upgrade 'git+https://github.com/Monash-RNA-Systems-Biology-Laboratory/tail-tools.git#egg=tail-tools'
+```
+
+### R part
+
+Easy way:
+
+```
+R
+BiocManager::install("Monash-RNA-Systems-Biology-Laboratory/tail-tools", subdir="tail_tools", dependencies=TRUE)
+```
+
+From source:
+
+```
+R
+devtools::install("tail_tools")
+```
 
 
 Usage
@@ -115,13 +144,17 @@ These tools may also be used from a python script (using the same system as my o
 
 ### R library usage
 
-The tailtools R library can then be loaded in R with:
+The tailtools R library can be loaded in R with:
 
-    library(tailtools)
+```
+library(tailtools)
+```
 
-* [Manual (pdf)](http://rnasystems.erc.monash.edu/doc/tailtools.pdf)
+The two main uses of this are two Shiny apps (interactive web-based applications):
 
-The pipeline also includes a Shiny app as part of its output (in subdirectory "shiny"). This can be served with ShinyServer or viewed from within R with `shiny::runApp("pipelineoutputdir/shiny")`.
+* The pipeline creates a Shiny app as part of its output (in subdirectory "shiny"). This can be served with ShinyServer or viewed from within R with `shiny::runApp("pipelineoutputdir/shiny")`.
+
+* You can create a Shiny app for differential tests. A template is given below.
 
 
 Reference format
@@ -129,7 +162,7 @@ Reference format
 
 Before processing any reads, you need to create a "tail-tools reference directory".
 
-References are most easily downloaed from the UCSC browser or the Ensembl genome browser. Recent development has focussed on using the Ensembl references.
+References are most easily downloaded from Ensembl. It is also possible to use references from the UCSC browser, but not recommended.
 
 References can be downloaded from Ensembl by downloading the "primary_assembly" version of the genome and a gene annotationn gff3 file from ftp://ftp.ensembl.org/pub/ and running:
 
@@ -138,7 +171,7 @@ References can be downloaded from Ensembl by downloading the "primary_assembly" 
         <assembly_file.fa.gz> \
         <gff3_file.gff3.gz>
 
-References can also be downloaded from the UCSC browser using:
+References can also be downloaded from the UCSC browser (not recommended) using:
 
     tail-tools make-ucsc-reference: \
         <output_dir> \
@@ -175,7 +208,7 @@ exon
 * Parent  - mRNA ID
 
 
-The pipeline assumes that genes do not have overlapping exons on the same strand. Is this too much to ask for in a reasonable genome annotation? Apparently the answer is yes. The UCSC and Ensemble genome downloaders merge genes with overlapping exons -- ids and names are concatenated with "/" as a separator. (In the case of Ensemble, an attempt is made to prioritize higher confidence transcripts in order to avoid merging genes.) This can complicate downstream analysis, and Paul apologises for the pain this causes.
+The pipeline assumes that two different genes do not have overlapping exons on the same strand. Is this too much to ask for in a reasonable genome annotation? Apparently the answer is yes. The UCSC and ENSEMBL genome downloaders merge genes with overlapping exons -- ids and names are concatenated with "/" as a separator. This can complicate downstream analysis, and Paul apologises for the pain this causes. In the case of ENSEMBL, higher confidence transcripts are given priority in order to avoid merging genes, and gene merging is rare.
 
 
 
@@ -276,15 +309,6 @@ action = tail_tools.Analyse_polya_batch(
         # List of instances of tail_tools.Analyse_polya
         samples = samples,
         
-        # List of sample groups
-        # A sample group is specified as 
-        # '<nesoni-selection-expression>=<name>'
-        # (=<name> may be omitted)
-        # See nesoni help for description of selection expressions,
-        # this uses the tags given to each sample to concisely 
-        # specify sets of samples.
-        groups = [ 'wt', 'mutA', 'mutB' ],
-        
         # (Deprecated)
         # Perform differential tests, old method
         # tests = [
@@ -330,7 +354,7 @@ Testing
 
 Differential testing is most conveniently performed using a Shiny app in R.
 
-Create a directory for a Shiny app containing an app.R file with something like:
+Create a directory for a Shiny app containing an `app.R` file with something like:
 
 ```
 library(tailtools)
@@ -394,12 +418,13 @@ Pipeline output
 
 * [Directories and files produced by the pipeline](doc/output.md)
 
+
 Statistics
 ---
 
-* [Statistics produced by `tail-tools analyse-tail-counts:`](doc/statistics.md)
-* [Differential expression and tail length](doc/differential.md)
-
+* [Statistics produced by `tail-tools analyse-tail-counts:`.](doc/statistics.md)
+* [Differential expression and tail length, old method.](doc/differential.md)
+* To understand new-style differential tests, see the vignettes in [topconfects](https://bioconductor.org/packages/devel/bioc/html/topconfects.html).
 
 
 

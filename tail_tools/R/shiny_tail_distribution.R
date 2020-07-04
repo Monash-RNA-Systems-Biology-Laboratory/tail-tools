@@ -15,11 +15,11 @@ features_to_queries <- function(peaks) {
     bounds <- ranges %>% as.data.frame
     bounds$name <- names(ranges)
     bounds <- bounds %>% 
-        arrange_(~seqnames,~strand,~three_prime) %>% 
-        group_by_(~seqnames,~strand) %>%
-        mutate_(
-    	    three_prime_min =~ pmax(-Inf, (three_prime + dplyr::lag(three_prime))*0.5, na.rm=T),
-    	    three_prime_max =~ pmin(Inf, (three_prime + dplyr::lead(three_prime))*0.5, na.rm=T)
+        arrange(seqnames,strand,three_prime) %>% 
+        group_by(seqnames,strand) %>%
+        mutate(
+    	    three_prime_min = pmax(-Inf, (three_prime + dplyr::lag(three_prime))*0.5, na.rm=T),
+    	    three_prime_max = pmin(Inf, (three_prime + dplyr::lead(three_prime))*0.5, na.rm=T)
         ) %>%
         ungroup()
     matching <- match(names(ranges), bounds$name)
@@ -69,13 +69,13 @@ meltdown <- function(mat, rows, columns, values) {
 # sum n, binned by length, respecting existing group_by
 bin_lengths <- function(df, stride) {
     df %>%
-        mutate_(bin =~ floor((length+0.5)/stride)) %>%
-        group_by_(~bin, add=TRUE) %>%
-        summarize_(n =~ sum(n)) %>%
-        mutate_(
-            length_low =~ bin*stride-0.5,
-            length_mid =~ (bin+0.5)*stride-0.5,
-            length_high =~ (bin+1)*stride-0.5
+        mutate(bin = floor((length+0.5)/stride)) %>%
+        group_by(bin, add=TRUE) %>%
+        summarize(n = sum(n)) %>%
+        mutate(
+            length_low = bin*stride-0.5,
+            length_mid = (bin+0.5)*stride-0.5,
+            length_high = (bin+1)*stride-0.5
         )
 }
 
@@ -212,10 +212,10 @@ shiny_tail_distribution <- function(
             
             if (i("tail_tail"))
                 read_info <- read_info %>%
-                    filter_(~length >= i("tail_min"))
+                    filter(length >= i("tail_min"))
             
             if (i("tail_percent")) {
-                normalizer <- read_info %>% group_by_(~sample) %>% summarize_(normalizer=~sum(n))
+                normalizer <- read_info %>% group_by(sample) %>% summarize(normalizer=sum(n))
                 describer <- "Percent reads"
                 labeller <- function(x) {
                     x <- x*100
@@ -286,27 +286,27 @@ shiny_tail_distribution <- function(
             labeller <- read_info_full()$labeller
             transformer <- read_info_full()$transformer
             tail_lengths <- read_info_full()$read_info %>% 
-                group_by_(~sample, ~length) %>% summarize_(n=~sum(n)) %>% ungroup()
+                group_by(sample, length) %>% summarize(n=sum(n)) %>% ungroup()
             
             tail_lengths <- tail_lengths %>%
                 left_join(normalizer, "sample") %>%
-                mutate_(n =~ n / normalizer)
+                mutate(n = n / normalizer)
             
             if (i("tail_style") == "Cumulative") {
                 print(
                     tail_lengths %>% 
-                    arrange_(~sample, ~desc(length)) %>% 
-                    group_by_(~sample) %>%
-                    mutate_(
-                        cumn =~ cumsum(n),
-                        cumn_lag =~ dplyr::lag(cumn,1,0),
-                        length_lead =~ dplyr::lead(length,1,0)
+                    arrange(sample, desc(length)) %>% 
+                    group_by(sample) %>%
+                    mutate(
+                        cumn = cumsum(n),
+                        cumn_lag = dplyr::lag(cumn,1,0),
+                        length_lead = dplyr::lead(length,1,0)
                     ) %>%
                     ungroup() %>%
-                    ggplot(aes_(color=~sample)) +
+                    ggplot(aes(color=sample)) +
                     #geom_point(aes(x=length,y=cumn_lag)) +
-                    ggplot2::geom_segment(aes_(x=~length,xend=~length,y=~transformer(cumn),yend=~transformer(cumn_lag))) +
-                    ggplot2::geom_segment(aes_(x=~length_lead,xend=~length,y=~transformer(cumn),yend=~transformer(cumn))) +
+                    ggplot2::geom_segment(aes(x=length,xend=length,y=transformer(cumn),yend=transformer(cumn_lag))) +
+                    ggplot2::geom_segment(aes(x=length_lead,xend=length,y=transformer(cumn),yend=transformer(cumn))) +
                     scale_x_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                     scale_y_continuous(labels = labeller) +
                     labs(x="poly(A) tail length", y=describer, color=samples_called) +
@@ -316,8 +316,8 @@ shiny_tail_distribution <- function(
                 print(
                     tail_lengths %>%
                     tidyr::complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
-                    group_by_(~sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
-                    ggplot(aes_(color=~sample,group=~sample,x=~length_mid,y=~transformer(n))) + 
+                    group_by(sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
+                    ggplot(aes(color=sample,group=sample,x=length_mid,y=transformer(n))) + 
                     geom_line() +
                     scale_x_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                     scale_y_continuous(labels = labeller) +
@@ -331,8 +331,8 @@ shiny_tail_distribution <- function(
                     #mutate(n = n/max(n)) %>%
                     #ungroup() %>%
                     tidyr::complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
-                    group_by_(~sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
-                    ggplot(aes_(x=~sample,y=~length_mid,fill=~transformer(n))) + 
+                    group_by(sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
+                    ggplot(aes(x=sample,y=length_mid,fill=transformer(n))) + 
                     geom_tile(height=tail_bin) +
                     scale_y_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                     viridis::scale_fill_viridis(guide=FALSE) +

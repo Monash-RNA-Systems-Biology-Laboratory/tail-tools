@@ -25,6 +25,82 @@ as_contrast <- function(contrast, design) {
 }
 
 
+#' Test for differential expression 
+#'
+#' Doesn't actually use weitrix, but method is similar.
+#'
+#' @param min_reads There must be this many reads for an item to be included in the test, summing over all relevant samples.
+#'
+#' @export
+test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2=NULL, min_reads=10, samples=NULL, title=NULL, step=0.001, fdr=0.05, what="genewise") {
+
+    contrast <- as_contrast(contrast, design)
+    design_coef <- limma::contrastAsCoef(design, contrast)
+
+    tc <- read_tail_counts(paste0(pipeline_dir, "/expression/", what, "/counts.csv"))
+
+    if (is.null(samples))
+        samples <- tc$samples$sample
+        
+    if (is.null(contrast)) {
+        contrast <- rep(0, ncol(design))
+        names(contrast) <- colnames(design)
+        contrast[coef1] <- -1
+        contrast[coef2] <- 1
+    }
+
+    tc <- tail_counts_subset_samples(tc, samples)
+
+    mat <- tail_counts_get_matrix(tc, "count")
+    keep <- rowSums(mat) >= min_reads
+
+    voomed <- 
+        edgeR::DGEList(
+            mat[keep,,drop=FALSE],
+            genes=select(tc$features[keep,,drop=FALSE], -feature)) %>%
+        edgeR::calcNormFactors() %>%
+        limma::voom(design)
+    
+    # limma's use of weights is not exact for contrasts (old solution)
+    #effect <- topconfectswald::effect_contrast(contrast)
+    #result <- topconfectswald::limma_nonlinear_confects(voomed, design, effect, step=step, fdr=fdr, full=TRUE)
+
+    # limma's use of weights is not exact for contrasts
+    # so alter design matrix to make contrast a coefficient
+    fit <- limma::lmFit(voomed, design_coef$design)
+    result <- topconfects::limma_confects(fit, design_coef$coef, full=TRUE, step=step, fdr=fdr)
+
+    result$pipeline_dir <- pipeline_dir
+    result$effect_desc <- "log2 fold change in expression"
+    result$title <- paste0(title, " - log2 fold change in expression - ", what, " - at least ", min_reads, " reads")
+
+    text <- capture.output({
+        cat("Samples\n")
+        print(colnames(mat))
+        cat("\nContrast\n")
+        print(contrast)
+        cat("\nDesign matrix\n")
+        print(design)
+    })
+
+    result$diagnostics <- list()
+    result$diagnostics[["Details"]] <- list(
+        text=text)
+
+    result$diagnostics[["Calibration vs sample"]] <- list(
+        plot=weitrix::weitrix_calplot(voomed, design, cat=col))
+
+    result$diagnostics[["Calibration vs expression"]] <- list(
+        plot=weitrix::weitrix_calplot(voomed, design, covar=mu))
+
+    result
+}
+
+test_diff_exp_20 <- function(...) test_diff_exp(..., min_reads=20)
+test_diff_exp_50 <- function(...) test_diff_exp(..., min_reads=50)
+
+
+
 #' @export
 test_end_shift_weitrix <- function(
         pipeline_dir, design, contrast, samples=NULL, fdr=0.05,

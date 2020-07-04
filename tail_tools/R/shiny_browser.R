@@ -86,7 +86,7 @@ plot_genome <- function(features, samples, pos, marks=c()) {
             so <- rtracklayer::summary(rtracklayer::BigWigFile(this_samples$span_opp[i]), pos, size=n, type="max")[[1]]
             scale <- samples$depth_normalizer[i] #max(1,cs$score,co$score)
             
-            data_frame(
+            tibble(
                 name = this_samples$name[i],
                 label = this_samples$label[i],
                 cover_same = cs$score / scale,
@@ -125,7 +125,7 @@ plot_genome <- function(features, samples, pos, marks=c()) {
     feature_plot <- function(forward, items) {
         p <- ggtemplate() + 
             ylab("") +
-            geom_point(data=data_frame(x=c(BiocGenerics::start(pos),BiocGenerics::end(pos)),y=c(0,1)),aes_(x=~x,y=~y),color=NA,fill=NA) +
+            geom_point(data=tibble(x=c(BiocGenerics::start(pos),BiocGenerics::end(pos)),y=c(0,1)),aes_(x=~x,y=~y),color=NA,fill=NA) +
             theme_minimal() +
             scale_y_continuous(limits=c(0,1),breaks=c())
         

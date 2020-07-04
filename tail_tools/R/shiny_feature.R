@@ -72,11 +72,11 @@ shiny_feature <- function(tc=NULL, feature=NULL, is_peak=FALSE, peak_tc=NULL, pe
                     return(NULL)
 
                 relevant_peaks()$obs %>%
-                select_(~sample, ~feature, ~norm_count) %>%
+                select(sample, feature, norm_count) %>%
                 tidyr::spread("feature", "norm_count") 
                 #tidyr::gather_("stat","value", c("norm_count","tail_count","tail")) %>%
-                #mutate_(column =~ paste0(stat,"__",feature)) %>%
-                #select_(~sample, ~column, ~value) %>%
+                #mutate(column = paste0(stat,"__",feature)) %>%
+                #select(sample, column, value) %>%
                 #tidyr::spread("column", "value")
             })
 

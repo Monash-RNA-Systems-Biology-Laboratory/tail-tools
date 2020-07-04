@@ -120,7 +120,7 @@ shiny_counts_report <- function(tc, pipeline_dir=NULL, species=NULL, title="Tail
         })
         
         env[[ns("tail_distribution-sample_normalizer")]] <- reactive({
-            select_(tc$samples, ~sample, ~normalizer)
+            select(tc$samples, sample, normalizer)
         })
         
         

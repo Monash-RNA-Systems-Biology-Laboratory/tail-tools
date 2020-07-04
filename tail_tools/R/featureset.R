@@ -31,7 +31,7 @@ get_organism_db <- function(species) {
             AnnotationDbi::keys(org_db, "ENSEMBL"), 
             keytype="ENSEMBL", 
             columns="GOALL") %>%
-        select_(name=~ENSEMBL, set_name=~GOALL) %>%
+        select(name=ENSEMBL, set_name=GOALL) %>%
         unique()
     
     set_info <-
@@ -39,7 +39,7 @@ get_organism_db <- function(species) {
             GO.db::GO.db,
             unique(gene_set$set_name),
             c("TERM","ONTOLOGY")) %>%
-        select_(set_name=~GOID, description=~TERM, ontology=~ONTOLOGY)
+        select(set_name=GOID, description=TERM, ontology=ONTOLOGY)
     
     # Taken from limma "kegga" function
     species.KEGG <- switch(species, Ag = "aga", At = "ath", 
@@ -56,13 +56,13 @@ get_organism_db <- function(species) {
             keytype="ENTREZID",  columns="ENSEMBL")
         
         keggs <- keggs %>%
-            select_(ENTREZID=~GeneID, set_name=~PathwayID) %>%
+            select(ENTREZID=GeneID, set_name=PathwayID) %>%
             inner_join(conversion, "ENTREZID") %>%
-            select_(name=~ENSEMBL, ~set_name)
+            select(name=ENSEMBL, set_name)
         
         kegg_info <- limma::getKEGGPathwayNames(species.KEGG, remove.qualifier=TRUE) %>%
-            select_(set_name=~PathwayID, description=~Description) %>%
-            mutate_(ontology=~"KEGG")
+            select(set_name=PathwayID, description=Description) %>%
+            mutate(ontology="KEGG")
         
         gene_set <- rbind(gene_set, keggs)
         set_info <- rbind(set_info, kegg_info)
@@ -83,17 +83,17 @@ featureset_test_genesets <- function(fs, species, minimum_set_size=2, ontologies
     sets <- get_genesets(species)
 
     set_info <- sets$set_info %>%
-         filter_(~ontology %in% ontologies)
+         filter(ontology %in% ontologies)
     gene_set <- sets$gene_set %>%
-         filter_(~set_name %in% set_info$set_name)
+         filter(set_name %in% set_info$set_name)
     
     universe <- intersect(as.character(fs$universe), gene_set$name)
     set <- intersect(as.character(fs$set), universe)
 
     gene_set <- gene_set %>%
-        filter_(~ name %in% universe) %>%
-        group_by_(~ set_name) %>%
-        filter_(~ length(name) >= minimum_set_size) %>%
+        filter(name %in% universe) %>%
+        group_by(set_name) %>%
+        filter(length(name) >= minimum_set_size) %>%
         ungroup() %>%
         as.data.frame
         
@@ -106,8 +106,8 @@ featureset_test_genesets <- function(fs, species, minimum_set_size=2, ontologies
     result$FDR <- p.adjust(result$P.DE, method="BH")
     result <- 
         left_join(result, sets$set_info, "set_name") %>%
-        select_(~FDR, p_value=~P.DE, size=~N, overlap=~DE, ~set_name, ~ontology, ~description) %>%
-        arrange_(~p_value)
+        select(FDR, p_value=P.DE, size=N, overlap=DE, set_name, ontology, description) %>%
+        arrange(p_value)
     
     list(table=result, set=set, universe=universe)    
 }

@@ -48,10 +48,10 @@ shiny_featureset <- function(tc, fs=NULL, species=NULL, is_peaks=FALSE, prefix="
     
         env[[ns("table-df")]] <- reactive({
             dplyr::left_join(
-                dplyr::data_frame(feature=fs()$set),
+                dplyr::tibble(feature=fs()$set),
                 tc$features,
                 "feature") %>%
-            dplyr::select_(~-one_of(c("Length","product","antisense_product"))) %>%
+            dplyr::select(-one_of(c("Length","product","antisense_product"))) %>%
             dplyr::rename(chr="chromosome")
         })
         

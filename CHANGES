@@ -1,8 +1,11 @@
 
 1.6  - tidyr::unnest_ disappeared, use tidyr::unnest.
-       End-shift app allow y limits to be set.
+       Shiny test app allow y limits to be set.
        Add sample option min_match.
        Bigwigs now omit introns (cover not span).
+       Some clean up of tidyverse code (_-suffix functions are now deprecated).
+       Updated install instructions.
+       weitrix based tests.
 
 1.5  - Shiny app supports differential tail length and differential expression.
        R code to produce matrix and weights for shift, tail length. 

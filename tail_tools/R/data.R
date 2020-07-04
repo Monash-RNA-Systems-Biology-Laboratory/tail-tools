@@ -142,17 +142,17 @@ read_tail_counts <- function(filename) {
    tab <- read_grouped_table(filename)
    
    features <- 
-       data_frame(
+       tibble(
            feature = factor_retaining_order(rownames(tab$Count))) %>%
        cbind(tab$Annotation)
    
    samples <-
-       data_frame(
+       tibble(
            sample = factor_retaining_order(colnames(tab$Count)))
    
    # observations
    obs <- 
-       data_frame(
+       tibble(
            feature = rep(features$feature, nrow(samples)),
            sample = rep(samples$sample, each=nrow(features)),
            count = do.call(c, tab$Count),
@@ -174,13 +174,13 @@ tail_counts_subset_features <- function(tc, features) {
     stopifnot(!any(duplicated(features)))   
     
     tc$features <- tc$features %>%
-        dplyr::filter_(~ feature %in% features) %>%
-        dplyr::mutate_(feature =~ factor(feature, features)) %>%
-        dplyr::arrange_(~ feature)
+        dplyr::filter(feature %in% features) %>%
+        dplyr::mutate(feature = factor(feature, features)) %>%
+        dplyr::arrange(feature)
     
     tc$obs <- tc$obs %>%
-        dplyr::filter_(~ feature %in% features) %>%
-        dplyr::mutate_(feature =~ factor(feature, features))
+        dplyr::filter(feature %in% features) %>%
+        dplyr::mutate(feature = factor(feature, features))
     
     tc
 }
@@ -193,13 +193,13 @@ tail_counts_subset_samples <- function(tc, samples) {
     stopifnot(!any(duplicated(samples)))
     
     tc$samples <- tc$samples %>%
-        filter_(~ sample %in% samples) %>%
-        mutate_(sample =~ factor(sample, samples)) %>%
-        arrange_(~ sample)
+        filter(sample %in% samples) %>%
+        mutate(sample = factor(sample, samples)) %>%
+        arrange(sample)
     
     tc$obs <- tc$obs %>%
-        filter_(~ sample %in% samples) %>%
-        mutate_(sample =~ factor(sample, samples))
+        filter(sample %in% samples) %>%
+        mutate(sample = factor(sample, samples))
     
     tc
 }

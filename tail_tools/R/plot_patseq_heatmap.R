@@ -69,6 +69,9 @@ plot_patseq_heatmap <- function(
     if (is.null(product_labels))
         product_labels <- rep("", nrow(y))
     
+    feature_labels <- as.character(feature_labels)
+    gene_labels <- as.character(gene_labels)
+    product_labels <- as.character(product_labels)
     feature_labels[is.na(feature_labels)] <- ""
     gene_labels[is.na(feature_labels)] <- ""
     product_labels[is.na(feature_labels)] <- ""
