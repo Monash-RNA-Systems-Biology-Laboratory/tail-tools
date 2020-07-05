@@ -1,4 +1,6 @@
 
+1.7  - R namespace bugfix.
+
 1.6  - tidyr::unnest_ disappeared, use tidyr::unnest.
        Shiny test app allow y limits to be set.
        Add sample option min_match.

@@ -212,7 +212,7 @@ shiny_tail_distribution <- function(
             
             if (i("tail_tail"))
                 read_info <- read_info %>%
-                    filter(length >= i("tail_min"))
+                    dplyr::filter(length >= i("tail_min"))
             
             if (i("tail_percent")) {
                 normalizer <- read_info %>% group_by(sample) %>% summarize(normalizer=sum(n))

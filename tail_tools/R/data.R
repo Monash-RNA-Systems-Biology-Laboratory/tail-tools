@@ -193,13 +193,13 @@ tail_counts_subset_samples <- function(tc, samples) {
     stopifnot(!any(duplicated(samples)))
     
     tc$samples <- tc$samples %>%
-        filter(sample %in% samples) %>%
-        mutate(sample = factor(sample, samples)) %>%
-        arrange(sample)
+        dplyr::filter(sample %in% samples) %>%
+        dplyr::mutate(sample = factor(sample, samples)) %>%
+        dplyr::arrange(sample)
     
     tc$obs <- tc$obs %>%
-        filter(sample %in% samples) %>%
-        mutate(sample = factor(sample, samples))
+        dplyr::filter(sample %in% samples) %>%
+        dplyr::mutate(sample = factor(sample, samples))
     
     tc
 }

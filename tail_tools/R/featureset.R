@@ -83,18 +83,18 @@ featureset_test_genesets <- function(fs, species, minimum_set_size=2, ontologies
     sets <- get_genesets(species)
 
     set_info <- sets$set_info %>%
-         filter(ontology %in% ontologies)
+         dplyr::filter(ontology %in% ontologies)
     gene_set <- sets$gene_set %>%
-         filter(set_name %in% set_info$set_name)
+         dplyr::filter(set_name %in% set_info$set_name)
     
     universe <- intersect(as.character(fs$universe), gene_set$name)
     set <- intersect(as.character(fs$set), universe)
 
     gene_set <- gene_set %>%
-        filter(name %in% universe) %>%
-        group_by(set_name) %>%
-        filter(length(name) >= minimum_set_size) %>%
-        ungroup() %>%
+        dplyr::filter(name %in% universe) %>%
+        dplyr::group_by(set_name) %>%
+        dplyr::filter(length(name) >= minimum_set_size) %>%
+        dplyr::ungroup() %>%
         as.data.frame
         
     #cat(length(fs$universe), length(universe), length(fs$set), length(set), "\n")
