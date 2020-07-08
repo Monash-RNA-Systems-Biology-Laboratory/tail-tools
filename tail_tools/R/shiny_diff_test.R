@@ -101,7 +101,7 @@ shiny_test <- function(confects=NULL, prefix="") {
 
                 ss_true <- ss_effect - ss_se
                 ss_confect <- sum(confects()$table$confect ^ 2, na.rm=TRUE)
-                desc <- sprintf("%s\nEstimated Sum of Squares of real effects %.2f\n(SS effects %.2f minus SS errors %.2f)\n(SS confects %.2f)",
+                desc <- sprintf("%s\nEstimated Sum of Squares of real effects %.2f\n(SS effects %.2f minus SS standard errors, df adjusted %.2f)\n(SS confects %.2f)",
                     desc, ss_true, ss_effect, ss_se, ss_confect)
             }
             
