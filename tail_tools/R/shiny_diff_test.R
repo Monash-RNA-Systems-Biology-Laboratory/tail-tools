@@ -88,7 +88,19 @@ shiny_test <- function(confects=NULL, prefix="") {
         env$output[[ns("description")]] <- renderUI({
             desc <- topconfects:::confects_description(confects())
             if (!is.null(confects()$technical_var))
-                desc <- paste0(desc,sprintf("\nPer-read variance is %.1f^2 times per-sample variance", sqrt(confects()$technical_var)))
+                desc <- sprintf("%s\nPer-read variance is %.1f^2 times per-sample variance", 
+                    desc, sqrt(confects()$technical_var))
+            
+            if (!is.null(confects()$table$se)) {
+                ss_effect <- sum(confects()$table$effect ^ 2) 
+                ss_se <- sum(confects()$table$se ^ 2)
+                desc <- sprintf("%s\nEstimated Sum of Squares of real effects %.2f\n(SS effects %.2f minus SS standard errors %.2f)",
+                    desc,
+                    ss_effect - ss_se,
+                    ss_effect,
+                    ss_se)
+            }
+            
             shiny::div(
                 shiny::h2( title() ),
                 shiny::pre( desc ))
