@@ -92,13 +92,12 @@ shiny_test <- function(confects=NULL, prefix="") {
                     desc, sqrt(confects()$technical_var))
             
             if (!is.null(confects()$table$se)) {
-                ss_effect <- sum(confects()$table$effect ^ 2) 
-                ss_se <- sum(confects()$table$se ^ 2)
-                desc <- sprintf("%s\nEstimated Sum of Squares of real effects %.2f\n(SS effects %.2f minus SS standard errors %.2f)",
-                    desc,
-                    ss_effect - ss_se,
-                    ss_effect,
-                    ss_se)
+                ss_effect <- sum(confects()$table$effect ^ 2, na.rm=TRUE) 
+                ss_se <- sum(confects()$table$se ^ 2, na.rm=TRUE)
+                ss_true <- ss_effect - ss_se
+                ss_confect <- sum(confects()$table$confect ^ 2, na.rm=TRUE)
+                desc <- sprintf("%s\nEstimated Sum of Squares of real effects %.2f\n(SS effects %.2f minus SS standard errors %.2f)\n(SS confects %.2f)",
+                    desc, ss_true, ss_effect, ss_se, ss_confect)
             }
             
             shiny::div(
