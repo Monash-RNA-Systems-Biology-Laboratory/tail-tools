@@ -33,10 +33,6 @@ as_contrast <- function(contrast, design) {
 #'
 #' @export
 test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2=NULL, min_reads=10, samples=NULL, title=NULL, step=0.001, fdr=0.05, what="genewise") {
-
-    contrast <- as_contrast(contrast, design)
-    design_coef <- limma::contrastAsCoef(design, contrast)
-
     tc <- read_tail_counts(paste0(pipeline_dir, "/expression/", what, "/counts.csv"))
 
     if (is.null(samples))
@@ -48,6 +44,9 @@ test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2
         contrast[coef1] <- -1
         contrast[coef2] <- 1
     }
+
+    contrast <- as_contrast(contrast, design)
+    design_coef <- limma::contrastAsCoef(design, contrast)
 
     tc <- tail_counts_subset_samples(tc, samples)
 
