@@ -1,4 +1,6 @@
 
+1.8 - End-shift test extra filtering to ensure no NA coefficients.
+
 1.7  - R namespace bugfix.
 
 1.6  - tidyr::unnest_ disappeared, use tidyr::unnest.

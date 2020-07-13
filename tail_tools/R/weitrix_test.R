@@ -112,7 +112,7 @@ test_end_shift_weitrix <- function(
     wei <- pipeline_weitrix_shift(
         pipeline_dir=pipeline_dir, samples=samples,  
         antisense=antisense, colliders=colliders, non_utr=non_utr, collapse_utr=collapse_utr,
-        min_reads=min_reads)
+        min_reads=min_reads, design=design_coef$design)
     
     cal <- weitrix::weitrix_calibrate_all(wei, design_coef$design)
 

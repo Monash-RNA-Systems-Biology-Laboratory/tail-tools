@@ -1,10 +1,19 @@
 
+# Filter for features where the design can actually be fitted using samples with min_reads reads
+weitrix_filter_full_rank <- function(wei, design, min_reads) {
+    full_rank <- function(selection) {
+        if (sum(selection) < ncol(design)) return(FALSE)
+        sum(abs(svd(design[selection,,drop=F])$d)>=1e-10) == ncol(design)
+    }
+    good <- apply(weitrix::weitrix_weights(wei)>=min_reads, 1, full_rank)
+    wei[good,]
+}
 
 #' @export
 pipeline_weitrix_shift <- function(
         pipeline_dir, samples=NULL,  
         antisense=F, colliders=F, non_utr=T, collapse_utr=F,
-        min_reads=0) {
+        min_reads=0, design=NULL) {
     data <- get_grouped_peaks(
         pipeline_dir,samples=samples,antisense=antisense,colliders=colliders,
         non_utr=non_utr,collapse_utr=collapse_utr,min_reads=min_reads,min_group=2)
@@ -16,6 +25,11 @@ pipeline_weitrix_shift <- function(
     
     S4Vectors::metadata(wei)$display_members <-
         split(sub("-collider$","",data$grouping$name), data$grouping$group)
+
+    # Remove any rows that will produce NA coefficients.
+    # (Note: main filtering is earlier by min_reads against the total number of reads in the row)
+    if (!is.null(design))
+        wei <- weitrix_filter_full_rank(wei, design, 1)
 
     wei
 }
@@ -35,15 +49,8 @@ pipeline_weitrix_tail <- function(
     if (!is.null(samples))
         wei <- wei[,samples]
 
-    if (min_reads > 0) {
-        # Filter for features where the design can actually be fitted using samples with min_reads reads
-        full_rank <- function(selection) {
-            if (sum(selection) < ncol(design)) return(FALSE)
-            sum(abs(svd(design[selection,,drop=F])$d)>=1e-10) == ncol(design)
-        }
-        good <- apply(weitrix::weitrix_weights(wei)>=min_reads, 1, full_rank)
-        wei <- wei[good,]
-    }
+    if (min_reads > 0)
+        wei <- weitrix_filter_full_rank(wei, design, min_reads)
 
     wei
 }
