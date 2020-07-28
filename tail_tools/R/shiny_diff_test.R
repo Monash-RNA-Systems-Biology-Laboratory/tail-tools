@@ -1,4 +1,28 @@
 
+
+# Confident sum of squares of x (with measurement variances v)
+ss_confidence_bound <- function(x,v,confidence=0.95) {
+    good <- !is.na(x) & is.finite(v)
+    x <- x[good]
+    v <- v[good]
+
+    # We want to explain excess mean square, given variances
+    ms <- sum(x^2) / sum(v)
+
+    # Welch-Satterthwaite degrees of freedom approximation
+    df <- sum(v)^2 / sum(v^2)
+
+    score <- function(ncp)
+        pchisq(ms*df,df,ncp=ncp*df) - confidence
+
+    if (score(0) <= 0) return(0)
+
+    uniroot(score, c(0,ms), extendInt="downX")$root * sum(v)
+}
+
+
+
+
 #' @export
 shiny_test <- function(confects=NULL, prefix="") {
     ns <- shiny::NS(prefix)
@@ -95,9 +119,11 @@ shiny_test <- function(confects=NULL, prefix="") {
                 ss_effect <- sum(confects()$table$effect ^ 2, na.rm=TRUE)
                 ss_se <- sum(confects()$table$se^2, na.rm=TRUE)
                 ss_true <- ss_effect - ss_se
+                ss_lower <- ss_confidence_bound(confects()$table$effect, confects()$table$se^2, 0.975)
+                ss_upper <- ss_confidence_bound(confects()$table$effect, confects()$table$se^2, 0.025)
                 ss_confect <- sum(confects()$table$confect ^ 2, na.rm=TRUE)
-                desc <- sprintf("%s\nEstimated Sum of Squares of real effects %.2f\n(SS effects %.2f minus SS standard errors %.2f)\n(SS confects %.2f)",
-                    desc, ss_true, ss_effect, ss_se, ss_confect)
+                desc <- sprintf("%s\nEstimated Sum of Squares of real effects %.2f\n95%% CI [%.2f,%.2f]\n(SS effects %.2f minus SS standard errors %.2f)\n(SS confects %.2f)",
+                    desc, ss_true, ss_lower,ss_upper, ss_effect, ss_se, ss_confect)
             }
             
             shiny::div(
