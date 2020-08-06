@@ -1,5 +1,6 @@
 
-1.8 - End-shift test extra filtering to ensure no NA coefficients.
+1.8  - End-shift test extra filtering to ensure no NA coefficients.
+       Fix bug in bigwig production when pysam present.
 
 1.7  - R namespace bugfix.
 

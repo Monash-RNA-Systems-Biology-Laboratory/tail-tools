@@ -133,15 +133,6 @@ def iter_fragments(alf):
 
 
 def make_bigwig(prefix, bam_filenames, make_spanner, fragments=False, stop_after=None, scale=1.0, polya=False): 
-    have_pysam = False
-    try:
-        import pysam
-        have_pysam = True
-    except ImportError:
-        pass
-    
-    #alf = pysam.AlignmentFile(bam_filenames[0])
-    #header = alf.header
     header = sam.parsed_bam_headers(bam_filenames[0])
     
     with open(prefix+"-chrom.sizes","wb") as f:
@@ -159,10 +150,7 @@ def make_bigwig(prefix, bam_filenames, make_spanner, fragments=False, stop_after
     old = grace.status("Bigwig")
 
     for filename in bam_filenames:
-        if have_pysam:
-            alf = pysam.AlignmentFile(filename)
-        else:
-            alf = sam.Bam_reader(filename)
+        alf = sam.Bam_reader(filename)
         
         n = 0
         
@@ -195,8 +183,7 @@ def make_bigwig(prefix, bam_filenames, make_spanner, fragments=False, stop_after
                 if stop_after is not None and n > stop_after: break
                 if n % 1000000 == 0: grace.status(os.path.basename(prefix)+" "+filename+" "+grace.pretty_number(n))
         
-        if have_pysam:
-            alf.close()
+        alf.close()
 
     bedgraph(prefix+"-fwd.bedgraph", zip(chrom_names, [ scale_spanner(scale, forward[item].get()) for item in chrom_names ]))
     subprocess.check_call([
@@ -273,10 +260,6 @@ def fragment_coverage(items):
 
 
 def make_ambiguity_bigwig(prefix, bam_filenames, stop_after=None, subsample=1): 
-    #import pysam
-    
-    #alf = pysam.AlignmentFile(bam_filenames[0])
-    #header = alf.header
     header = sam.parsed_bam_headers(bam_filenames[0])
     
     with open(prefix+"-chrom.sizes","wb") as f:
@@ -286,13 +269,10 @@ def make_ambiguity_bigwig(prefix, bam_filenames, stop_after=None, subsample=1):
     chrom_names = [ entry["SN"] for entry in header["SQ"] ]
     chrom_sizes = [ int(entry["LN"]) for entry in header["SQ"] ]
 
-    #alf.close()
-
     unambiguous = dict([ (i,Piler(j)) for i,j in zip(chrom_names,chrom_sizes) ])
     total = dict([ (i,Piler(j)) for i,j in zip(chrom_names,chrom_sizes) ])
 
     for filename in bam_filenames:
-        #alf = pysam.AlignmentFile(filename)
         alf = sam.Bam_reader(filename)
         n = 0
         
@@ -304,8 +284,8 @@ def make_ambiguity_bigwig(prefix, bam_filenames, stop_after=None, subsample=1):
             sub = (sub + 1) % subsample
             if sub: continue
         
-            #spanner = fragment_split_coverage([item])
-            spanner = fragment_coverage([item])        #TODO fixme when blocks available
+            spanner = fragment_split_coverage([item])
+            #spanner = fragment_coverage([item])        #TODO fixme when blocks available
             total[item.reference_name].add(spanner)
             
             NH = 1
@@ -379,8 +359,8 @@ def make_ambiguity_bigwig_by_readname(prefix, bam_filenames, stop_after=None, su
             items = [ item for item, this_AS in zip(items,AS) if this_AS >= best_AS ]
         
             for item in items:
-                #spanner = fragment_split_coverage([item])
-                spanner = fragment_coverage([item])        #TODO fixme when blocks available
+                spanner = fragment_split_coverage([item])
+                #spanner = fragment_coverage([item])        #TODO fixme when blocks available
                 spanner = scale_spanner(1.0/len(items), spanner)
                 total[item.reference_name].add(spanner)
                 if len(items) == 1:
