@@ -56,6 +56,10 @@ BiocManager::install("Victorian-Bioinformatics-Consortium/nesoni", subdir="neson
 
 - The "wigToBigWig" tool from the [UCSC Genome Browser utilities](http://hgdownload.soe.ucsc.edu/admin/exe/).
 
+- "pigz" parallel gzip utility.
+
+- "igvtools" command line utility from IGV.
+
 - [R](https://www.r-project.org/) 3.6 or higher.
 
 - My R package [varistran](https://github.com/MonashBioinformaticsPlatform/varistran).
