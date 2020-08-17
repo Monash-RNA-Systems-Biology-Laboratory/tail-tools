@@ -383,14 +383,34 @@ samples <-
 # Construct a named list which defines the desired tests
 tests <- list()
 
-# Define desired tests in terms of samples to use, design matrix, and contrast.
+# Define desired tests in terms of samples to use, design matrix, and a coefficient.
+tests[["wt_mutA"]] <- list(
+    "test",
+    title="wt to mutA",
+    pipeline_dir=pipeline_dir,
+    samples=samples$name,
+    design=model.matrix(~ strain + rep, data=samples),
+    coef="strainmutA")
+
+# ... or in terms of a contrast.
 tests[["mutA_to_mutB"]] <- list(
-    "test_contrast",
+    "test",
     title="mutA to mutB",
     pipeline_dir=pipeline_dir,
     samples=samples$name,
     design=model.matrix(~ strain + rep, data=samples),
     contrast=c(0,-1,1,0,0))
+
+# Multiple coefficients, or multiple contrasts (as columns in a matrix),
+# may be specified to perfom an omnibus test.
+tests[["strain_any"]] <- list(
+    "test",
+    title="And differences between strains",
+    pipeline_dir=pipeline_dir,
+    samples=samples$name,
+    design=model.matrix(~ strain + rep, data=samples),
+    coef=c("strainmutA", "strainmutB"))
+
 
 # A subset of samples may be used. 
 # For example we could drop groups irrelevant to the test.
@@ -402,12 +422,27 @@ keep <-
     droplevels()
 
 tests[["wt_to_mutA"]] <- list(
-    "test_contrast",
+    "test",
     title="wt to mutA",
     pipeline_dir=pipeline_dir,
     samples=keep$name,
     design=model.matrix(~ strain + rep, data=keep),
-    contrast=c(0,1,0,0))
+    coef="strainmutA")
+
+
+# If neither coef or contrast is specified, test will look for 
+# excess variability not explained by the design (which can be simply ~1).
+#
+# You can optionally specify a "calibration design" to be used in the
+# weitrix calibration step. This sets a lower noise level that genes will need
+# to exceed to be considered to have excess variability.
+tests[["any_variability"]] <- list(
+    "test",
+    title="Any variability",
+    pipeline_dir=pipeline_dir,
+    samples=samples$name,
+    design=model.matrix(~1, data=samples)
+    calibration_design=model.matrix(~ strain + rep, data=keep))
 
 
 app <- shiny_tests(tests, title="My shiny test app")

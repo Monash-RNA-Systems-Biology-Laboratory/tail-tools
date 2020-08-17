@@ -20,17 +20,25 @@ as_contrast <- function(contrast, design) {
 
    contrast <- as.matrix(contrast)
    stopifnot(nrow(contrast) == ncol(design))
-   stopifnot(ncol(contrast) == 1)
+   stopifnot(ncol(contrast) >= 1)
    contrast
 }
 
+perform_weitrix_test <- function(weitrix, design, coef, contrast, fdr, step, dispersion_est) {
+    # Backwards compatability, should not be needed
+    if (!is.null(contrast)) {
+        contrast <- as_contrast(contrast, design)
+    }
 
-#' Test for differential expression 
-#'
-#' Doesn't actually use weitrix, but method is similar.
-#'
-#' @param min_reads There must be this many reads for an item to be included in the test, summing over all relevant samples.
-#'
+    if (is.null(coef) && is.null(contrast)) {
+        weitrix::weitrix_sd_confects(weitrix, design, fdr=fdr, step=step)
+    } else {
+        weitrix::weitrix_confects(weitrix, design, coef=coef, contrasts=contrast, fdr=fdr, step=step, dispersion_est=dispersion_est)
+    }
+}
+
+
+#' Legacy test for differential expression 
 #' @export
 test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2=NULL, min_reads=10, samples=NULL, title=NULL, step=0.001, fdr=0.05, what="genewise") {
     tc <- read_tail_counts(paste0(pipeline_dir, "/expression/", what, "/counts.csv"))
@@ -45,9 +53,20 @@ test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2
         contrast[coef2] <- 1
     }
 
-    contrast <- as_contrast(contrast, design)
-    design_coef <- limma::contrastAsCoef(design, contrast)
+    test_diff_exp_weitrix(pipeline_dir=pipeline_dir, design=design, contrast=contrast, min_reads=min_reads, samples=samples, title=title, step=step, fdr=fdr, what=what)
+}
 
+test_diff_exp_20 <- function(...) test_diff_exp(..., min_reads=20)
+test_diff_exp_50 <- function(...) test_diff_exp(..., min_reads=50)
+
+
+#' @export
+test_diff_exp_weitrix <- function(
+        pipeline_dir, design, coef=NULL, contrast=NULL, min_reads=10, 
+        samples=NULL, title=NULL, step=NULL, fdr=0.05, 
+        calibration_design=design, dispersion_est="ebayes_limma",
+        what="genewise") {
+    tc <- read_tail_counts(paste0(pipeline_dir, "/expression/", what, "/counts.csv"))
     tc <- tail_counts_subset_samples(tc, samples)
 
     mat <- tail_counts_get_matrix(tc, "count")
@@ -58,28 +77,21 @@ test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2
             mat[keep,,drop=FALSE],
             genes=select(tc$features[keep,,drop=FALSE], -feature)) %>%
         edgeR::calcNormFactors() %>%
-        limma::voom(design)
+        limma::voom(calibration_design)
     
-    # limma's use of weights is not exact for contrasts (old solution)
-    #effect <- topconfectswald::effect_contrast(contrast)
-    #result <- topconfectswald::limma_nonlinear_confects(voomed, design, effect, step=step, fdr=fdr, full=TRUE)
-
-    # limma's use of weights is not exact for contrasts
-    # so alter design matrix to make contrast a coefficient
-    fit <- limma::lmFit(voomed, design_coef$design)
-    result <- topconfects::limma_confects(fit, design_coef$coef, full=TRUE, step=step, fdr=fdr)
+    result <- perform_weitrix_test(weitrix::as_weitrix(voomed), design=design, coef=coef, contrast=contrast, fdr=fdr, step=step, dispersion_est=dispersion_est)
 
     result$pipeline_dir <- pipeline_dir
-    result$effect_desc <- "log2 fold change in expression"
-    result$title <- paste0(title, " - log2 fold change in expression - ", what, " - at least ", min_reads, " reads")
+    result$effect_desc <- paste0(result$effect_desc, " of log2 RPM")
+    result$title <- paste0(title, " - ", result$effect_desc, " - ", what, " - at least ", min_reads, " reads")
 
     text <- capture.output({
         cat("Samples\n")
         print(colnames(mat))
-        cat("\nContrast\n")
-        print(contrast)
+        cat("\nContrasts\n")
+        print(result$contrasts)
         cat("\nDesign matrix\n")
-        print(design)
+        print(result$design)
     })
 
     result$diagnostics <- list()
@@ -95,49 +107,56 @@ test_diff_exp <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef2
     result
 }
 
-test_diff_exp_20 <- function(...) test_diff_exp(..., min_reads=20)
-test_diff_exp_50 <- function(...) test_diff_exp(..., min_reads=50)
+test_diff_exp_weitrix_20 <- function(...) test_diff_exp_weitrix(..., min_reads=20)
+test_diff_exp_weitrix_50 <- function(...) test_diff_exp_weitrix(..., min_reads=50)
 
 
 
 #' @export
 test_end_shift_weitrix <- function(
-        pipeline_dir, design, contrast, samples=NULL, fdr=0.05,
+        pipeline_dir, design, coef=NULL, contrast=NULL, samples=NULL, fdr=0.05, step=NULL,
         antisense=F, colliders=F, non_utr=F, collapse_utr=F, min_reads=10,
+        calibration_design=design, dispersion_est="ebayes_limma",
         title="End shift test (weitrix based)") {
 
-    contrast <- as_contrast(contrast, design)
-    design_coef <- limma::contrastAsCoef(design, contrast)
+    # Take smaller steps than default for sd effect size
+    if (is.null(step) && (length(coef) >= 2 || (is.matrix(contrast) && ncol(contrast) >= 2)))
+        step <- 0.01
 
     wei <- pipeline_weitrix_shift(
         pipeline_dir=pipeline_dir, samples=samples,  
         antisense=antisense, colliders=colliders, non_utr=non_utr, collapse_utr=collapse_utr,
-        min_reads=min_reads, design=design_coef$design)
+        min_reads=min_reads, design=calibration_design)
     
-    cal <- weitrix::weitrix_calibrate_all(wei, design_coef$design)
-
-    fit <- limma::lmFit(weitrix::weitrix_elist(cal), design_coef$design)
-
-    result <- topconfects::limma_confects(fit, design_coef$coef, full=TRUE, fdr=fdr)
+    cal <- weitrix::weitrix_calibrate_all(wei, calibration_design)
+    
+    result <- perform_weitrix_test(cal, design=design, coef=coef, contrast=contrast, fdr=fdr, step=step, dispersion_est=dispersion_est)
 
     # AveExpr should actually be about expression (log2 RPM)
     total_reads <- SummarizedExperiment::rowData(cal)$total_reads
     ave_expr <- log2( total_reads*1e6 / sum(total_reads) )
     result$table$AveExpr <- ave_expr[result$table$index]
+    result$table$row_mean <- NULL
 
     result$limits <- c(-1,1)
     result$pipeline_dir <- pipeline_dir
-    result$title <- paste0(title, " - end shift (weitrix based) - at least ", min_reads, " reads")
-    result$effect_desc <- "shift"
+    result$effect_desc <- paste0(result$effect_desc, " of APA")
+    result$title <- paste0(
+        title, 
+        " - ", result$effect_desc, " - ", 
+        if (antisense || colliders || collapse_utr) "custom peaks" 
+        else if (non_utr) "all sense peaks" 
+        else "3' UTR peaks",
+        " - at least ", min_reads, " reads")
     result$display_members <- S4Vectors::metadata(wei)$display_members
 
     text <- capture.output({
         cat("Samples\n")
         print(colnames(wei))
-        cat("\nContrast\n")
-        print(contrast)
+        cat("\nContrasts\n")
+        print(result$contrasts)
         cat("\nDesign matrix\n")
-        print(design)
+        print(result$design)
     })
 
     result$diagnostics <- list()
@@ -168,43 +187,42 @@ test_end_shift_weitrix_nonutr_twocoef <- as_two_coef_test(test_end_shift_weitrix
 
 #' @export
 test_diff_tail_weitrix <- function(
-        pipeline_dir, design, contrast, samples=NULL, fdr=0.05,
-        what="genewise", min_reads=50,
+        pipeline_dir, design, coef=NULL, contrast=NULL, samples=NULL, fdr=0.05, step=NULL,
+        what="genewise", min_reads=50, calibration_design=design,
         title="Differential tail length (weitrix based)") {
 
-    contrast <- as_contrast(contrast, design)
-    design_coef <- limma::contrastAsCoef(design, contrast)
+    # Take bigger steps than default for sd effect size
+    if (is.null(step) && (length(coef) >= 2 || (is.matrix(contrast) && ncol(contrast) >= 2)))
+        step <- 1.0
 
     wei <- pipeline_weitrix_tail(
         pipeline_dir=pipeline_dir, samples=samples, what=what,
-        min_reads=min_reads, design=design_coef$design)
+        min_reads=min_reads, design=calibration_design)
 
-    cal <- weitrix::weitrix_calibrate_all(wei, design_coef$design)
-
-    fit <- limma::lmFit(weitrix::weitrix_elist(cal), design_coef$design)
+    cal <- weitrix::weitrix_calibrate_all(wei, calibration_design)
     
-    result <- topconfects::limma_confects(fit, design_coef$coef, full=TRUE, fdr=fdr)
+    result <- perform_weitrix_test(cal, design=design, coef=coef, contrast=contrast, fdr=fdr, step=step, dispersion_est=dispersion_est)
 
     total_reads <- rowSums(weitrix::weitrix_weights(wei))
     ave_expr <- log2( total_reads*1e6 / sum(total_reads) )
     result$table$AveExpr <- ave_expr[result$table$index]
 
-    ave_tail <- weitrix::weitrix_components(cal, design=~1, verbose=F)$row[,1]
-    result$table$AveTail <- ave_tail[result$table$index]
+    #ave_tail <- weitrix::weitrix_components(cal, design=~1, verbose=F)$row[,1]
+    #result$table$AveTail <- ave_tail[result$table$index]
 
     result$pipeline_dir <- pipeline_dir
-    result$title <- paste0(title, " - tail length (weitrix based) - at least ", min_reads, " reads in sufficient samples")
-    result$effect_desc <- "change in tail length"
+    result$effect_desc <- paste0(result$effect_desc, " of tail length")
+    result$title <- paste0(title, " - ", result$effect_desc, " - at least ", min_reads, " reads in sufficient samples")
     result$magnitude_column <- "AveTail"
     result$magnitude_desc <- "Average tail length"
 
     text <- capture.output({
         cat("Samples\n")
         print(colnames(wei))
-        cat("\nContrast\n")
-        print(contrast)
+        cat("\nContrasts\n")
+        print(result$contrasts)
         cat("\nDesign matrix\n")
-        print(design)
+        print(result$design)
     })
 
     result$diagnostics <- list()

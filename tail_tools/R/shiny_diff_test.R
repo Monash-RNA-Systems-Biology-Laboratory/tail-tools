@@ -135,11 +135,14 @@ shiny_test <- function(confects=NULL, prefix="") {
             shiny::h2( title() )
         })
 
-        env[[ns("results-df")]] <- reactive({ 
+        env[[ns("results-df")]] <- reactive({
+            contrast_cols <- colnames(confects()$contrasts)
+
             confects()$table %>%
             select(-index) %>%
             prioritize_columns(
-                c("rank", "confect", "effect", "AveTail", "logCPM", "AveExpr", 
+                c("rank", "confect", "effect", contrast_cols, 
+                  "AveTail", "logCPM", "AveExpr", "row_mean",
                   "fdr_zero", "gene", "biotype", "name", "product"))
         })
 
@@ -166,20 +169,27 @@ shiny_test <- function(confects=NULL, prefix="") {
                 high <- confects()$limits[2]
             }
 
+            contrast_cols <- colnames(confects()$contrasts)
+
             list(
                 pageLength=20,
 
-                columnDefs=list(
-                    list(targets=cols$confect, visible=FALSE),
-                    confect_coldef(cols$effect, cols$confect, low, high),
-                    fixed_coldef(cols$logCPM,1),
-                    fixed_coldef(cols$AveExpr,1),
-                    fixed_coldef(cols$AveTail,1),
-                    precision_coldef(cols$fdr_zero,2),
-                    precision_coldef(cols$se,2),
-                    fixed_coldef(cols$df,1),
-                    fixed_coldef(cols$`mean-tail`,1),
-                    fixed_coldef(cols$`proportion-with-tail`,2))) 
+                columnDefs=c(
+                    list(
+                        list(targets=cols$confect, visible=FALSE),
+                        confect_coldef(cols$effect, cols$confect, low, high),
+                        fixed_coldef(cols$logCPM,1),
+                        fixed_coldef(cols$AveExpr,1),
+                        fixed_coldef(cols$AveTail,1),
+                        fixed_coldef(cols$row_mean,1),
+                        fixed_coldef(cols$typical_obs_err,2),
+                        precision_coldef(cols$fdr_zero,2),
+                        precision_coldef(cols$se,2),
+                        fixed_coldef(cols$df,1),
+                        fixed_coldef(cols$`mean-tail`,1),
+                        fixed_coldef(cols$`proportion-with-tail`,2)),
+                    purrr::map(contrast_cols, ~fixed_coldef(cols[[.]], 2))
+                    )) 
         })
 
         env[[ns("gene-tc")]] <- reactive(withProgress(message="Loading", {

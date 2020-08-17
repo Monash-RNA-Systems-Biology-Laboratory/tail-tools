@@ -1,4 +1,6 @@
 
+1.9  - ANOVA and excess variation tests in Shiny test app
+
 1.8  - End-shift test extra filtering to ensure no NA coefficients.
        Fix bug in bigwig production when pysam present.
 

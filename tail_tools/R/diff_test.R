@@ -35,7 +35,7 @@ test_variants = list(
        "Differential tail length, primary peakwise (min reads 100 in enough samples)"="test_diff_tail_primary_peak_100",
        "Differential tail length, primary peakwise (min reads 200 in enough samples)"="test_diff_tail_primary_peak_200"),
 
-    "test_contrast" = c(
+    "test" = c(
        "End shift, UTR only, weitrix method"="test_end_shift_weitrix",
        "End shift, including all sense peaks, weitrix method"="test_end_shift_weitrix_nonutr",
        "Differential tail length (min reads 50 in enough samples), weitrix method"="test_diff_tail_weitrix",
@@ -44,12 +44,13 @@ test_variants = list(
        "Differential tail length, primary peakwise (min reads 50 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_50",
        "Differential tail length, primary peakwise (min reads 100 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_100",
        "Differential tail length, primary peakwise (min reads 200 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_200",
-       "Differential expression (min reads 10 in 1 sample), voom-limma method"="test_diff_exp",
-       "Differential expression (min reads 20 in 1 sample), voom-limma method"="test_diff_exp_20",
-       "Differential expression (min reads 50 in 1 sample), voom-limma method"="test_diff_exp_50"))
+       "Differential expression (min reads 10 in 1 sample), voom-weitrix method"="test_diff_exp_weitrix",
+       "Differential expression (min reads 20 in 1 sample), voom-weitrix method"="test_diff_exp_weitrix_20",
+       "Differential expression (min reads 50 in 1 sample), voom-weitrix method"="test_diff_exp_weitrix_50"))
 
 # For legacy code
 test_variants$test_end_shift <- test_variants$test_vs
+test_variants$test_contrast <- test_variants$test
 
 
 
