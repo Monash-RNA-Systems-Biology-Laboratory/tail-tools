@@ -8,7 +8,7 @@ as_two_coef_test <- function(func) {
         contrast[coef1] <- -1
         contrast[coef2] <- 1
 
-        func(pipeline_dir, design, contrast, ...)
+        func(pipeline_dir=pipeline_dir, design=design, contrast=contrast, ...)
     }
 }
 
