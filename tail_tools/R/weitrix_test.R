@@ -187,8 +187,8 @@ test_end_shift_weitrix_nonutr_twocoef <- as_two_coef_test(test_end_shift_weitrix
 
 #' @export
 test_diff_tail_weitrix <- function(
-        pipeline_dir, design, coef=NULL, contrast=NULL, samples=NULL, fdr=0.05, step=NULL,
-        what="genewise", min_reads=50, calibration_design=design,
+        pipeline_dir, design, coef=NULL, contrast=NULL, samples=NULL, fdr=0.05, step=NULL, 
+        what="genewise", min_reads=50, calibration_design=design, dispersion_est="ebayes_limma",
         title="Differential tail length (weitrix based)") {
 
     # Take bigger steps than default for sd effect size
