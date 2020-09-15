@@ -213,7 +213,7 @@ test_diff_tail_weitrix <- function(
     result$pipeline_dir <- pipeline_dir
     result$effect_desc <- paste0(result$effect_desc, " of tail length")
     result$title <- paste0(title, " - ", result$effect_desc, " - at least ", min_reads, " reads in sufficient samples")
-    result$magnitude_column <- "AveTail"
+    result$magnitude_column <- "row_mean"
     result$magnitude_desc <- "Average tail length"
 
     text <- capture.output({
