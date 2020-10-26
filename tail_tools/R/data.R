@@ -62,7 +62,7 @@ read_grouped_table <- function(filename) {
     # Use cached R object if possible
     rds_filename <- paste0(filename,".rds")
     if (file.exists(rds_filename) && file.mtime(rds_filename) > file.mtime(filename))
-        return(readRDS(rds_filename))
+        try( return(readRDS(rds_filename)) )
 
     groups <- c()
     tab.separated <- FALSE
