@@ -58,7 +58,12 @@ samples_group_tags <- function(samples, group_name, tags, treatment=TRUE) {
 
 
 #' @export
-read_grouped_table <- function(filename, require=c(), default.group='All') {
+read_grouped_table <- function(filename) {
+    # Use cached R object if possible
+    rds_filename <- paste0(filename,".rds")
+    if (file.exists(rds_filename) && file.mtime(rds_filename) > file.mtime(filename))
+        return(readRDS(rds_filename))
+
     groups <- c()
     tab.separated <- FALSE
     
@@ -67,10 +72,10 @@ read_grouped_table <- function(filename, require=c(), default.group='All') {
     f <- file(filename,'r')
     repeat {
         line <- readLines(f,1)
-        if (length(line) == 0) break;
+        if (length(line) == 0) break
         if (substr(line,1,1) != '#') {
             tab.separated <- (length(grep('\t',line)) > 0)
-            break;
+            break
         }
         
         skip <- skip + 1
@@ -82,35 +87,18 @@ read_grouped_table <- function(filename, require=c(), default.group='All') {
     }
     close(f)
 
+    stopifnot(length(groups) > 0)
+
     if (tab.separated)
         data <- read.delim(filename, skip=skip, check.names=FALSE)    
-    else    
+    else
         data <- read.csv(filename, skip=skip, check.names=FALSE)
-    
+
     rows <- data[,1]
     cols <- colnames(data)[seq_len(ncol(data)-1)+1]    
     data <- data[ ,seq_len(ncol(data)-1)+1, drop=FALSE]
     rownames(data) <- rows
     colnames(data) <- cols
-
-    # === Fallbacks if groups not given ===
-        
-    if (!length(groups)) {
-        rpkms <- grep('^RPKM', colnames(data))
-        if (length(rpkms)) {
-            # === Legacy count file ===
-            n_samples <- rpkms[1] - 1
-            groups <- c(
-                rep('Count', n_samples),
-                rep('RPKM', n_samples),
-                rep('Annotation', ncol(data)-n_samples*2)
-            )
-        }
-    }
-    if (!length(groups)) {
-        groups <- c(default.group)
-    }
-
     
     i <- 2
     while(i <= ncol(data)) {
@@ -126,10 +114,8 @@ read_grouped_table <- function(filename, require=c(), default.group='All') {
         result[[name]] <- data[,groups == name,drop=FALSE]
     }
     
-    for(item in require)
-        if (is.null( result[[item]] ))
-            stop('Table ',filename,' has no group ',item,'. Is it in the right format?')
-    
+    try( saveRDS(result, rds_filename) )
+
     result
 }
 

@@ -263,7 +263,7 @@ for name, tags in tags:
         
         #To adjust clipping prior to alignment, modify these defaults:
         # clip_runs_basespace = tail_tools.Clip_runs_basespace(
-        #    adaptor='AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC', 
+        #    adaptor='GATCGGAAGAGCACACGTCTGAACTCCAGTCAC', 
         #    clip_quality=0, length=20),
 
         #To use bowtie2 rather than STAR

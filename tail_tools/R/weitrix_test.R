@@ -37,6 +37,9 @@ perform_weitrix_test <- function(weitrix, design, coef, contrast, fdr, step, dis
     }
 }
 
+# Save disk space and loading time for diagnostic plots
+compact_plot <- function(p) patchwork::wrap_elements(cowplot::as_grob(p))
+
 
 #' Legacy test for differential expression 
 #' @export
@@ -99,10 +102,10 @@ test_diff_exp_weitrix <- function(
         text=text)
 
     result$diagnostics[["Calibration vs sample"]] <- list(
-        plot=weitrix::weitrix_calplot(voomed, design, cat=col))
+        plot=compact_plot(weitrix::weitrix_calplot(voomed, design, cat=col)))
 
     result$diagnostics[["Calibration vs expression"]] <- list(
-        plot=weitrix::weitrix_calplot(voomed, design, covar=mu))
+        plot=compact_plot(weitrix::weitrix_calplot(voomed, design, covar=mu)))
 
     result
 }
@@ -164,16 +167,16 @@ test_end_shift_weitrix <- function(
         text=text)
 
     result$diagnostics[["Calibration vs sample"]] <- list(
-        plot=weitrix::weitrix_calplot(cal, design, cat=col))
+        plot=compact_plot(weitrix::weitrix_calplot(cal, design, cat=col)))
 
     result$diagnostics[["Calibration vs shift"]] <- list(
-        plot=weitrix::weitrix_calplot(cal, design, covar=mu))
+        plot=compact_plot(weitrix::weitrix_calplot(cal, design, covar=mu)))
 
     result$diagnostics[["Calibration vs per_read_var"]] <- list(
-        plot=weitrix::weitrix_calplot(cal, design, covar=per_read_var))
+        plot=compact_plot(weitrix::weitrix_calplot(cal, design, covar=per_read_var)))
 
     result$diagnostics[["Calibration vs read count"]] <- list(
-        plot=weitrix::weitrix_calplot(cal, design, covar=log2(weitrix::weitrix_weights(wei))) + labs(x="log2 reads"))
+        plot=compact_plot(weitrix::weitrix_calplot(cal, design, covar=log2(weitrix::weitrix_weights(wei))) + labs(x="log2 reads")))
 
     result
 }
@@ -230,13 +233,13 @@ test_diff_tail_weitrix <- function(
         text=text)
 
     result$diagnostics[["Calibration vs sample"]] <- list(
-        plot=weitrix::weitrix_calplot(cal, design, cat=col))
+        plot=compact_plot(weitrix::weitrix_calplot(cal, design, cat=col)))
 
     result$diagnostics[["Calibration vs tail length"]] <- list(
-        plot=weitrix::weitrix_calplot(cal, design, covar=mu))
+        plot=compact_plot(weitrix::weitrix_calplot(cal, design, covar=mu)))
 
     result$diagnostics[["Calibration vs read count"]] <- list(
-        plot=weitrix::weitrix_calplot(cal, design, covar=log2(weitrix::weitrix_weights(wei))) + labs(x="log2 reads with tail"))
+        plot=compact_plot(weitrix::weitrix_calplot(cal, design, covar=log2(weitrix::weitrix_weights(wei))) + labs(x="log2 reads with tail")))
 
     result  
 }

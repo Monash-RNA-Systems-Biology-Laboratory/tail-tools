@@ -161,15 +161,19 @@ class Tail_count(config.Action_with_prefix):
 """
 )
 @config.Int_flag('tail',
-     'Minimum tail length to count as having a tail.'
-     )
+    'Minimum tail length to count as having a tail.'
+    )
 @config.Int_flag('adaptor',
-     'Minimum number of adaptor bases required, 0 for no filtering.'
-     )
+    'Minimum number of adaptor bases required, 0 for no filtering.'
+    )
+@config.Int_flag('clip_tail',
+    'Tails longer than this will be reduced to this length. 0 for no clipping.'
+    )
 @config.Main_section('pickles')
 class Aggregate_tail_counts(config.Action_with_output_dir):             
     tail = 4
     adaptor = 0
+    clip_tail = 0
     pickles = [ ]
      
     #Memory intensive, don't run in parallel
@@ -196,12 +200,19 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
             data.append(datum)
             names.append(name)
             sample_tags.append(tags)
+
+            if self.clip_tail:
+                for feature in datum:
+                    feature.hits = [ 
+                        (min(self.clip_tail,item2[0]),item2[1]) 
+                        for item2 in feature.hits 
+                        ]
             
             try:
                 max_length = max(max_length, max( 
-                    item[0] #tail_length
+                    item2[0] #tail_length
                     for feature in datum
-                    for item in feature.hits
+                    for item2 in feature.hits
                     ) + 1)
             except ValueError:
                 pass
@@ -838,6 +849,9 @@ class Collapse_counts(config.Action_with_prefix):
 @config.Int_flag('adaptor',
      'Minimum number of adaptor bases required, 0 for no filtering.'
      )
+@config.Int_flag('clip_tail',
+    'Tails longer than this will be reduced to this length. 0 for no clipping.'
+    )
 @config.String_flag('title', 'Report title.')
 @config.String_flag('file_prefix', 'Prefix for filenames in report.')
 @config.String_flag('reuse')
@@ -850,6 +864,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
     extension = None
     tail = 4
     adaptor = 0
+    clip_tail = 0
     title = 'PAT-Seq expression analysis'
     file_prefix = ''
     working_dirs = [ ]
@@ -913,7 +928,8 @@ class Analyse_tail_counts(config.Action_with_output_dir):
                 output_dir=self.output_dir, 
                 pickles=pickle_filenames,
                 tail=self.tail,
-                adaptor=self.adaptor
+                adaptor=self.adaptor,
+                clip_tail=self.clip_tail,
                 ).process_make(stage)
         
         nesoni.Norm_from_counts(

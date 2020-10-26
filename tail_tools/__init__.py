@@ -19,7 +19,7 @@ from .rnaseq import Make_rnaseq_reference
 from .bigwig import Bam_to_bigwig, Bam_ambiguity, Polya_bigwigs
 from .shiny import Shiny
 from .peaks import Call_peaks
-from .workflows import Analyse_polya, Analyse_polya_batch
+from .workflows import Analyse_polya, Abduct_polya, Analyse_polya_batch
 
 
 def main():

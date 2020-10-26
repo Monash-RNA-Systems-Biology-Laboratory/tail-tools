@@ -2,7 +2,7 @@
 % Please edit documentation in R/weitrix_test.R
 \name{test_diff_exp}
 \alias{test_diff_exp}
-\title{Test for differential expression}
+\title{Legacy test for differential expression}
 \usage{
 test_diff_exp(
   pipeline_dir,
@@ -18,9 +18,6 @@ test_diff_exp(
   what = "genewise"
 )
 }
-\arguments{
-\item{min_reads}{There must be this many reads for an item to be included in the test, summing over all relevant samples.}
-}
 \description{
-Doesn't actually use weitrix, but method is similar.
+Legacy test for differential expression
 }

@@ -51,6 +51,7 @@ shiny_feature <- function(tc=NULL, feature=NULL, is_peak=FALSE, peak_tc=NULL, pe
                         return(NULL)
 
                     hits <- peak_tc()$features$parent == feature() | peak_tc()$features$antisense_parent == feature()
+                    hits[is.na(hits)] <- FALSE
 
                     if (!any(hits))
                         return(NULL)

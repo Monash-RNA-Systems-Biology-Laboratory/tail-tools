@@ -34,6 +34,8 @@ Depends:
     utils,
     grDevices,
     graphics,
+    cowplot,
+    patchwork,
     assertthat,
     grid,
     gridBase, 
@@ -54,5 +56,5 @@ Imports:
     readr,
     tidyr,
     varistran
-RoxygenNote: 7.1.0
+RoxygenNote: 7.1.1
 Encoding: UTF-8

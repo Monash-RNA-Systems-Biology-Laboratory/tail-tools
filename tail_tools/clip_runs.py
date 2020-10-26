@@ -90,6 +90,8 @@ Reads should be in FASTQ format.
 """)
 @config.String_flag('sample', 'Sample name (for logging of statistics).')
 @config.Int_flag('clip_quality', 'Genomic sequence is clipped to a region containing 90% of bases with at least this quality.')
+@config.Int_flag('a_mismatch_penalty', 'Penalty to score for non-A when matching poly(A).')
+@config.Int_flag('adaptor_mismatch_penalty', 'Penalty to score for adaptor mismatch when matching adaptor.')
 #@config.Int_flag('ignore_quality', 'When calling poly(A) and adaptor, ignore bases below this quality. This may be lower than --clip-quality.')
 @config.Int_flag('min_score', 'Minimum score to call a poly(A) tail, essentially number of As+adaptor bases matched.')
 @config.String_flag('adaptor', 'Adaptor sequence expected after poly-A tail (basespace only).')
@@ -102,6 +104,8 @@ class Clip_runs_basespace(config.Action_with_prefix):
     adaptor = 'GATCGGAAGAGCACACGTCTGAACTCCAGTCAC'    
     clip_quality = 0
     #ignore_quality = 0
+    a_mismatch_penalty = 4
+    adaptor_mismatch_penalty = 4 
     min_score = 10
     length = 20
     debug = False
@@ -201,7 +205,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
                                     score += 1
                                     adaptor_bases += 1
                                 else:
-                                    score -= 4
+                                    score -= self.adaptor_mismatch_penalty
                                 i += 1
                                 
                             #if a_end >= len(seq): break
@@ -221,7 +225,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
                             if seq[a_end] == 'A':
                                 aonly_score += 1
                             else: #if qual[a_end] >= ignore_quality:
-                                aonly_score -= 4
+                                aonly_score -= self.a_mismatch_penalty
                             #else:
                             #    aonly_score -= 1                       
 

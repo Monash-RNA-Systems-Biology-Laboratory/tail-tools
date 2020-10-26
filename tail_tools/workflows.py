@@ -39,20 +39,6 @@ def _parallel(*items):
 
         
 
-#
-#
-#class Tail_only(config.Action_filter):
-#    def run(self):
-#        fin = self.begin_input()
-#        fout = self.begin_output()
-#        
-#        for line in fin:
-#            if line.startswith('@') or '\tAA:i:' in line:
-#                fout.write(line)
-#                continue
-#        
-#        self.end_input(fin)
-#        self.end_output(fout)
 
 
 @config.help(
@@ -262,6 +248,38 @@ class Analyse_polya(config.Action_with_output_dir):
             #os.unlink(polya_filename)
 
 
+@config.help(
+    "Use a sample from a previous pipeline run.",
+    "")
+@config.String_flag("abductee", "Path to sample.")
+@config.Positional('reference', 'Reference directory created by "nesoni make-reference:". Filled in by Analyse_polya_batch.')
+class Abduct_polya(config.Action_with_output_dir):
+    abductee = None
+    reference = None
+
+    # No reads (don't participate in duplicate filename checking)
+    reads = [ ]
+
+    def __init__(self, *args, **argd):
+        super(Abduct_polya, self).__init__(*args, **argd)
+        if self.abductee:
+            abductee = working_directory.Working(self.abductee, must_exist=True)
+            self.tags = abductee.param["tags"]
+
+    def run(self):
+        working = working_directory.Working(self.output_dir, must_exist=False)
+        abductee = working_directory.Working(self.abductee, must_exist=True)
+
+        for filename in [
+                "parameters",
+                "alignments_filtered_sorted.bam",
+                "alignments_filtered_sorted.bam.bai",
+                "depths.pickle.gz",
+                "clipped_reads_log.txt",
+                "filter_log.txt",
+                ]:
+            io.symbolic_link(abductee/filename, working/filename)
+
 
 @config.help(
 'Analyse a set of samples and produce an HTML report, including depth of coverage plots, heatmaps, etc.',
@@ -271,6 +289,12 @@ class Analyse_polya(config.Action_with_output_dir):
 @config.String_flag('title', 'Analysis report title.')
 @config.String_flag('file_prefix', 'Prefix for report filenames.')
 @config.Bool_flag('do_fragile', 'Do steps that might fail? Some steps fail if too few peaks are called.')
+@config.Int_flag('adaptor',
+    'Minimum number of adaptor bases required, 0 for no filtering.'
+    )
+@config.Int_flag('clip_tail',
+    'Tails longer than this will be reduced to this length. 0 for no clipping.'
+    )
 @config.Int_flag('peak_min_depth', 
     'Number of poly(A) reads ending at nearly the same position required in order to call a peak.'
     )
@@ -317,6 +341,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     extension = 1000
     
     do_fragile = True
+
+    adaptor = 0
+    clip_tail = 0
     
     peak_min_depth = 50
     peak_polya = True
@@ -384,14 +411,15 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         clipper_logs = [ join(item.output_dir, 'clipped_reads_log.txt') for item in samples ]
         filter_logs = [ join(item.output_dir, 'filter_log.txt') for item in samples ]
-        filter_polya_logs = [ join(item.output_dir + '-polyA', 'filter_log.txt') for item in samples ]
 
         analyse_template = tail_lengths.Analyse_tail_counts(
             working_dirs = dirs,
             extension = self.extension,
             annotations = reference/'reference.gff',
             types = self.types,
-            parts = self.parts
+            parts = self.parts,
+            adaptor = self.adaptor,
+            clip_tail = self.clip_tail,
             )
         
         with nesoni.Stage() as stage:        
