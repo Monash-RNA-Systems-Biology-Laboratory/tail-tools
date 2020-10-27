@@ -262,9 +262,14 @@ for name, tags in tags:
         tags = tags,
         
         #To adjust clipping prior to alignment, modify these defaults:
-        # clip_runs_basespace = tail_tools.Clip_runs_basespace(
-        #    adaptor='GATCGGAAGAGCACACGTCTGAACTCCAGTCAC', 
-        #    clip_quality=0, length=20),
+        clip_runs_basespace = tail_tools.Clip_runs_basespace(
+            # How many As to make up for one mismatch in the poly(A) sequence?
+            # - default is 4, which has been with older four-color 
+            #   Illumina sequencing.
+            # - for two-color sequencing, completely disable mismatches
+            #   with a value longer than the read length, eg 1000.
+            a_mismatch_penalty = ...
+        ),
 
         #To use bowtie2 rather than STAR
         #aligner="bowtie2",

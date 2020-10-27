@@ -231,6 +231,11 @@ shiny_test <- function(confects=NULL, prefix="") {
         env$output[[ns("enrichment_out")]] <- renderUI({
             df <- confects()$table
             df$rev_rank <- nrow(df) - df$rank
+
+            # For primarypeakwise results
+            if ("parent" %in% names(df))
+                df$name <- df$parent
+
             ranking <- env$input[[ns("enrichment_ranking")]]
             if (ranking == "abs") {
             } else if (ranking == "up") {

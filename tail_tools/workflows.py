@@ -289,6 +289,7 @@ class Abduct_polya(config.Action_with_output_dir):
 @config.String_flag('title', 'Analysis report title.')
 @config.String_flag('file_prefix', 'Prefix for report filenames.')
 @config.Bool_flag('do_fragile', 'Do steps that might fail? Some steps fail if too few peaks are called.')
+@config.Bool_flag('do_bigwigs', 'Do bigwig file creation?')
 @config.Int_flag('adaptor',
     'Minimum number of adaptor bases required, 0 for no filtering.'
     )
@@ -341,6 +342,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     extension = 1000
     
     do_fragile = True
+    do_bigwigs = True
 
     adaptor = 0
     clip_tail = 0
@@ -453,7 +455,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             norm_file = workspace/"norm.csv",
             peaks_file = workspace/("peaks", "relation-child.gff"),
             title = "IGV tracks - "+self.title
-            ).make
+            ).make if self.do_bigwigs else _do_nothing
         
         job_norm_bigwig = _call(_serial, job_norm, job_bigwig)
 
@@ -505,8 +507,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
 
         r = reporting.Reporter(workspace/'report', self.title, self.file_prefix, style=web.style())
         
-        io.symbolic_link(source=workspace/'bigwigs', link_name=r.workspace/'bigwigs')
-        r.write('<div style="font-size: 150%; margin-top: 1em; margin-bottom: 1em;"><a href="bigwigs/index.html">&rarr; Load tracks into IGV</a></div>')
+        if self.do_bigwigs:
+            io.symbolic_link(source=workspace/'bigwigs', link_name=r.workspace/'bigwigs')
+            r.write('<div style="font-size: 150%; margin-top: 1em; margin-bottom: 1em;"><a href="bigwigs/index.html">&rarr; Load tracks into IGV</a></div>')
 
         tail_tools.Shiny(workspace/('report','shiny'), self.output_dir, title=self.title, species=self.species).run()
         r.write('<div style="font-size: 150%; margin-top: 1em; margin-bottom: 1em;"><a href="'+self.shiny_report_url+'" target="_blank">&rarr; Interactive report (shiny)</a></div>')
