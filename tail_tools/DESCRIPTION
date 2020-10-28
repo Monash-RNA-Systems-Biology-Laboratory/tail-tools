@@ -44,7 +44,8 @@ Depends:
     ggplot2, 
     shiny,
     edgeR,
-    limma
+    limma,
+    memoise
 Imports:
     reshape2,
     jsonlite,

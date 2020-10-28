@@ -38,15 +38,23 @@ test_variants = list(
     "test" = c(
        "End shift, UTR only, weitrix method"="test_end_shift_weitrix",
        "End shift, including all sense peaks, weitrix method"="test_end_shift_weitrix_nonutr",
+       "Differential expression (min reads 10 in 1 sample), voom-weitrix method"="test_diff_exp_weitrix",
+       "Differential expression (min reads 20 in 1 sample), voom-weitrix method"="test_diff_exp_weitrix_20",
+       "Differential expression (min reads 50 in 1 sample), voom-weitrix method"="test_diff_exp_weitrix_50",
        "Differential tail length (min reads 50 in enough samples), weitrix method"="test_diff_tail_weitrix",
        "Differential tail length (min reads 100 in enough samples), weitrix method"="test_diff_tail_weitrix_100",
        "Differential tail length (min reads 200 in enough samples), weitrix method"="test_diff_tail_weitrix_200",
        "Differential tail length, primary peakwise (min reads 50 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_50",
        "Differential tail length, primary peakwise (min reads 100 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_100",
        "Differential tail length, primary peakwise (min reads 200 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_200",
-       "Differential expression (min reads 10 in 1 sample), voom-weitrix method"="test_diff_exp_weitrix",
-       "Differential expression (min reads 20 in 1 sample), voom-weitrix method"="test_diff_exp_weitrix_20",
-       "Differential expression (min reads 50 in 1 sample), voom-weitrix method"="test_diff_exp_weitrix_50"))
+       
+       "Differential tail length (detrended samples, min reads 50 in enough samples), weitrix method"="test_diff_tail_weitrix_50_detrend",
+       "Differential tail length (detrended samples, min reads 100 in enough samples), weitrix method"="test_diff_tail_weitrix_100_detrend",
+       "Differential tail length (detrended samples, min reads 200 in enough samples), weitrix method"="test_diff_tail_weitrix_200_detrend",
+       "Differential tail length, primary peakwise (detrended samples, min reads 50 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_50_detrend",
+       "Differential tail length, primary peakwise (detrended samples, min reads 100 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_100_detrend",
+       "Differential tail length, primary peakwise (detrended samples, min reads 200 in enough samples), weitrix method"="test_diff_tail_weitrix_primary_peak_200_detrend"
+       ))
 
 # For legacy code
 test_variants$test_end_shift <- test_variants$test_vs

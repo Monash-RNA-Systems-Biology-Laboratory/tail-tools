@@ -2,6 +2,9 @@
 1.9  - ANOVA and excess variation tests in Shiny test app.
        Loading counts.csv in R now generates an RDS file for faster reloading.
        Options to clip tails at a certain length or require adaptor bases.
+       Tail length weight calibration now uses "well knotted" splines.
+       Option to do differential tails on detrended samples.
+
 
 1.8  - End-shift test extra filtering to ensure no NA coefficients.
        Fix bug in bigwig production when pysam present.

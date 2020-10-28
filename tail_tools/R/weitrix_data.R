@@ -44,7 +44,8 @@ pipeline_weitrix_tail <- function(
     wei <- weitrix::as_weitrix(as.matrix(data$Tail), as.matrix(data$Tail_count))
 
     SummarizedExperiment::rowData(wei) <- data$Annotation
-    S4Vectors::metadata(wei)$weitrix$calibrate_all_formula <- "~splines::ns(mu,4)+splines::ns(log(weight),4)"
+    S4Vectors::metadata(wei)$weitrix$calibrate_all_formula <- 
+        "~weitrix::well_knotted_spline(mu,3)+weitrix::well_knotted_spline(log(weight),3)"
 
     if (!is.null(samples))
         wei <- wei[,samples]

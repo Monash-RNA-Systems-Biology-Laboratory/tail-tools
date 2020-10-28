@@ -24,6 +24,32 @@ as_contrast <- function(contrast, design) {
    contrast
 }
 
+
+# Detrend each sample vs overall mean, calibrate
+detrend_samples_and_calibrate <- function(wei, design) {
+    cal <- weitrix::weitrix_calibrate_all(wei, design)
+
+    long <- weitrix::matrix_long(weitrix::weitrix_x(cal))
+    long$weight <- as.vector(weitrix::weitrix_weights(cal))
+    long <- long %>%
+        dplyr::group_by(name) %>%
+        dplyr::mutate(mu=weighted.mean(value,weight)) %>%
+        dplyr::ungroup()
+    fit <- lm( value ~ weitrix::well_knotted_spline(mu,3) * col, data=long, weight=weight)
+
+    long$pred <- predict(fit, newdata=long)
+
+    mat <- matrix(long$value - long$pred + long$mu, nrow=nrow(wei))
+    rownames(mat) <- rownames(wei)
+    colnames(mat) <- colnames(wei)
+
+    fixed <- wei
+    weitrix::weitrix_x(fixed) <- mat
+
+    weitrix::weitrix_calibrate_all(fixed, design)
+}
+
+
 perform_weitrix_test <- function(weitrix, design, coef, contrast, fdr, step, dispersion_est) {
     # Backwards compatability, should not be needed
     if (!is.null(contrast)) {
@@ -89,12 +115,14 @@ test_diff_exp_weitrix <- function(
     result$title <- paste0(title, " - ", result$effect_desc, " - ", what, " - at least ", min_reads, " reads")
 
     text <- capture.output({
-        cat("Samples\n")
-        print(colnames(mat))
-        cat("\nContrasts\n")
-        print(result$contrasts)
         cat("\nDesign matrix\n")
-        print(result$design)
+        design <- result$design
+        rownames(design) <- colnames(wei)
+        print(design)
+        cat("\nContrasts\n")
+        contrasts <- result$contrasts
+        rownames(contrasts) <- colnames(design)
+        print(contrasts)
     })
 
     result$diagnostics <- list()
@@ -154,12 +182,14 @@ test_end_shift_weitrix <- function(
     result$display_members <- S4Vectors::metadata(wei)$display_members
 
     text <- capture.output({
-        cat("Samples\n")
-        print(colnames(wei))
-        cat("\nContrasts\n")
-        print(result$contrasts)
         cat("\nDesign matrix\n")
-        print(result$design)
+        design <- result$design
+        rownames(design) <- colnames(wei)
+        print(design)
+        cat("\nContrasts\n")
+        contrasts <- result$contrasts
+        rownames(contrasts) <- colnames(design)
+        print(contrasts)
     })
 
     result$diagnostics <- list()
@@ -191,7 +221,8 @@ test_end_shift_weitrix_nonutr_twocoef <- as_two_coef_test(test_end_shift_weitrix
 #' @export
 test_diff_tail_weitrix <- function(
         pipeline_dir, design, coef=NULL, contrast=NULL, samples=NULL, fdr=0.05, step=NULL, 
-        what="genewise", min_reads=50, calibration_design=design, dispersion_est="ebayes_limma",
+        what="genewise", detrend_samples=FALSE,
+        min_reads=50, calibration_design=design, dispersion_est="ebayes_limma",
         title="Differential tail length (weitrix based)") {
 
     # Take bigger steps than default for sd effect size
@@ -202,7 +233,10 @@ test_diff_tail_weitrix <- function(
         pipeline_dir=pipeline_dir, samples=samples, what=what,
         min_reads=min_reads, design=calibration_design)
 
-    cal <- weitrix::weitrix_calibrate_all(wei, calibration_design)
+    if (detrend_samples)
+        cal <- detrend_samples_and_calibrate(wei, calibration_design)
+    else
+        cal <- weitrix::weitrix_calibrate_all(wei, calibration_design)
     
     result <- perform_weitrix_test(cal, design=design, coef=coef, contrast=contrast, fdr=fdr, step=step, dispersion_est=dispersion_est)
 
@@ -215,17 +249,24 @@ test_diff_tail_weitrix <- function(
 
     result$pipeline_dir <- pipeline_dir
     result$effect_desc <- paste0(result$effect_desc, " of tail length")
-    result$title <- paste0(title, " - ", result$effect_desc, " - at least ", min_reads, " reads in sufficient samples")
+    result$title <- paste0(
+        title, " - ", 
+        result$effect_desc, " - ",
+        what, " - ",
+        if (detrend_samples) "detrended samples - ", 
+        "at least ", min_reads, " reads in sufficient samples")
     result$magnitude_column <- "row_mean"
     result$magnitude_desc <- "Average tail length"
 
     text <- capture.output({
-        cat("Samples\n")
-        print(colnames(wei))
-        cat("\nContrasts\n")
-        print(result$contrasts)
         cat("\nDesign matrix\n")
-        print(result$design)
+        design <- result$design
+        rownames(design) <- colnames(wei)
+        print(design)
+        cat("\nContrasts\n")
+        contrasts <- result$contrasts
+        rownames(contrasts) <- colnames(design)
+        print(contrasts)
     })
 
     result$diagnostics <- list()
@@ -237,6 +278,9 @@ test_diff_tail_weitrix <- function(
 
     result$diagnostics[["Calibration vs tail length"]] <- list(
         plot=compact_plot(weitrix::weitrix_calplot(cal, design, covar=mu)))
+
+    result$diagnostics[["Calibration vs sample and tail length"]] <- list(
+        plot=compact_plot(weitrix::weitrix_calplot(cal, design, covar=mu, cat=col)))
 
     result$diagnostics[["Calibration vs read count"]] <- list(
         plot=compact_plot(weitrix::weitrix_calplot(cal, design, covar=log2(weitrix::weitrix_weights(wei))) + labs(x="log2 reads with tail")))
@@ -261,3 +305,12 @@ test_diff_tail_weitrix_primary_peak_100_twocoef <- as_two_coef_test(test_diff_ta
 
 test_diff_tail_weitrix_primary_peak_200 <- function(...) test_diff_tail_weitrix(..., min_reads=200, what="primarypeakwise")
 test_diff_tail_weitrix_primary_peak_200_twocoef <- as_two_coef_test(test_diff_tail_weitrix_primary_peak_200)
+
+
+
+test_diff_tail_weitrix_50_detrend <- function(...) test_diff_tail_weitrix(..., detrend_samples=TRUE, min_reads=50)
+test_diff_tail_weitrix_100_detrend <- function(...) test_diff_tail_weitrix(..., detrend_samples=TRUE, min_reads=100)
+test_diff_tail_weitrix_200_detrend <- function(...) test_diff_tail_weitrix(..., detrend_samples=TRUE, min_reads=200)
+test_diff_tail_weitrix_primary_peak_50_detrend <- function(...) test_diff_tail_weitrix(..., detrend_samples=TRUE, min_reads=50, what="primarypeakwise")
+test_diff_tail_weitrix_primary_peak_100_detrend <- function(...) test_diff_tail_weitrix(..., detrend_samples=TRUE, min_reads=100, what="primarypeakwise")
+test_diff_tail_weitrix_primary_peak_200_detrend <- function(...) test_diff_tail_weitrix(..., detrend_samples=TRUE, min_reads=200, what="primarypeakwise")

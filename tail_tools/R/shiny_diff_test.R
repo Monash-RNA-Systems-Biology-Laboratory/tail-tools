@@ -87,6 +87,8 @@ shiny_test <- function(confects=NULL, prefix="") {
 
     panels <- list(overview_panel, results_panel, enrichment_panel, diagnostics_panel)
 
+    counts_reader <- memoise::memoise(function(path) tail_counts_vst(read_tail_counts(path)))
+
     server <- function(env) {
         confects <- ensure_reactive(confects, ns("confects"), env)
 
@@ -192,14 +194,16 @@ shiny_test <- function(confects=NULL, prefix="") {
                     )) 
         })
 
-        env[[ns("gene-tc")]] <- reactive(withProgress(message="Loading", {
-            read_tail_counts(paste0(confects()$pipeline_dir, "/expression/genewise/counts.csv")) %>%
-            tail_counts_vst
+        env[[ns("pipeline_dir")]] <- reactive({
+            confects()$pipeline_dir
+        })
+
+        env[[ns("gene-tc")]] <- reactive(withProgress(message="Loading genes", {
+            counts_reader(paste0( confects()$pipeline_dir, "/expression/genewise/counts.csv"))
         }))
 
-        env[[ns("gene-peak_tc")]] <- reactive(withProgress(message="Loading", {
-            read_tail_counts(paste0(confects()$pipeline_dir, "/expression/peakwise/counts.csv")) %>%
-            tail_counts_vst
+        env[[ns("gene-peak_tc")]] <- reactive(withProgress(message="Loading peaks", {
+            counts_reader(paste0( confects()$pipeline_dir, "/expression/peakwise/counts.csv"))
         }))
 
         env[[ns("gene-feature")]] <- reactive({
@@ -351,7 +355,8 @@ shiny_tests <- function(tests, cache_prefix="cache_", title="Differential tests"
 
             shiny::p("Results are ranked by FDR-adjusted confident effect size (confect) (see Bioconductor package topconfects). If you prefer ranking by \"significance\", rank results by the fdr_zero column, which is the traditional FDR adjusted p-value for the null hypothesis of zero effect."),
             shiny::p("Paul says: As you can see, there are now a lot of variants of the different tests. I would like to focus on using the weitrix-based tests going forward, so please use these. Weitrix methods are supported by the weitrix package which is made available in Bioconductor, and match the methods documented in the weitrix package vignettes (weitrix version 1.1.2 and higher)."),
-            shiny::p("Also note the weitrix-based poly(A) tail length test is no longer log2 tail length, it's untransformed tail length.")
+            shiny::p("Also note the weitrix-based poly(A) tail length test is no longer log2 tail length, it's untransformed tail length."),
+            shiny::p("Detrending of samples in tail length tests aims to remove systematic differences between samples. This might be samples having overall longer tails, or samples with a trend versus the mean tail length for each gene. Use the diagnostic plots to decide if this is necessary. This should only be used if a small number of genes are expected to change tail lengths! If the experiment causes a global change in tail lengths, using this may erase the global effect or even flip the sign of the effect for some genes!")
         )
     )
     
