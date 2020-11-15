@@ -2,6 +2,7 @@
 1.9  - ANOVA and excess variation tests in Shiny test app.
        Loading counts.csv in R now generates an RDS file for faster reloading.
        Options to clip tails at a certain length or require adaptor bases.
+       Options to clip reads where the density of high quality bases drops below a certain level. Gs are ignored in this, as two-color sequencing of Gs is dark on both channels and reads may end end with a run of high quality Gs actually representing running off the end of the fragment.
        Tail length weight calibration now uses "well knotted" splines.
        Option to do differential tails on detrended samples.
 

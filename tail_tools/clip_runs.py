@@ -89,7 +89,8 @@ A good quality region is found, containing 90% bases with quality at least --cli
 Reads should be in FASTQ format.
 """)
 @config.String_flag('sample', 'Sample name (for logging of statistics).')
-@config.Int_flag('clip_quality', 'Genomic sequence is clipped to a region containing 90% of bases with at least this quality.')
+@config.Int_flag('clip_quality', 'Sequence is clipped to a region containing 90% of bases with at least this quality. G bases are ignored for this purpose, since two-color sequencing will produce high quality Gs for pure black.')
+@config.Int_flag('clip_penalty', 'One low quality base is made up for by this many good quality bases.')
 @config.Int_flag('a_mismatch_penalty', 'Penalty to score for non-A when matching poly(A).')
 @config.Int_flag('adaptor_mismatch_penalty', 'Penalty to score for adaptor mismatch when matching adaptor.')
 #@config.Int_flag('ignore_quality', 'When calling poly(A) and adaptor, ignore bases below this quality. This may be lower than --clip-quality.')
@@ -103,6 +104,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
     sample = 'sample'
     adaptor = 'GATCGGAAGAGCACACGTCTGAACTCCAGTCAC'    
     clip_quality = 0
+    clip_penalty = 4
     #ignore_quality = 0
     a_mismatch_penalty = 4
     adaptor_mismatch_penalty = 4 
@@ -133,28 +135,37 @@ class Clip_runs_basespace(config.Action_with_prefix):
 
             for filename in self.filenames:
                 for name, seq, qual in io.read_sequences(filename, qualities='required'):
-                    # "Good quality" sequence ends at the first low quality base
-                    #good_quality_end = 0
-                    #while good_quality_end < len(seq) and qual[good_quality_end] >= clip_quality:
-                    #    good_quality_end += 1
-                    
-                    goodness_score = 0
-                    best_goodness_score = 0
-                    good_quality_end = 0
-                    i = 0
-                    while True:
-                        if goodness_score > best_goodness_score:
-                            best_goodness_score = goodness_score
-                            good_quality_end = i
-                        
-                        if i >= len(seq):
-                            break
+
+                    # Find a good point to clip the reads so that
+                    # most of the bases have good quality.
+                    #
+                    # This is primarily for use with two-color sequencing
+                    # by newer Illumina machines such as NovaSeq.
+                    #
+                    # Gs are not examined for quality as both colors
+                    # off is a G, and we see "high quality" Gs beyond the
+                    # end of the fragment. 
+                    if self.clip_quality <= 0:
+                        good_quality_end = len(seq)
+                    else:
+                        goodness_score = 0
+                        best_goodness_score = 0
+                        good_quality_end = 0
+                        i = 0
+                        while True:
+                            if goodness_score > best_goodness_score:
+                                best_goodness_score = goodness_score
+                                good_quality_end = i
                             
-                        if qual[i] >= clip_quality:
-                            goodness_score += 1
-                        else:
-                            goodness_score -= 9
-                        i += 1
+                            if i >= len(seq):
+                                break
+
+                            if seq[i] != 'G':
+                                if qual[i] >= clip_quality:
+                                    goodness_score += 1
+                                else:
+                                    goodness_score -= self.clip_penalty
+                            i += 1
                             
                     
                     best_score = self.min_score-1
@@ -166,7 +177,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
                     best_aonly_end = good_quality_end
                     
                     # Consider each possible start position for the poly(A)
-                    for a_start in xrange(len(seq)):
+                    for a_start in xrange(good_quality_end):
                         if a_start and seq[a_start-1] == 'A': continue
                         
                         # Consider each possible end position for the poly(A)
@@ -180,15 +191,11 @@ class Clip_runs_basespace(config.Action_with_prefix):
                             
                             
                             # The poly(A) should be followed by adaptor,
-                            ## at least until the end of good quality sequence.
-                            # However if there is evidence of the adaptor beyond
-                            # the end of good quality, we still want to know that,
-                            # and count it towards the number of adaptor bases present.
                             score = aonly_score
                             adaptor_bases = 0
                             i = a_end
                             abort_score = best_score-len(self.adaptor)
-                            abort_i = min(len(seq), a_end+len(self.adaptor))
+                            abort_i = min(good_quality_end, a_end+len(self.adaptor))
                             while score >= abort_score:
                                 #if (score > best_score and 
                                 #    (i >= good_quality_end or i >= a_end+len(self.adaptor))):
@@ -220,7 +227,7 @@ class Clip_runs_basespace(config.Action_with_prefix):
                             #        aonly_score -= 4
                             #        if aonly_score <= 0: break
 
-                            if a_end >= len(seq): break
+                            if a_end >= good_quality_end: break
 
                             if seq[a_end] == 'A':
                                 aonly_score += 1
@@ -234,11 +241,12 @@ class Clip_runs_basespace(config.Action_with_prefix):
                     # 2018-03-21 
                     # Look for tail starting after good quality,
                     # however don't call a tail if starts after good quality 
-                    if best_a_start > good_quality_end:
-                        best_a_start = good_quality_end
-                        best_a_end = good_quality_end
-                        best_adaptor_bases = 0
-                        best_score = 0
+                    ## Disabled: tail must also be within good quality region
+                    #if best_a_start > good_quality_end:
+                    #    best_a_start = good_quality_end
+                    #    best_a_end = good_quality_end
+                    #    best_adaptor_bases = 0
+                    #    best_score = 0
 
                     a_start = best_a_start
                     a_end = best_a_end

@@ -264,11 +264,17 @@ for name, tags in tags:
         #To adjust clipping prior to alignment, modify these defaults:
         clip_runs_basespace = tail_tools.Clip_runs_basespace(
             # How many As to make up for one mismatch in the poly(A) sequence?
-            # - default is 4, which has been with older four-color 
-            #   Illumina sequencing.
+            # - default is 4, which has been with older four-color Illumina sequencing.
             # - for two-color sequencing, completely disable mismatches
             #   with a value longer than the read length, eg 1000.
             a_mismatch_penalty = ...
+
+            # Clip to high quality region 
+            # - default is 0, no clipping, has been good for four-color sequencing.
+            # - for two-color sequencing, 20 has given good results on one dataset,
+            #   but check fastq files when choosing a reasonable value.
+            # (note: high quality Gs are ignored)
+            clip_quality = ...
         ),
 
         #To use bowtie2 rather than STAR
