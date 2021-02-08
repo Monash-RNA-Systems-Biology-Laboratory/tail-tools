@@ -48,6 +48,8 @@ class Primer_gff(config.Action_with_prefix):
                     continue
                 
                 id = row[id_col].strip()
+                self.log.log("Processing "+id+"\n")
+
                 assert " " not in id, "ID contains space: "+id
                 primer = row[primer_col].strip().upper()
                 assert len(primer) > self.skip, "Primer too short: "+id

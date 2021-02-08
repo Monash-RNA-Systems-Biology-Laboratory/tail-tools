@@ -117,7 +117,7 @@ test_diff_exp_weitrix <- function(
     text <- capture.output({
         cat("\nDesign matrix\n")
         design <- result$design
-        rownames(design) <- colnames(wei)
+        rownames(design) <- colnames(voomed)
         print(design)
         cat("\nContrasts\n")
         contrasts <- result$contrasts
