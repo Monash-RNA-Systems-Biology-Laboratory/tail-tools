@@ -297,11 +297,11 @@ action = tail_tools.Analyse_polya_batch(
         title = 'Pipeline output',
         
         # Reference directory you created earlier
-        reference = '/path/to/reference/directories/S_cerevisiae_82',
+        reference = '/path/to/reference/directories/s_cerevisiae_ensembl_93',
 
         # Where will the shiny part of the html report be served from?
         # (In the output this part is pipeline/report/shiny)
-        #shiny_report_url = "http://myserver:3838/..."
+        #shiny_report_url = "http://myserver:3838/...",
 
         # Allow reads/peaks this far downstrand of 
         # the annotated transcript end point
@@ -452,8 +452,8 @@ tests[["any_variability"]] <- list(
     title="Any variability",
     pipeline_dir=pipeline_dir,
     samples=samples$name,
-    design=model.matrix(~1, data=samples)
-    calibration_design=model.matrix(~ strain + rep, data=keep))
+    design=model.matrix(~1, data=samples),
+    calibration_design=model.matrix(~ strain + rep, data=samples))
 
 
 app <- shiny_tests(tests, title="My shiny test app")

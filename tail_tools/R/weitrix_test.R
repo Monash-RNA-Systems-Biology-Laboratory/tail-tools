@@ -121,7 +121,8 @@ test_diff_exp_weitrix <- function(
         print(design)
         cat("\nContrasts\n")
         contrasts <- result$contrasts
-        rownames(contrasts) <- colnames(design)
+        if (!is.null(contrasts))
+            rownames(contrasts) <- colnames(design)
         print(contrasts)
     })
 
@@ -188,7 +189,8 @@ test_end_shift_weitrix <- function(
         print(design)
         cat("\nContrasts\n")
         contrasts <- result$contrasts
-        rownames(contrasts) <- colnames(design)
+        if (!is.null(contrasts))
+            rownames(contrasts) <- colnames(design)
         print(contrasts)
     })
 
@@ -265,7 +267,8 @@ test_diff_tail_weitrix <- function(
         print(design)
         cat("\nContrasts\n")
         contrasts <- result$contrasts
-        rownames(contrasts) <- colnames(design)
+        if (!is.null(contrasts))
+            rownames(contrasts) <- colnames(design)
         print(contrasts)
     })
 
