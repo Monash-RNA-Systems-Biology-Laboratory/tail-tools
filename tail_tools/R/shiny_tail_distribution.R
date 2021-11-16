@@ -171,6 +171,10 @@ shiny_tail_distribution <- function(
                 paste0("input['",ns("tail_style"),"' != 'Cumulative'"), 
                 numericInput(ns("tail_bin"), "Tail length bin size", 1, min=1)))),
         br(),
+        textInput(ns("colors"),"Color palette", width="100%"),
+        p("Specify colors as hex codes, space separated. Will not be used if there are less colors than lines."),
+        p("Example: #ff0000 #ff4400 #ff8800 #0000ff #0044ff #0088ff"),
+        br(),
         tail_distribution$component_ui(request))
         #br(),
         #h3("Templated sequence"),
@@ -291,6 +295,12 @@ shiny_tail_distribution <- function(
             tail_lengths <- tail_lengths %>%
                 left_join(normalizer, "sample") %>%
                 mutate(n = n / normalizer)
+
+            color_scale <- NULL
+            parts <- strsplit(i("colors"),"\\s+")
+            parts <- parts[nchar(parts)>0]
+            if (length(parts) > 0) 
+                color_scale <- scale_color_discrete(type=parts)
             
             if (i("tail_style") == "Cumulative") {
                 print(
@@ -309,6 +319,7 @@ shiny_tail_distribution <- function(
                     ggplot2::geom_segment(aes(x=length_lead,xend=length,y=transformer(cumn),yend=transformer(cumn))) +
                     scale_x_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                     scale_y_continuous(labels = labeller) +
+                    color_scale +
                     labs(x="poly(A) tail length", y=describer, color=samples_called) +
                     theme_bw()
                 )
@@ -321,6 +332,7 @@ shiny_tail_distribution <- function(
                     geom_line() +
                     scale_x_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                     scale_y_continuous(labels = labeller) +
+                    color_scale +
                     labs(x="poly(A) tail length", y=describer, color=samples_called) +
                     theme_bw()   
                 )

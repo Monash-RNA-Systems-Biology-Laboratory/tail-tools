@@ -211,6 +211,7 @@ shiny_mpat <- function(
                         ggplot2::geom_segment(aes_(x=~length_lead,xend=~length,y=~transformer(cumn),yend=~transformer(cumn))) +
                         scale_x_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                         scale_y_continuous(labels = labeller) +
+                        env$color_scale() +
                         labs(x="poly(A) tail length", y=describer, color=samples_called) +
                         theme_bw()
                     )
@@ -223,10 +224,11 @@ shiny_mpat <- function(
                         geom_line() +
                         scale_x_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                         scale_y_continuous(labels = labeller) +
+                        env$color_scale() +
                         labs(x="poly(A) tail length", y=describer, color=samples_called) +
                         theme_bw()   
                     )
-                } else {
+                } else { # Heatmap
                     print(
                         tail_lengths %>%
                         #group_by(sample) %>%
@@ -280,6 +282,7 @@ shiny_mpat <- function(
                         ggplot2::geom_segment(aes_(x=~width_lead,xend=~width,y=~transformer(cumn),yend=~transformer(cumn))) +
                         #scale_x_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                         scale_y_continuous(labels = labeller) +
+                        env$color_scale() +
                         labs(x="Position relative to primer start", y=describer, color=samples_called) +
                         theme_bw()
                 )
@@ -312,7 +315,7 @@ shiny_mpat <- function(
                     if (have_grouping) checkboxInput("group_samples", "Group samples", value=FALSE)
                 ),
                 br(),
-                
+
                 selectInput("normalizing_samples","Samples to normalize to in overview",choices=samples,selected=c(),multiple=TRUE,width="100%"),
                 p(
                     actionButton("normalizing_samples_all", "All"),
@@ -364,6 +367,10 @@ shiny_mpat <- function(
                     column(3, numericInput("tail_max", "Maximum tail length", max_tail, min=1)),
                     column(3, conditionalPanel("input.tail_style != 'Cumulative'", 
                         numericInput("tail_bin", "Tail length bin size", 1, min=1)))),
+                if (have_bams) textInput("colors","Color palette", width="100%"),
+                if (have_bams) p("Specify colors as hex codes, space separated. Will not be used if there are less colors than lines."),
+                if (have_bams) p("Example: #ff0000 #ff4400 #ff8800 #0000ff #0044ff #0088ff"),
+                if (have_bams) br(),
                 if (have_bams) call_ui(tail_distribution$component_ui, request),                
                 if (have_bams) br(),
                 if (have_bams) h3("Templated sequence"),
@@ -500,6 +507,14 @@ shiny_mpat <- function(
              env$normed()$normalizer
         }, digits=6)
 
+        env$color_scale <- reactive({
+            result <- NULL
+            parts <- strsplit(input$colors,"\\s+")
+            parts <- parts[nchar(parts)>0]
+            if (length(parts) > 0) 
+                result <- scale_color_discrete(type=parts)
+            result
+        })
 
         if (have_bams) {
             env$read_info_basic <- reactive(withProgress(message="Reading tail lengths", {
