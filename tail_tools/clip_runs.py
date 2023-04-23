@@ -87,6 +87,8 @@ Looks for a run of As, followed by an adaptor sequence, followed by anything.
 A good quality region is found, containing 90% bases with quality at least --clip-quality. The run of As must lie withing this region, but the adaptor sequence may extend beyond this. Up to 20% errors are allowed in the poly(A) and adaptor sequence.
 
 Reads should be in FASTQ format.
+
+If read names end with /1, the /1 will be stripped (for consistency with STAR, which also strips these).
 """)
 @config.String_flag('sample', 'Sample name (for logging of statistics).')
 @config.Int_flag('clip_quality', 'Sequence is clipped to a region containing 90% of bases with at least this quality. G bases are ignored for this purpose, since two-color sequencing will produce high quality Gs for pure black.')
@@ -135,6 +137,10 @@ class Clip_runs_basespace(config.Action_with_prefix):
 
             for filename in self.filenames:
                 for name, seq, qual in io.read_sequences(filename, qualities='required'):
+
+                    # STAR will strip a trailing /1 from read names if present.
+                    if name.endswith("/1"):
+                        name = name[:-2]
 
                     # Find a good point to clip the reads so that
                     # most of the bases have good quality.

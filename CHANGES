@@ -6,6 +6,7 @@
        Tail length weight calibration now uses "well knotted" splines.
        Option to do differential tails on detrended samples.
        Color palette can be changed for tail distribution.
+       /1 stripped from read names during clipping, as STAR removes /1 from read names if present.
 
 1.8  - End-shift test extra filtering to ensure no NA coefficients.
        Fix bug in bigwig production when pysam present.
