@@ -265,8 +265,10 @@ for name, tags in tags:
         clip_runs_basespace = tail_tools.Clip_runs_basespace(
             # How many As to make up for one mismatch in the poly(A) sequence?
             # - default is 4, which has been good with older four-color Illumina sequencing.
+            #   (eg MiSeq)
             # - for two-color sequencing, completely disable mismatches
             #   with a value longer than the read length, eg 1000.
+            #   (eg MiniSeq, NextSeq 550, NovaSeq 6000)
             a_mismatch_penalty = ...
 
             # Clip to high quality region 
