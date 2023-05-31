@@ -52,7 +52,7 @@ BiocManager::install("Victorian-Bioinformatics-Consortium/nesoni", subdir="neson
 
 - [samtools](http://www.htslib.org/)
 
-- The "convert" tool from [ImageMagick](https://imagemagick.org/). Ubuntu users may need to further install `libmagickcore*-extra`.
+- The "convert" tool from [ImageMagick](https://imagemagick.org/). Ubuntu users may need to further install `libmagickcore*-extra`, and also `inkscape` to ensure the RSVG renderer is available.
 
 - The "wigToBigWig" tool from the [UCSC Genome Browser utilities](http://hgdownload.soe.ucsc.edu/admin/exe/).
 
