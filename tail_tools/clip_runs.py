@@ -77,6 +77,20 @@ class Clip_runs_colorspace(config.Action_with_prefix):
 
 
 
+def interpret_adaptor(adaptor):
+    # Expect UMI and then barcode to follow poly(A)
+    # Expect read name to be [READNAME]_[BARCODE]_[UMI]
+    if adaptor == "umibarcode":
+        def umibarcode(name):
+            parts = name.split()[0].rsplit("_",2)
+            assert len(parts) == 3
+            return parts[2]+parts[1]
+        return umibarcode
+    
+    # else fixed adaptor sequence
+    for char in adaptor:
+        assert char in "ACGT", "adaptor "+adaptor+" is not all ACGT or \"umibarcode\""
+    return lambda name: adaptor
 
 
 @config.help(
@@ -97,7 +111,7 @@ If read names end with /1, the /1 will be stripped (for consistency with STAR, w
 @config.Int_flag('adaptor_mismatch_penalty', 'Penalty to score for adaptor mismatch when matching adaptor.')
 #@config.Int_flag('ignore_quality', 'When calling poly(A) and adaptor, ignore bases below this quality. This may be lower than --clip-quality.')
 @config.Int_flag('min_score', 'Minimum score to call a poly(A) tail, essentially number of As+adaptor bases matched.')
-@config.String_flag('adaptor', 'Adaptor sequence expected after poly-A tail (basespace only).')
+@config.String_flag('adaptor', 'Adaptor sequence expected after poly-A tail. Can also be "umibarcode" to specify that the poly(A) sequence will be followed by the UMI and then the BARCODE, which are encoded in the read name as [READNAME]_[BARCODE]_[UMI].')
 @config.Int_flag('length', 'Minimum length.')
 @config.Int_flag('only', 'Only use first NNN reads (for debugging). 0 means use all reads.')
 @config.Bool_flag('debug', 'Show detected poly-A region and adaptor location in each read.')
@@ -134,14 +148,18 @@ class Clip_runs_basespace(config.Action_with_prefix):
             n_clipped = 0
             total_before = 0
             total_clipped = 0
-
+            
+            adaptor_getter = interpret_adaptor(self.adaptor)
+            
             for filename in self.filenames:
                 for name, seq, qual in io.read_sequences(filename, qualities='required'):
-
+                    
                     # STAR will strip a trailing /1 from read names if present.
                     if name.endswith("/1"):
                         name = name[:-2]
-
+                    
+                    this_adaptor = adaptor_getter(name)
+                    
                     # Find a good point to clip the reads so that
                     # most of the bases have good quality.
                     #
@@ -195,26 +213,25 @@ class Clip_runs_basespace(config.Action_with_prefix):
                                 best_aonly_start = a_start
                                 best_aonly_end = a_end
                             
-                            
                             # The poly(A) should be followed by adaptor,
                             score = aonly_score
                             adaptor_bases = 0
                             i = a_end
-                            abort_score = best_score-len(self.adaptor)
-                            abort_i = min(good_quality_end, a_end+len(self.adaptor))
+                            abort_score = best_score-len(this_adaptor)
+                            abort_i = min(good_quality_end, a_end+len(this_adaptor))
                             while score >= abort_score:
                                 #if (score > best_score and 
-                                #    (i >= good_quality_end or i >= a_end+len(self.adaptor))):
+                                #    (i >= good_quality_end or i >= a_end+len(this_adaptor))):
                                 if score > best_score:
                                     best_score = score
                                     best_a_start = a_start
                                     best_a_end = a_end
                                     best_adaptor_bases = adaptor_bases
-                            
+                                
                                 if i >= abort_i:
                                     break
-                            
-                                if seq[i] == self.adaptor[i-a_end]:
+                                
+                                if seq[i] == this_adaptor[i-a_end]:
                                     score += 1
                                     adaptor_bases += 1
                                 else:
@@ -232,16 +249,14 @@ class Clip_runs_basespace(config.Action_with_prefix):
                             #    else:
                             #        aonly_score -= 4
                             #        if aonly_score <= 0: break
-
+                            
                             if a_end >= good_quality_end: break
-
+                            
                             if seq[a_end] == 'A':
                                 aonly_score += 1
-                            else: #if qual[a_end] >= ignore_quality:
+                            else:
                                 aonly_score -= self.a_mismatch_penalty
-                            #else:
-                            #    aonly_score -= 1                       
-
+                            
                             a_end += 1
                     
                     # 2018-03-21 
@@ -266,10 +281,14 @@ class Clip_runs_basespace(config.Action_with_prefix):
                             ('C' if item<clip_quality else ' ') 
                             for item in qual )
                         print '-' * good_quality_end
+                        print qual
                         print seq
-                        print ' '*a_start + 'A'*(a_end-a_start) + self.adaptor + ".%d %d"%(adaptor_bases,best_score)
+                        print ' '*a_start + 'a'*(a_end-a_start) + this_adaptor
+                        print 'As: %d Adaptor bases: %d Score: %d'%(a_end-a_start, adaptor_bases,best_score)
                         #print ' '*aonly_start + 'A'*(aonly_end-aonly_start) + "."
-                        print 
+                        print
+                        print
+                        print
                         sys.stdout.flush()
 
                     n += 1

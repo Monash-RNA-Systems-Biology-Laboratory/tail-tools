@@ -453,12 +453,14 @@ Show a heatmap of the number of reads with different tail lengths in different g
 """
 )
 @config.Positional('aggregate', 'Prefix of output from "aggregate-tail-lengths:"')
+@config.Int_flag('skip', 'Omit columns 0,1,2,...,skip-1')
 @config.Int_flag('min_tails', 'Minimum number of reads with tails in order to include in heatmap.')
 @config.Float_flag('min_svd', 'Attempt to pick a sample of genes representative of all the different types of variation. Zero = no filter.')
 @config.Int_flag('top', 'Furthermore, only include the top n features by total reads. Zero = include all.')
 class Plot_pooled(config.Action_with_prefix, runr.R_action):
     aggregate = None
     top = 0
+    skip = 4
     min_tails = 1000
     min_svd = 0
 
@@ -476,7 +478,7 @@ class Plot_pooled(config.Action_with_prefix, runr.R_action):
     # === Normalize by row maximum ===
 
     # Omit columns for tail length 0,1,2,3    
-    skip <- 4
+    #skip <- 4
 
     norm.pooled <- pooled[,skip+seq_len(max(0,maxtail-skip)),drop=FALSE]
     for(i in basic.seq(ncol(norm.pooled)))
@@ -946,6 +948,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
             Plot_pooled(
                 prefix = plot_workspace/'pooled-heatmap',
                 aggregate = self.output_dir,
+                skip = self.tail,
                 #min_tails = min_tails,
                 min_tails = 1,
                 top = 100,

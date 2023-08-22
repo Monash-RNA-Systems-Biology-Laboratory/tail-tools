@@ -297,7 +297,7 @@ def make_ambiguity_bigwig(prefix, bam_filenames, stop_after=None, subsample=1):
                 
             n += 1
             if stop_after is not None and n > stop_after: break
-            if n % 1000000 == 0: print prefix, filename, grace.pretty_number(n)
+            #if n % 1000000 == 0: print prefix, filename, grace.pretty_number(n)
         
         alf.close()
 

@@ -60,6 +60,9 @@ Directories are created both using all reads and for reads with a poly-A tail.
 @config.String_flag("aligner", "Aligner to use, basespace only. Options are 'bowtie2' or 'STAR'.")
 @config.Int_flag("min_match", "STAR only: minimum number of matches required for alignment.")
 @config.Float_flag('extension_prop_a', 'Extending alignments over genomic "A"s, what is the lowest proportion of "A"s allowed? (Basespace only.)')
+@config.Int_flag('min_tail',
+    'Minimum number of As to be called a poly(A) tail. Note if using Analyse_polya_batch (as usual), the setting in Analyse_poly_batch will override this value.'
+    )
 class Analyse_polya(config.Action_with_output_dir):
     reference = None
     tags = [ ]
@@ -70,6 +73,8 @@ class Analyse_polya(config.Action_with_output_dir):
     
     aligner = "star"
     min_match = 0
+    
+    min_tail = 4
     
     clip_runs_colorspace = clip_runs.Clip_runs_colorspace()
     clip_runs_basespace = clip_runs.Clip_runs_basespace()
@@ -105,7 +110,7 @@ class Analyse_polya(config.Action_with_output_dir):
         colorspace = colorspace[0]
         
         #polya_dir = self.get_polya_dir()
-    
+        
         working = working_directory.Working(self.output_dir, must_exist=False)
         working.set_reference(self.reference)
         reference = working.get_reference()
@@ -123,7 +128,7 @@ class Analyse_polya(config.Action_with_output_dir):
         assert aligner in ("bowtie2", "star")
         
         #polya_filename = working/'alignments_filtered_polyA.sam.gz'
-
+        
         if colorspace:
             self.clip_runs_colorspace(
                 filenames=self.reads,
@@ -199,6 +204,7 @@ class Analyse_polya(config.Action_with_output_dir):
                 output=extended_filename,
                 reads=self.reads,
                 reference_filenames=[ reference.reference_fasta_filename() ],
+                tail=self.min_tail,
             ).make()
         else:    
             extend_sam.Extend_sam_basespace(
@@ -206,7 +212,8 @@ class Analyse_polya(config.Action_with_output_dir):
                 output=extended_filename,
                 clips=[ clipped_prefix+'.clips.gz' ],
                 reference_filenames=[ reference.reference_fasta_filename() ],
-                prop_a = self.extension_prop_a
+                prop_a = self.extension_prop_a,
+                tail=self.min_tail,
             ).make()
         
         nesoni.Import(
@@ -293,6 +300,9 @@ class Abduct_polya(config.Action_with_output_dir):
 @config.Int_flag('adaptor',
     'Minimum number of adaptor bases required, 0 for no filtering.'
     )
+@config.Int_flag('min_tail',
+    'Minimum number of non-templated As for a read to be called as having a poly(A) tail. Affects both peak calling and estimation of average tail lengths.'
+    )
 @config.Int_flag('clip_tail',
     'Tails longer than this will be reduced to this length. 0 for no clipping.'
     )
@@ -345,6 +355,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     do_bigwigs = True
 
     adaptor = 0
+    min_tail = 4
     clip_tail = 0
     
     peak_min_depth = 50
@@ -407,13 +418,14 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             samples.append(sample(
                 samplespace / sample.output_dir,
                 reference = self.reference,
+                min_tail = self.min_tail,
                 ))
         
         dirs = [ item.output_dir for item in samples ]
         
         clipper_logs = [ join(item.output_dir, 'clipped_reads_log.txt') for item in samples ]
         filter_logs = [ join(item.output_dir, 'filter_log.txt') for item in samples ]
-
+        
         analyse_template = tail_lengths.Analyse_tail_counts(
             working_dirs = dirs,
             extension = self.extension,
@@ -421,6 +433,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             types = self.types,
             parts = self.parts,
             adaptor = self.adaptor,
+            tail = self.min_tail,
             clip_tail = self.clip_tail,
             )
         
