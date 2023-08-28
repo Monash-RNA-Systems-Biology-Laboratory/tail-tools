@@ -148,8 +148,8 @@ function refresh() {
         var region_name = {
             "cover" : "", 
             "polyacover" : " poly(A)",
-            "3p": " 3' all",
-            "polya3p" : " 3' poly(A)"}[region];
+            "3p": " 3p all",
+            "polya3p" : " 3p poly(A)"}[region];
         
         ["raw","norm"].forEach(function(normalization) {
             if (!is_checked(normalization)) return;

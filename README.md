@@ -269,16 +269,20 @@ for name, tags in tags:
             # - for two-color sequencing, completely disable mismatches
             #   with a value longer than the read length, eg 1000.
             #   (eg MiniSeq, NextSeq 550, NovaSeq 6000)
-            a_mismatch_penalty = ...
-
+            a_mismatch_penalty = ...,
+            
             # Clip to high quality region 
             # - default is 0, no clipping, has been good for four-color sequencing.
             # - for two-color sequencing, 20 has given good results on one dataset,
             #   but check fastq files when choosing a reasonable value.
             # (note: high quality Gs are ignored)
-            clip_quality = ...
+            clip_quality = ...,
+            
+            # If using pooled PAT-Seq.
+            # Ensure reads are named like: READNAME_BARCODE_UMI
+            #adaptor = "umibarcode",
         ),
-
+        
         #To use bowtie2 rather than STAR
         #aligner="bowtie2",
         
@@ -294,12 +298,15 @@ for name, tags in tags:
 action = tail_tools.Analyse_polya_batch(
         # Output directory
         'pipeline',
+                
+        # List of instances of tail_tools.Analyse_polya
+        samples = samples,
         
         # Title for report
         title = 'Pipeline output',
         
         # Reference directory you created earlier
-        reference = '/path/to/reference/directories/s_cerevisiae_ensembl_93',
+        reference = '/data/reference/tail-tools/...',
 
         # Where will the shiny part of the html report be served from?
         # (In the output this part is pipeline/report/shiny)
@@ -312,38 +319,27 @@ action = tail_tools.Analyse_polya_batch(
         # (Left blank since it's easy to forget to change.)
         extension = ... ,
         
-        # The pipeline can crash on some steps if few or weird peaks are called.
-        # Setting this to False will disable some of the fragile stages.
-        do_fragile = True,
+        # To be recognized as a poly(A) read there must be this many non-templated "A"s.
+        # Default for PAT-Seq is 4.
+        # Some variant protocols may require longer, eg if 12 As are always present specify 13.
+        min_tail = 4,
+        
+        # Minimum average tail length required to call a peak.
+        # Set higher then 0.0 if there is mispriming.
+        # 15.0 may be reasonable.
+        peak_min_tail = 15.0,
         
         # Size of peak features generated
         # ie how far back from a site a read can end and still be counted towards it
         # Should be read length or a little shorter
         peak_length = 300,
         
-        # Minimum average tail length required to call a peak.
-        # Set higher then 0.0 if there is mispriming.
-        # 15.0 may be reasonable.
-        peak_min_tail = ...,
-        
         # Optional: Species to use in GO term analysis, choices are: Sc Ce Mm Hs
-        species="Sc",
-                
-        # List of instances of tail_tools.Analyse_polya
-        samples = samples,
+        #species="Sc",
         
-        # (Deprecated)
-        # Perform differential tests, old method
-        # tests = [
-        #     tail_tools.Test(
-        #         'mutA-wt',
-        #         title = 'Mutant A vs wildtype',
-        #         null  = ['wt/mutA'],
-        #         alt   = ['mutA'],
-        #         ),
-        #     #etc
-        #     ],
-
+        # The pipeline can crash on some steps if few or weird peaks are called.
+        # Setting this to False will disable some of the fragile stages.
+        do_fragile = True,
         )
 
 
