@@ -334,6 +334,11 @@ action = tail_tools.Analyse_polya_batch(
         # Should be read length or a little shorter
         peak_length = 300,
         
+        # Should UMI rather than read counting be used?
+        # UMI should be part of the read name.
+        # Ensure reads are named like: READNAME_BARCODE_UMI or READNAME_UMI
+        umis = FALSE,
+        
         # Optional: Species to use in GO term analysis, choices are: Sc Ce Mm Hs
         #species="Sc",
         

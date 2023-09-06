@@ -9,6 +9,7 @@
        /1 stripped from read names during clipping, as STAR removes /1 from read names if present.
        Option to change number of As to call a tail from default of 4.
        Option to clip reads based on UMI and barcode (encoded in read name) rather than fixed adaptor sequence.
+       UMI counting (assuming UMI encoded in read name).
 
 1.8  - End-shift test extra filtering to ensure no NA coefficients.
        Fix bug in bigwig production when pysam present.

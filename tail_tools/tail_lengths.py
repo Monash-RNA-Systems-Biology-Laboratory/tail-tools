@@ -3,7 +3,7 @@ import itertools, collections, math, os.path
 
 import nesoni
 from nesoni import annotation, sam, span_index, config, grace, working_directory, workspace, io, runr, reporting, selection, legion
-from . import web
+from . import web, Tail_count_umi, Aggregate_tail_counts_umi 
 
 import cPickle as pickle
 
@@ -846,14 +846,13 @@ class Collapse_counts(config.Action_with_prefix):
 @config.String_flag('spike_in', 'Comma separated list of spike-in "genes".')
 @config.Int_flag('extension', 'How far downstrand of the given annotations a read or peak belonging to a gene might be.')
 @config.Int_flag('tail',
-     'Minimum tail length to count as having a tail.'
-     )
+     'Minimum tail length to count as having a tail.')
 @config.Int_flag('adaptor',
-     'Minimum number of adaptor bases required, 0 for no filtering.'
-     )
+     'Minimum number of adaptor bases required, 0 for no filtering.')
 @config.Int_flag('clip_tail',
-    'Tails longer than this will be reduced to this length. 0 for no clipping.'
-    )
+    'Tails longer than this will be reduced to this length. 0 for no clipping.')
+@config.Bool_flag('umis',
+    'Should counting be based on UMIs (contained in read names)?')
 @config.String_flag('title', 'Report title.')
 @config.String_flag('file_prefix', 'Prefix for filenames in report.')
 @config.String_flag('reuse')
@@ -867,6 +866,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
     tail = 4
     adaptor = 0
     clip_tail = 0
+    umis = False
     title = 'PAT-Seq expression analysis'
     file_prefix = ''
     working_dirs = [ ]
@@ -908,13 +908,13 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         file_prefix = self.file_prefix
         if file_prefix and not file_prefix.endswith('-'):
             file_prefix += '-'
-
+        
         with nesoni.Stage() as stage:
             for dir in working_dirs:
                 working = working_directory.Working(dir, must_exist=True)
                 pickle_filenames.append(pickle_workspace/working.name+'.pickle.gz')
                 if self.reuse: continue
-                Tail_count(
+                (Tail_count_umi if self.umis else Tail_count)(
                     pickle_workspace/working.name,
                     working_dir=dir, 
                     annotations=self.annotations,
@@ -926,7 +926,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         assert len(set(pickle_filenames)) == len(pickle_filenames), "Duplicate sample name."
         
         with nesoni.Stage() as stage:
-            Aggregate_tail_counts(
+            (Aggregate_tail_counts_umi if self.umis else Aggregate_tail_counts)(
                 output_dir=self.output_dir, 
                 pickles=pickle_filenames,
                 tail=self.tail,
