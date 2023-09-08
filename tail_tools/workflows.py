@@ -538,7 +538,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.report_logs('alignment-statistics',
             #[ workspace/'stats.txt' ] +
             clipper_logs + filter_logs + #filter_polya_logs +
-            [ expressionspace/('genewise','aggregate-tail-counts_log.txt') ],
+            [ expressionspace/('genewise','aggregate-tail-counts'+('-umi' if self.umis else '')+'_log.txt') ],
             filter=lambda sample, field: (
                 field not in [
                     'fragments','fragments aligned to the reference','reads kept',
@@ -610,7 +610,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         
         r.write('<ul>\n')
         r.write('<li> -info.csv = gene name and product, etc\n')
-        r.write('<li> -count.csv = read count\n')
+        r.write('<li> -count.csv = ' + ('UMI' if self.umis else 'read') + ' count\n')
+        if self.umis:
+            r.write('<li> -alignments.csv = actual aligning read count, before UMI based deduplication\n')
         r.write('<li> -mlog2-RPM.csv = moderated log2 Reads Per Million\n')
         r.write('<li> -tail.csv = average poly(A) tail length\n')
         r.write('<li> -tail-count.csv = poly(A) read count\n')
@@ -640,11 +642,11 @@ class Analyse_polya_batch(config.Action_with_output_dir):
         r.p('Nesoni version '+nesoni.VERSION)
         
         r.close()
-
-
+        
+        
     def _run_peaks(self, workspace, expressionspace, reference, dirs, analyse_template, file_prefix):
         shiftspace = io.Workspace(workspace/'peak-shift')
-
+        
         peaks.Call_peaks(
             workspace/'peaks',
             annotations = reference/'reference.gff',
@@ -736,6 +738,9 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             io.write_csv_2(raw/(name+'-tail.csv'), counts_table['Tail'])
             io.write_csv_2(raw/(name+'-tail-count.csv'), counts_table['Tail_count'])
             io.write_csv_2(raw/(name+'-proportion.csv'), counts_table['Proportion'])
+            
+            if 'Alignments' in counts_table:
+                io.write_csv_2(raw/(name+'-alignments.csv'), counts_table['Alignments'])
             
             norm_table = io.read_grouped_table(norms)
             io.write_csv_2(raw/(name+'-norm.csv'), norm_table['All'])

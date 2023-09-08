@@ -256,8 +256,8 @@ class Aggregate_tail_counts_umi(config.Action_with_output_dir):
                 
                 del feature.hits
             
-            self.log.datum(names[i], 'Alignments to features', n_alignments)
-            self.log.datum(names[i], 'UMIs to features', n_umis)
+            self.log.datum(names[i], 'Alignments to features', int(n_alignments))
+            self.log.datum(names[i], 'UMIs to features', int(n_umis))
         
         
         counts = [ ]  # [feature][sample](total_count, [taillength])
@@ -331,7 +331,7 @@ class Aggregate_tail_counts_umi(config.Action_with_output_dir):
             this_total = sum( item[i] for item in sample_n_tail )
             this_n = sum( item[i] for item in sample_n )
             if this_n:
-                self.log.datum(name, 'Average proportion of reads with tail', this_total/this_n)
+                self.log.datum(name, 'Average proportion of UMIs with tail', this_total/this_n)
         
         with open(work/'features-with-data.gff','wb') as f:
             annotation.write_gff3_header(f)
@@ -354,9 +354,9 @@ class Aggregate_tail_counts_umi(config.Action_with_output_dir):
             '#sampleTags='+','.join(tags)
             for tags in sample_tags
             ] + [
-            '"Tail_count" group is number of reads with tail',
+            '"Tail_count" group is number of UMIs with tail',
             '"Tail" group is mean tail per sample',
-            '"Proportion" group is proportion of reads with tail',
+            '"Proportion" group is proportion of UMIs with tail',
             ]
             
         have_biotype = any("Biotype" in item.attr for item in annotations)
