@@ -853,6 +853,9 @@ class Collapse_counts(config.Action_with_prefix):
     'Tails longer than this will be reduced to this length. 0 for no clipping.')
 @config.Bool_flag('umis',
     'Should counting be based on UMIs (contained in read names)?')
+@config.Bool_flag("umi_tail_max",
+    "Should the max of tail length for each UMI be taken? True: use max. False: use mean."
+    )
 @config.String_flag('title', 'Report title.')
 @config.String_flag('file_prefix', 'Prefix for filenames in report.')
 @config.String_flag('reuse')
@@ -867,6 +870,7 @@ class Analyse_tail_counts(config.Action_with_output_dir):
     adaptor = 0
     clip_tail = 0
     umis = False
+    umi_tail_max = False
     title = 'PAT-Seq expression analysis'
     file_prefix = ''
     working_dirs = [ ]
@@ -926,13 +930,23 @@ class Analyse_tail_counts(config.Action_with_output_dir):
         assert len(set(pickle_filenames)) == len(pickle_filenames), "Duplicate sample name."
         
         with nesoni.Stage() as stage:
-            (Aggregate_tail_counts_umi if self.umis else Aggregate_tail_counts)(
-                output_dir=self.output_dir, 
-                pickles=pickle_filenames,
-                tail=self.tail,
-                adaptor=self.adaptor,
-                clip_tail=self.clip_tail,
-                ).process_make(stage)
+            if self.umis:
+                Aggregate_tail_counts_umi(
+                    output_dir=self.output_dir, 
+                    pickles=pickle_filenames,
+                    tail=self.tail,
+                    adaptor=self.adaptor,
+                    clip_tail=self.clip_tail,
+                    umi_tail_max=self.umi_tail_max,
+                    ).process_make(stage)
+            else:
+                Aggregate_tail_counts(
+                    output_dir=self.output_dir, 
+                    pickles=pickle_filenames,
+                    tail=self.tail,
+                    adaptor=self.adaptor,
+                    clip_tail=self.clip_tail,
+                    ).process_make(stage)
         
         nesoni.Norm_from_counts(
             prefix=work/'norm',

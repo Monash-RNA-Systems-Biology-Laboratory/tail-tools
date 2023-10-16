@@ -320,6 +320,9 @@ class Abduct_polya(config.Action_with_output_dir):
 @config.String_flag('parts', 'Comma separated list of feature types that make up features. Default is "exon". Alternatively you might use "three_prime_utr" for a stricter definition of where we expect reads or "gene" for a broad definition including introns.')
 @config.Bool_flag('umis',
     'Should counting be based on UMIs (contained in read names)?')
+@config.Bool_flag("umi_tail_max",
+    "Should the max of tail length for each UMI be taken? True: use max. False: use mean."
+    )
 @config.String_flag("species", 'Species for GO analysis. Currently supports Human ("Hs"), Saccharomyces cerevisiae ("Sc"), Caenorhabditis elegans ("Ce"), Mus musculus ("Mm")')
 @config.String_flag("shiny_report_url", 'The main report contains a link to a shiny-app section. What URL will the shiny-app be served from?')
 #@config.String_flag('blurb', 'Introductory HTML text for report')
@@ -370,6 +373,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
     parts = "exon"
     
     umis = False
+    umi_tail_max = False
     
     species = ""
     shiny_report_url = "shiny/"
@@ -441,6 +445,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
             tail = self.min_tail,
             clip_tail = self.clip_tail,
             umis = self.umis,
+            umi_tail_max = self.umi_tail_max,
             )
         
         with nesoni.Stage() as stage:        

@@ -174,11 +174,15 @@ class Tail_count_umi(config.Action_with_prefix):
 @config.Int_flag('clip_tail',
     'Tails longer than this will be reduced to this length. 0 for no clipping.'
     )
+@config.Bool_flag("umi_tail_max",
+    "Should the max of tail length for each UMI be taken? True: use max. False: use mean."
+    )
 @config.Main_section('pickles')
 class Aggregate_tail_counts_umi(config.Action_with_output_dir):             
     tail = 4
     adaptor = 0
     clip_tail = 0
+    umi_tail_max = False
     pickles = [ ]
      
     #Memory intensive, don't run in parallel
@@ -245,8 +249,11 @@ class Aggregate_tail_counts_umi(config.Action_with_output_dir):
                 
                 feature.tail_counts = [ 0.0 ] * max_length
                 for bin in umi_bins.values():
-                    for tail_length in bin:
-                        feature.tail_counts[tail_length] += 1.0/len(bin)
+                    if self.umi_tail_max:
+                        feature.tail_counts[max(bin)] += 1.0
+                    else:
+                        for tail_length in bin:
+                            feature.tail_counts[tail_length] += 1.0/len(bin)
                 
                 feature.total_count = len(umi_bins)
                 feature.alignment_count = len(feature.hits)
