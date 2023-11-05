@@ -310,6 +310,16 @@ test_diff_tail_weitrix_primary_peak_200 <- function(...) test_diff_tail_weitrix(
 test_diff_tail_weitrix_primary_peak_200_twocoef <- as_two_coef_test(test_diff_tail_weitrix_primary_peak_200)
 
 
+test_diff_tail_weitrix_peak_50 <- function(...) test_diff_tail_weitrix(..., min_reads=50, what="peakwise")
+test_diff_tail_weitrix_peak_50_two_coef <- as_two_coef_test(test_diff_tail_weitrix_peak_50)
+
+test_diff_tail_weitrix_peak_100 <- function(...) test_diff_tail_weitrix(..., min_reads=100, what="peakwise")
+test_diff_tail_weitrix_peak_100_two_coef <- as_two_coef_test(test_diff_tail_weitrix_peak_100)
+
+test_diff_tail_weitrix_peak_200 <- function(...) test_diff_tail_weitrix(..., min_reads=200, what="peakwise")
+test_diff_tail_weitrix_peak_200_two_coef <- as_two_coef_test(test_diff_tail_weitrix_peak_200)
+
+
 
 test_diff_tail_weitrix_50_detrend <- function(...) test_diff_tail_weitrix(..., detrend_samples=TRUE, min_reads=50)
 test_diff_tail_weitrix_100_detrend <- function(...) test_diff_tail_weitrix(..., detrend_samples=TRUE, min_reads=100)
