@@ -142,7 +142,9 @@ test_diff_exp_weitrix <- function(
 test_diff_exp_weitrix_20 <- function(...) test_diff_exp_weitrix(..., min_reads=20)
 test_diff_exp_weitrix_50 <- function(...) test_diff_exp_weitrix(..., min_reads=50)
 
-
+test_diff_exp_weitrix_peak_10 <- function(...) test_diff_exp_weitrix(..., min_reads=10, what="peakwise")
+test_diff_exp_weitrix_peak_20 <- function(...) test_diff_exp_weitrix(..., min_reads=20, what="peakwise")
+test_diff_exp_weitrix_peak_50 <- function(...) test_diff_exp_weitrix(..., min_reads=50, what="peakwise")
 
 #' @export
 test_end_shift_weitrix <- function(
