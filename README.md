@@ -282,12 +282,15 @@ for name, tags in tags:
             # Ensure reads are named like: READNAME_BARCODE_UMI
             #adaptor = "umibarcode",
         ),
+
+        #To discard multi-mapping reads. Default is to choose one location at random.
+        #discard_multimappers=True,
         
         #To use bowtie2 rather than STAR
         #aligner="bowtie2",
         
         # Only use alignments with this many matching bases (STAR aligner only) 
-        #min_match=30
+        #min_match=30,
         
         #To allow for looser mispriming, lower this.
         #To only allow for stricter mispriming, raise this (maximum 1).
@@ -337,7 +340,7 @@ action = tail_tools.Analyse_polya_batch(
         # Should UMI rather than read counting be used?
         # UMI should be part of the read name.
         # Ensure reads are named like: READNAME_BARCODE_UMI or READNAME_UMI
-        umis = FALSE,
+        umis = False,
         
         # Optional: Species to use in GO term analysis, choices are: Sc Ce Mm Hs
         #species="Sc",
