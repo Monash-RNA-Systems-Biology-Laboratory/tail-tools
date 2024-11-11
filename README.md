@@ -264,17 +264,20 @@ for name, tags in tags:
         #To adjust clipping prior to alignment, modify these defaults:
         clip_runs_basespace = tail_tools.Clip_runs_basespace(
             # How many As to make up for one mismatch in the poly(A) sequence?
-            # - default is 4, which has been good with older four-color Illumina sequencing.
+            # - Default is 4, which has been good with older four-color Illumina sequencing.
             #   (eg MiSeq)
-            # - for two-color sequencing, completely disable mismatches
+            # - For two-color sequencing, completely disable mismatches
             #   with a value longer than the read length, eg 1000.
             #   (eg MiniSeq, NextSeq 550, NovaSeq 6000)
             a_mismatch_penalty = ...,
             
             # Clip to high quality region 
-            # - default is 0, no clipping, has been good for four-color sequencing.
-            # - for two-color sequencing, 20 has given good results on one dataset,
-            #   but check fastq files when choosing a reasonable value.
+            # - Default is 0, no clipping, has been good for four-color sequencing.
+            # - For two-color sequencing, tested with a NovaSeq dataset:
+            #     clip_quality=20 gave good results, but we noticed it over-estimated 
+            #                     tail lengths on 60-A Sequins.
+            #     clip_quality=30 gave improved estimation of Sequin tail lengths, 
+            #                     and is my current recommendation.
             # (note: high quality Gs are ignored)
             clip_quality = ...,
             
