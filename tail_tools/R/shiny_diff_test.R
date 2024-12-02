@@ -22,27 +22,35 @@ ss_confidence_bound <- function(x,v,confidence=0.95) {
 }
 
 
-
-
 #' @export
 shiny_test <- function(confects=NULL, prefix="") {
     ns <- shiny::NS(prefix)
-
+    
+    # confect and effect shown separately on same plot (turned out to be confusing)
     me_plot <- shiny_plot(prefix=ns("me_plot"))
-
+    
+    # More conventional mean-difference style plot, color by confect
+    me2_plot <- shiny_plot(prefix=ns("me2_plot"), width=700)
+    
     results_table <- shiny_table(
         title="Results", 
         filename="results.csv", 
         prefix=ns("results"))
-
+    
     gene_view <- shiny_feature(is_peak=FALSE, prefix=ns("gene"))
-
+    
     overview_panel <- function(request)
         shiny::tabPanel("Overview", 
             shiny::uiOutput(ns("description")),
             shiny::fluidRow(
-                shiny::column(3, shiny::numericInput(ns("ymin"), "y-axis min", value=NA)),
-                shiny::column(3, shiny::numericInput(ns("ymax"), "y-axis max", value=NA))),
+                shiny::column(2, shiny::numericInput(ns("ymin"), "y-axis min", value=NA)),
+                shiny::column(2, shiny::numericInput(ns("ymax"), "y-axis max", value=NA)),
+                shiny::column(2, shiny::textInput(ns("ylabel"), "y-axis label", value="")),
+                shiny::column(2, shiny::textInput(ns("breaks"), "Confect breaks", value=""))),
+            me2_plot$component_ui(request),
+            shiny::p("This plot shows \"effect\" values on the y axis. \"Confect\" values are indicated by color."),
+            shiny::p("Confect breaks can be specified as a space separated list of numbers, eg: 0 0.5 1 1.5"),
+            shiny::h2("Old style plot"),
             me_plot$component_ui(request),
             shiny::p("Grey dots show estimated effect size -- these estimates tend to be noisy when there are few reads. Black dots show confident effect size, a confident smallest bound on the effect size at the specified FDR. Each black dot has a corresponding grey dot. Grey dots without a corresponding black dot are not significantly different from zero."))
 
@@ -99,19 +107,43 @@ shiny_test <- function(confects=NULL, prefix="") {
             else
                 "Differential test"
         })
-
-        env[[ns("me_plot-callback")]] <- function() {
+        
+        
+        ylim <- reactive({
             ymin <- env$input[[ns("ymin")]]
             if (is.na(ymin))
                 ymin <- min(confects()$table$effect,na.rm=T)
             ymax <- env$input[[ns("ymax")]]
             if (is.na(ymax))
                 ymax <- max(confects()$table$effect,na.rm=T)
-            result <- topconfects::confects_plot_me(confects()) +
-                coord_cartesian(ylim=c(ymin,ymax))
+            c(ymin, ymax)
+        })
+        
+        confects_with_desc <- reactive({
+            result <- confects()
+            ylabel <- env$input[[ns("ylabel")]]
+            if (ylabel != "")
+                result$effect_desc <- ylabel
+            result
+        })
+        
+        env[[ns("me_plot-callback")]] <- function() {
+            result <- topconfects::confects_plot_me(confects_with_desc()) +
+                coord_cartesian(ylim=ylim())
             print(result)
         }
-
+        
+        env[[ns("me2_plot-callback")]] <- function() {
+            breaks <- env$input[[ns("breaks")]]
+            breaks <- strsplit(breaks, "(,|\\s)+")[[1]]
+            breaks <- na.omit(as.numeric(breaks))
+            
+            # TODO: move function to topconfects
+            result <- confects_plot_me2(confects_with_desc(), breaks=breaks) +
+                coord_cartesian(ylim=ylim())
+            print(result)
+        }
+        
         env$output[[ns("description")]] <- renderUI({
             desc <- topconfects:::confects_description(confects())
             if (!is.null(confects()$technical_var))
@@ -296,8 +328,9 @@ shiny_test <- function(confects=NULL, prefix="") {
             diagnostic <- confects()$diagnostics[[wanted]]
             diagnostic$plot
         }
-
+        
         me_plot$component_server(env)
+        me2_plot$component_server(env)
         results_table$component_server(env)
         gene_view$component_server(env)
         diagnostic_plot$component_server(env)
