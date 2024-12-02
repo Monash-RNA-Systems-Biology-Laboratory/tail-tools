@@ -139,7 +139,7 @@ shiny_test <- function(confects=NULL, prefix="") {
             breaks <- na.omit(as.numeric(breaks))
             
             # TODO: move function to topconfects
-            result <- confects_plot_me2(confects_with_desc(), breaks=breaks) +
+            result <- topconfects::confects_plot_me2(confects_with_desc(), breaks=breaks) +
                 coord_cartesian(ylim=ylim())
             print(result)
         }
