@@ -137,7 +137,7 @@ shiny_test <- function(confects=NULL, prefix="") {
         
         env[[ns("me_plot-callback")]] <- function() {
             result <- topconfects::confects_plot_me(confects_with_desc()) +
-                coord_cartesian(ylim=ylim(), xlim=xlim(), default=TRUE)
+                coord_cartesian(ylim=ylim(), xlim=xlim())
             print(result)
         }
         
@@ -147,7 +147,7 @@ shiny_test <- function(confects=NULL, prefix="") {
             breaks <- na.omit(as.numeric(breaks))
             
             result <- topconfects::confects_plot_me2(confects_with_desc(), breaks=breaks) +
-                coord_cartesian(ylim=ylim(), xlim=xlim(), default=TRUE)
+                coord_cartesian(ylim=ylim(), xlim=xlim())
             print(result)
         }
         
