@@ -43,13 +43,15 @@ shiny_test <- function(confects=NULL, prefix="") {
         shiny::tabPanel("Overview", 
             shiny::uiOutput(ns("description")),
             shiny::fluidRow(
+                shiny::column(2, shiny::numericInput(ns("xmin"), "x-axis min", value=NA)),
+                shiny::column(2, shiny::numericInput(ns("xmax"), "x-axis max", value=NA)),
                 shiny::column(2, shiny::numericInput(ns("ymin"), "y-axis min", value=NA)),
                 shiny::column(2, shiny::numericInput(ns("ymax"), "y-axis max", value=NA)),
                 shiny::column(2, shiny::textInput(ns("ylabel"), "y-axis label", value="")),
                 shiny::column(2, shiny::textInput(ns("breaks"), "Confect breaks", value=""))),
             me2_plot$component_ui(request),
             shiny::p("This plot shows \"effect\" values on the y axis. \"Confect\" values are indicated by color."),
-            shiny::p("Confect breaks can be specified as a space separated list of numbers, eg: 0 0.5 1 1.5"),
+            shiny::p("Confect breaks can be specified as a space separated list of non-negative numbers, eg: 0 0.5 1 1.5"),
             shiny::h2("Old style plot"),
             me_plot$component_ui(request),
             shiny::p("Grey dots show estimated effect size -- these estimates tend to be noisy when there are few reads. Black dots show confident effect size, a confident smallest bound on the effect size at the specified FDR. Each black dot has a corresponding grey dot. Grey dots without a corresponding black dot are not significantly different from zero."))
@@ -119,6 +121,12 @@ shiny_test <- function(confects=NULL, prefix="") {
             c(ymin, ymax)
         })
         
+        xlim <- reactive({
+            xmin <- env$input[[ns("xmin")]]
+            xmax <- env$input[[ns("xmax")]]
+            c(xmin, xmax)
+        })
+        
         confects_with_desc <- reactive({
             result <- confects()
             ylabel <- env$input[[ns("ylabel")]]
@@ -129,7 +137,7 @@ shiny_test <- function(confects=NULL, prefix="") {
         
         env[[ns("me_plot-callback")]] <- function() {
             result <- topconfects::confects_plot_me(confects_with_desc()) +
-                coord_cartesian(ylim=ylim())
+                coord_cartesian(ylim=ylim(), xlim=xlim(), default=TRUE)
             print(result)
         }
         
@@ -138,9 +146,8 @@ shiny_test <- function(confects=NULL, prefix="") {
             breaks <- strsplit(breaks, "(,|\\s)+")[[1]]
             breaks <- na.omit(as.numeric(breaks))
             
-            # TODO: move function to topconfects
             result <- topconfects::confects_plot_me2(confects_with_desc(), breaks=breaks) +
-                coord_cartesian(ylim=ylim())
+                coord_cartesian(ylim=ylim(), xlim=xlim(), default=TRUE)
             print(result)
         }
         

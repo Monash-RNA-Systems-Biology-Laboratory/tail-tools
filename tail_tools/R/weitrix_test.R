@@ -171,8 +171,9 @@ test_end_shift_weitrix <- function(
     ave_expr <- log2( total_reads*1e6 / sum(total_reads) )
     result$table$AveExpr <- ave_expr[result$table$index]
     result$table$row_mean <- NULL
-
-    result$limits <- c(-1,1)
+    
+    if (is.null(result$limits))
+        result$limits <- c(-1,1)
     result$pipeline_dir <- pipeline_dir
     result$effect_desc <- paste0(result$effect_desc, " of APA")
     result$title <- paste0(
