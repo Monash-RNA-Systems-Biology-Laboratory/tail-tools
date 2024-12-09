@@ -139,7 +139,7 @@ confect_coldef <- function(target, confect, low, high) {
                     from = low;
                     to = confect;
                 }
-                bound = " (" + (effect>=0?"&geq;":"&leq;") + (confect>=0?" ":"") + confect.toFixed(2) + ")"
+                bound = " (" + (effect>=0?"&gt;":"&lt;") + (confect>=0?" ":"") + confect.toFixed(2) + ")"
             }
             function tr(x) { return (x-low)/(high-low) * 200 + 1.5; }
             return "<tt style=\\"white-space: pre\\">" + 
