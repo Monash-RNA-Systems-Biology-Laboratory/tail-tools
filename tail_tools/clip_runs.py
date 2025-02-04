@@ -1,7 +1,7 @@
 
 import collections
 
-from nesoni import config, io, grace
+from nesoni import config, io, bio, grace
 
 import sys
 
@@ -80,12 +80,19 @@ class Clip_runs_colorspace(config.Action_with_prefix):
 def interpret_adaptor(adaptor):
     # Expect UMI and then barcode to follow poly(A)
     # Expect read name to be [READNAME]_[BARCODE]_[UMI]
-    if adaptor == "umibarcode":
-        def umibarcode(name):
+    if adaptor == "umi_barcode":
+        def umi_barcode(name):
             parts = name.split()[0].rsplit("_",2)
             assert len(parts) == 3
             return parts[2]+parts[1]
-        return umibarcode
+        return umi_barcode
+    
+    if adaptor == "rc_umi_rc_barcode":
+        def rc_umi_rc_barcode(name):
+            parts = name.split()[0].rsplit("_",2)
+            assert len(parts) == 3
+            return bio.reverse_complement(parts[1]+parts[2])
+        return rc_umi_rc_barcode
     
     # else fixed adaptor sequence
     for char in adaptor:
@@ -333,6 +340,27 @@ class Clip_runs_basespace(config.Action_with_prefix):
             self.log.datum(self.sample,'mean length clipped',float(total_clipped)/n_clipped)
 
 
+
+
+@config.help('Detect appropriate adaptor setting if reads have UMIs.')
+@config.Main_section('filenames', 'Input FASTQ files.')
+class Detect_adaptor(config.Action):
+    filenames = [ ]
+    
+    def run(self):
+        umi_barcode = interpret_adaptor('umi_barcode')
+        rc_umi_rc_barcode = interpret_adaptor('rc_umi_rc_barcode')
+        for filename in self.filenames:
+            print filename
+            n_umi_barcode = 0
+            n_rc_umi_rc_barcode = 0
+            for name, seq in io.read_sequences(filename):
+                n_umi_barcode += umi_barcode(name) in seq
+                n_rc_umi_rc_barcode += rc_umi_rc_barcode(name) in seq
+            print 'Saw \'umi_barcode\' in', n_umi_barcode, 'reads.'
+            print 'Saw \'rc_umi_rc_barcode\' in', n_rc_umi_rc_barcode, 'reads.'
+            print
+            
 
 
 if __name__ == '__main__':

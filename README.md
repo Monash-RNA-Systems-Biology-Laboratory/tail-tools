@@ -283,7 +283,11 @@ for name, tags in tags:
             
             # If using pooled PAT-Seq.
             # Ensure reads are named like: READNAME_BARCODE_UMI
-            #adaptor = "umibarcode",
+            # Check the orientation of barcodes and umis. Are they forward or reverse-complement?
+            # Use 
+            #   tail-tools detect-adaptor: my-reads.fastq.gz 
+            # to determine correct choice.
+            #adaptor = "umi_barcode" or "rc_umi_rc_barcode",
         ),
 
         #To discard multi-mapping reads. Default is to choose one location at random.

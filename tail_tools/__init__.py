@@ -4,7 +4,7 @@ VERSION = '1.9dev'
 import nesoni
 
 from .fasta_qual_merge import Fasta_qual_merge
-from .clip_runs import Clip_runs_colorspace, Clip_runs_basespace
+from .clip_runs import Clip_runs_colorspace, Clip_runs_basespace, Detect_adaptor
 from .extend_sam import Extend_sam_colorspace, Extend_sam_basespace
 from .proportions import Proportions, Proportions_heatmap 
 from .tail_lengths_umi import Tail_count_umi, Aggregate_tail_counts_umi
@@ -65,7 +65,8 @@ def main():
             Bam_ambiguity,
 
             'Utilities:',
-            Primer_gff,            
+            Primer_gff,
+            Detect_adaptor,
         ], 
         'tail-tools',
         )
