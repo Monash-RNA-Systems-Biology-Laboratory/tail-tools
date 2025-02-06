@@ -281,9 +281,9 @@ for name, tags in tags:
             # (note: high quality Gs are ignored)
             clip_quality = ...,
             
-            # If using pooled PAT-Seq.
-            # Ensure reads are named like: READNAME_BARCODE_UMI
-            # Check the orientation of barcodes and umis. Are they forward or reverse-complement?
+            # Adaptor used to clip reads. The default is correct for non-UMI PAT-Seq.
+            # If using PAT-Seq with UMIs, ensure reads are named like: READNAME_BARCODE_UMI
+            # Next check the orientation of barcodes and umis. Are they forward or reverse-complement?
             # Use 
             #   tail-tools detect-adaptor: my-reads.fastq.gz 
             # to determine correct choice.

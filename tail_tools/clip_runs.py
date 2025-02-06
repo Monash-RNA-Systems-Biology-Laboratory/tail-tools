@@ -3,7 +3,7 @@ import collections
 
 from nesoni import config, io, bio, grace
 
-import sys
+import sys, os
 
 
 State = collections.namedtuple('State','state score a_start a_end') 
@@ -343,22 +343,27 @@ class Clip_runs_basespace(config.Action_with_prefix):
 
 
 @config.help('Detect appropriate adaptor setting if reads have UMIs.')
-@config.Main_section('filenames', 'Input FASTQ files.')
+@config.Main_section('filenames', 'Input FASTQ files.', empty_is_ok=False)
 class Detect_adaptor(config.Action):
     filenames = [ ]
     
     def run(self):
-        umi_barcode = interpret_adaptor('umi_barcode')
-        rc_umi_rc_barcode = interpret_adaptor('rc_umi_rc_barcode')
+        adaptors = ['GATCGGAAGAGCACACGTCTGAACTCCAGTCAC','umi_barcode','rc_umi_rc_barcode']
+        funcs = [ interpret_adaptor(adaptor) for adaptor in adaptors ]
         for filename in self.filenames:
-            print filename
-            n_umi_barcode = 0
-            n_rc_umi_rc_barcode = 0
+            print os.path.basename(filename)
+            n = 0
+            counts = [ 0 ]*len(adaptors)
             for name, seq in io.read_sequences(filename):
-                n_umi_barcode += umi_barcode(name) in seq
-                n_rc_umi_rc_barcode += rc_umi_rc_barcode(name) in seq
-            print 'Saw \'umi_barcode\' in', n_umi_barcode, 'reads.'
-            print 'Saw \'rc_umi_rc_barcode\' in', n_rc_umi_rc_barcode, 'reads.'
+                n += 1
+                for i in range(len(adaptors)):
+                    try:
+                        counts[i] += funcs[i](name) in seq
+                    except:
+                        pass #... handle missing _ _ in name... could be done nicer
+            print grace.pretty_number(n, width=15), 'reads'
+            for i in range(len(adaptors)):
+                print grace.pretty_number(counts[i], width=15), 'had \''+adaptors[i]+'\''
             print
             
 
