@@ -263,11 +263,14 @@ class Filter_and_relate_peaks_to_genes(config.Action_with_prefix):
             if not hits:
                 hit_to = "Intron"
                 hits = gene_index.get(query, True)
-
+            
             antisense_hits = gene_index.get(query.reversed(), True)
-            if not hits:
-                hit_to = "Antisense"
-                hits = antisense_hits
+            
+            # 2025-02-03: This turned out to be an annoying feature, disabling. 
+            #             Antisense hits are reported separately in Antisense_... fields anyway.
+            #if not hits:
+            #    hit_to = "Antisense"
+            #    hits = antisense_hits
             
             if hits:
                 peak.attr["Parent"] = join_descriptions([ item.get_id() for item in hits ], ",")

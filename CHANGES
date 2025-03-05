@@ -11,6 +11,7 @@
        Option to clip reads based on UMI and barcode (encoded in read name) rather than fixed adaptor sequence.
        UMI counting (assuming UMI encoded in read name).
        Tool to detect adaptor orientation.
+       Anti-sense relations are no longer used (separate antisense fields are still provided).
 
 1.8  - End-shift test extra filtering to ensure no NA coefficients.
        Fix bug in bigwig production when pysam present.
