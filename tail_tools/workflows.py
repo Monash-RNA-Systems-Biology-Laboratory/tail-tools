@@ -260,9 +260,11 @@ class Analyse_polya(config.Action_with_output_dir):
     "")
 @config.String_flag("abductee", "Path to sample.")
 @config.Positional('reference', 'Reference directory created by "nesoni make-reference:". Filled in by Analyse_polya_batch.')
+@config.Int_flag("min_tail", "Ignored. Original setting will be used.")
 class Abduct_polya(config.Action_with_output_dir):
     abductee = None
     reference = None
+    min_tail = 4 #Ignored
 
     # No reads (don't participate in duplicate filename checking)
     reads = [ ]
@@ -812,7 +814,7 @@ class Analyse_polya_batch(config.Action_with_output_dir):
                 ("Exon", "otherwise in an exon"),
                 ("Downstrand", "otherwise downstrand of a non-coding RNA"),
                 ("Intron", "otherwise in an intron"),
-                ("Antisense", "otherwise antisense to a gene"),
+                # No longer reported ("Antisense", "otherwise antisense to a gene"),
                 ("None", "couldn't be related to annotated genes"),
                 ]:
             r.write("<br/>%d peaks and %.1f%% of reads %s\n" % (peak_counts[name], read_counts[name]*100.0/total_reads, desc))

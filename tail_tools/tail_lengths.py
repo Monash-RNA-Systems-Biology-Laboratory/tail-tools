@@ -36,9 +36,9 @@ class Tail_count(config.Action_with_prefix):
      
      ##Memory intensive, hack to run with reduced parallelism
      ## as nesoni doesn't have any memory usage management, only core usage
-     #def cores_required(self):
-     #    return min(4, legion.coordinator().get_cores())
-
+     def cores_required(self):
+         return min(2, legion.coordinator().get_cores())
+     
      def run(self):
          assert self.extension is not None, '--extension must be specified'
      
