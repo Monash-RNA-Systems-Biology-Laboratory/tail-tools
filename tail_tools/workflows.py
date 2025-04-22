@@ -141,8 +141,8 @@ class Analyse_polya(config.Action_with_output_dir):
                 prefix=clipped_prefix,
                 sample=working.name,
             ).make()        
-
-        cores = nesoni.coordinator().get_cores()
+        
+        cores = min(8, nesoni.coordinator().get_cores())
         
         if colorspace:
             nesoni.Execute(

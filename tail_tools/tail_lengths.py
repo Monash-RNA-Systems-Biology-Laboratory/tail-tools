@@ -176,9 +176,9 @@ class Aggregate_tail_counts(config.Action_with_output_dir):
     clip_tail = 0
     pickles = [ ]
      
-    #Memory intensive, don't run in parallel
+    #Memory intensive, avoid running in parallel
     def cores_required(self):
-        return legion.coordinator().get_cores()
+        return min(8, legion.coordinator().get_cores())
          
     def run(self):
         assert len(self.pickles) > 0, "No samples to count."

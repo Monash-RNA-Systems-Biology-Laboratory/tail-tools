@@ -185,9 +185,9 @@ class Aggregate_tail_counts_umi(config.Action_with_output_dir):
     umi_tail_max = False
     pickles = [ ]
      
-    #Memory intensive, don't run in parallel
+    #Memory intensive, avoid running in parallel
     def cores_required(self):
-        return legion.coordinator().get_cores()
+        return min(8, legion.coordinator().get_cores())
          
     def run(self):
         assert len(self.pickles) > 0, "No samples to count."
