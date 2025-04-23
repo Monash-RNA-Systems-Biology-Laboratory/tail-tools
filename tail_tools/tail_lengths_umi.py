@@ -108,6 +108,9 @@ class Tail_count_umi(config.Action_with_prefix):
          
          index = span_index.index_annotations(part_annotations)
          
+         # Deduplicate UMIs
+         umi_pool = { }
+         
          for alignment in sam.Bam_reader(workspace/'alignments_filtered_sorted.bam'):
              if alignment.is_unmapped or alignment.is_secondary or alignment.is_supplementary:
                  continue
@@ -115,6 +118,11 @@ class Tail_count_umi(config.Action_with_prefix):
              parts = alignment.qname.rsplit("_",1)
              assert len(parts) == 2, "Read name missing UMI: "+alignment.qname
              umi = parts[1]
+             
+             # Deduplicate UMI
+             if umi not in umi_pool:
+                umi_pool[umi] = umi
+             umi = umi_pool[umi]
              
              start = alignment.reference_start
              end = alignment.reference_end
