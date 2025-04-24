@@ -330,9 +330,10 @@ action = tail_tools.Analyse_polya_batch(
         extension = ... ,
         
         # To be recognized as a poly(A) read there must be this many non-templated "A"s.
-        # Default for PAT-Seq is 4.
-        # Some variant protocols may require longer, eg if 12 As are always present specify 13.
-        min_tail = 4,
+        # Default choice for older PAT-Seq is 4.
+        # For more recent variants of PAT-Seq 12 As are always present when there is any 
+        #   poly(A) tail, and you should specify 13.
+        min_tail = ... ,
         
         # Minimum average tail length required to call a peak.
         # Set higher then 0.0 if there is mispriming.
