@@ -55,7 +55,7 @@ class Make_tt_reference(config.Action_with_output_dir):
 
     index = True
     shrimp = False
-    bowtie = True
+    bowtie = False
     star = True
     filenames = [ ]
     
@@ -191,7 +191,7 @@ class Make_tt_reference(config.Action_with_output_dir):
                 '--genomeFastaFiles',work/'reference.fa',
                 '--sjdbGTFfile',work/'reference.gff',
                 '--sjdbGTFtagExonParentTranscript','Parent',
-                '--sjdbOverhang','100',
+                '--sjdbOverhang','199',
                 ])
             
         work.update_param(tail_tools_reference_version=work.VERSION)
