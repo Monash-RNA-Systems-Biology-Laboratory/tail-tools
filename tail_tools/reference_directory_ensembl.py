@@ -375,7 +375,7 @@ class Make_ensembl_reference(config.Action_with_output_dir):
     
     index = True
     shrimp = False
-    bowtie = True
+    bowtie = False
     star = True
     rename = ''    
     genes = '///'
