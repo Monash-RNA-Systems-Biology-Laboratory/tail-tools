@@ -1,20 +1,19 @@
 
-Tail Tools
-==========
+# Tail Tools
 
 This is a Python 2 based suite of tools for analysing Illumina or SOLiD sequencing reads with poly(A) tails, as produced using the PAT-Seq technique. The PAT-Seq technique was developed by Dr. Traude Beilharz, who heads the RNA Systems Biology Laboratory at Monash University.
 
-Tail Tools is developed by Dr. Paul Harrison (paul.harrison@monash.edu) at Monash University. Development was initially under the auspices of the Victorian Bioinformatics Consortium and now continues with the Monash Bioinformatics Platform. Michael See contributed R code to visualize output as an interactive heatmap.
+Tail Tools is developed by Dr. Paul Harrison (paul.harrison@monash.edu) at Monash University. Development was initially under the auspices of the Victorian Bioinformatics Consortium and now continues with the Monash Genomics and Bioinformatics Platform. Michael See contributed R code to visualize output as an interactive heatmap.
 
 Please feel free to email Paul any questions you have about getting Tail Tools up and running.
 
 Links
 
 * [RNA Systems Biology Laboratory](http://rnasystems.erc.monash.edu)
-* [Monash Bioinformatics Platform](http://monash.edu/bioinformatics)
+* [Monash Genomics and Bioinformatics Platform](https://www.monash.edu/researchinfrastructure/mgbp)
 
-License
--------
+
+## License
 
 This software is distributed under the terms of the GPL, version 2 or later,
 excepting that:
@@ -27,10 +26,39 @@ excepting that:
   public domain.
 
 
-Requirements
-------------
+## Installation
 
-Use of PyPy is recommened for speed.
+Conda is the easiest way to set up an environment to run Tail Tools. Otherwise install the requirements listed below, and then the Python and R parts of Tail Tools.
+
+### Conda
+
+This has been tested in May 2025.
+
+```
+conda create --name tail-tools
+conda activate tail-tools
+
+conda install -c bioconda -c conda-forge \
+    'pypy2.7>=5.10.0' 'star>=2.7.11b' 'r-base>=4.4.3' 'r-pak>=0.8.0.2' \
+    'samtools>=1.21' 'igvtools>=2.17.3' 'ucsc-wigtobigwig>=472' \
+    'imagemagick>=7.1.1' 'pigz>=2.8'
+
+pypy -m ensurepip --upgrade
+
+pypy -m pip install --upgrade \
+    'git+https://github.com/Victorian-Bioinformatics-Consortium/nesoni.git#egg=nesoni' \
+    'git+https://github.com/Monash-RNA-Systems-Biology-Laboratory/tail-tools.git#egg=tail-tools'
+
+Rscript -e 'pak::pkg_install(c(
+    "MonashBioinformaticsPlatform/varistran",
+    "Victorian-Bioinformatics-Consortium/nesoni/nesoni/nesoni-r",
+    "Monash-RNA-Systems-Biology-Laboratory/tail-tools/tail_tools"))'
+```
+
+
+### Requirements
+
+Tail Tools uses Python version 2. Use of PyPy is recommened for speed.
 
 - [nesoni](https://github.com/Victorian-Bioinformatics-Consortium/nesoni), most easy installed with pip in Python and BiocManager in R:
 
@@ -74,8 +102,7 @@ BiocManager::install("MonashBioinformaticsPlatform/varistran")
 BiocManager::install("pfh/topconfects", dependencies=TRUE)
 ```
 
-
-### Optional, to support deprecated features:
+### Optional requirement to support deprecated features:
 
 - Optionally can also use bowtie2 instead of STAR for Illumina reads, or SHRiMP for SOLiD reads.
 
@@ -95,11 +122,7 @@ BiocManager::install("pfh/topconfects@wald", dependencies=TRUE)
 BiocManager::install("pfh/topconfects@ql", dependencies=TRUE)
 ```
 
-
-Installation
-------------
-
-### Python part
+### Python part installation
 
 Easy way:
 
@@ -119,12 +142,11 @@ For PyPy, you can use pip by invoking the module:
 pypy -m pip install --user --upgrade 'git+https://github.com/Monash-RNA-Systems-Biology-Laboratory/tail-tools.git#egg=tail-tools'
 ```
 
-### R part
+### R part installation
 
 Easy way:
 
-```
-R
+```R
 BiocManager::install("Monash-RNA-Systems-Biology-Laboratory/tail-tools", subdir="tail_tools", dependencies=TRUE)
 ```
 
@@ -136,18 +158,19 @@ devtools::install("tail_tools")
 ```
 
 
-Usage
------
+## Usage
 
 This package contains a number of tools, which can be listed by typing:
 
-    tail-tools
-  
+```
+tail-tools
+```
 
 The package can be used directly from the source directory with:
 
-    python -m tail_tools
-
+```
+python -m tail_tools
+```
 
 These tools may also be used from a python script (using the same system as my older genomics python package "nesoni"). A typical example of invoking the pipeline from python can be found below.
 
@@ -156,7 +179,7 @@ These tools may also be used from a python script (using the same system as my o
 
 The tailtools R library can be loaded in R with:
 
-```
+```R
 library(tailtools)
 ```
 
@@ -167,8 +190,7 @@ The two main uses of this are two Shiny apps (interactive web-based applications
 * You can create a Shiny app for differential tests. A template is given below.
 
 
-Reference format
-----------------
+## Reference format
 
 Before processing any reads, you need to create a "tail-tools reference directory".
 
@@ -176,16 +198,12 @@ References are most easily downloaded from Ensembl. It is also possible to use r
 
 References can be downloaded from Ensembl by downloading the "primary_assembly" version of the genome and a gene annotationn gff3 file from ftp://ftp.ensembl.org/pub/ and running:
 
-    tail-tools make-ensembl-reference: \
-        <output_dir> \
-        <assembly_file.fa.gz> \
-        <gff3_file.gff3.gz>
-
-References can also be downloaded from the UCSC browser (not recommended) using:
-
-    tail-tools make-ucsc-reference: \
-        <output_dir> \
-        <ucsc_reference_name>
+```
+tail-tools make-ensembl-reference: \
+    <output_dir> \
+    <assembly_file.fa.gz> \
+    <gff3_file.gff3.gz>
+```
 
 If creating your own reference, it needs to consist of:
 
@@ -194,10 +212,12 @@ If creating your own reference, it needs to consist of:
 
 The reference directory is then created with the command:
 
-    tail-tools make-tt-reference: \
-        <output_dir> \
-        <sequence_file> \
-        <annotations_file>
+```
+tail-tools make-tt-reference: \
+    <output_dir> \
+    <sequence_file> \
+    <annotations_file>
+```
 
 Annotations shall include the following feature types and attributes:
 
@@ -222,8 +242,7 @@ The pipeline assumes that two different genes do not have overlapping exons on t
 
 
 
-Pipeline
---------
+## Pipeline
 
 Having created a reference directory, the next step is to run the pipeline,
 "analyse-polya-batch". This can be done from the command line, but is more
@@ -384,14 +403,13 @@ if __name__ == '__main__':
 
 ```
 
-Testing
--------
+## Differential testing
 
 Differential testing is most conveniently performed using a Shiny app in R.
 
 Create a directory for a Shiny app containing an `app.R` file with something like:
 
-```
+```R
 library(tailtools)
 library(tidyverse)
 
@@ -477,20 +495,17 @@ app
 The app can be run from within R with `shiny::runApp("app-dir")` or using Shiny Server.
 
 
-BAM-file alignment attributes
----
+## BAM-file alignment attributes
 
 * [BAM-file alignment attributes](doc/bam-files.md)
 
 
-Pipeline output
----
+## Pipeline output
 
 * [Directories and files produced by the pipeline](doc/output.md)
 
 
-Statistics
----
+## Statistics
 
 * [Statistics produced by `tail-tools analyse-tail-counts:`.](doc/statistics.md)
 * [Differential expression and tail length, old method.](doc/differential.md)
