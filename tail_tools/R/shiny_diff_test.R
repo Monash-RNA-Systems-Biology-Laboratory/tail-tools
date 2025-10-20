@@ -354,12 +354,12 @@ shiny_test <- function(confects=NULL, prefix="") {
 #' @export
 shiny_tests <- function(tests, cache_prefix="cache_", title="Differential tests", prefix="") {
     ns <- shiny::NS(prefix)
-
+    
     titles <- names(tests)
     for(i in seq_along(tests))
         if (!is.null(tests[[i]]$title))
             titles[i] <- tests[[i]]$title
-
+    
     version <- 9
     get <- function(name, func, fdr) {
         filename <- paste0(cache_prefix,name,"_",func,"_fdr",fdr,".rds")

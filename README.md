@@ -367,7 +367,7 @@ action = tail_tools.Analyse_polya_batch(
         # Should UMI rather than read counting be used?
         # UMI should be part of the read name.
         # Ensure reads are named like: READNAME_BARCODE_UMI or READNAME_UMI
-        umis = False,
+        umis = ...True or False...,
         
         # Optional: Species to use in GO term analysis, choices are: Sc Ce Mm Hs
         #species="Sc",
@@ -493,6 +493,7 @@ app
 ```
 
 The app can be run from within R with `shiny::runApp("app-dir")` or using Shiny Server.
+
 
 
 ## BAM-file alignment attributes
