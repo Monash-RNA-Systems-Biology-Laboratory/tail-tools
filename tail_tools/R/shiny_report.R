@@ -157,8 +157,10 @@ shiny_counts_report <- function(tc, pipeline_dir=NULL, species=NULL, title="Tail
             if (!is.null(e("feature-feature"))) return()
             
             hits <- tolower(tc$features$feature) == tolower(i("feature_name"))
-            if (!is_peaks && sum(hits) == 0)
+            if (!is_peaks && sum(hits) == 0) {
                 hits <- tolower(tc$features$gene) == tolower(i("feature_name"))
+                hits[is.na(hits)] <- FALSE
+            }
             
             if (sum(hits) == 1) 
                 updateTextInput(env$session, ns("feature_name"), value=tc$features$feature[hits])
