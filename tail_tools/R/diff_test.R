@@ -89,7 +89,7 @@ test_diff_tail <- function(pipeline_dir, design, contrast=NULL, coef1=NULL, coef
     tail_mat <- tail_counts_get_matrix(tc, "tail")
     tail_count_mat <- tail_counts_get_matrix(tc, "tail_count")
 
-    elist <- weighted_log2_tails(tail_mat, tail_count_mat, design, gene=select_(tc$features,~-feature), min_reads=min_reads)
+    elist <- weighted_log2_tails(tail_mat, tail_count_mat, design, gene=select(tc$features,-feature), min_reads=min_reads)
     fit <- limma::lmFit(elist, design)
     cfit <- limma::contrasts.fit(fit, contrast)
     result <- topconfectswald::limma_confects(cfit, 1, trend=FALSE, step=step, fdr=fdr, full=TRUE)
@@ -257,21 +257,21 @@ test_end_shift_ql <- function(
         
         # Incorporate antisense peaks
         anti_info <- anti_info %>% 
-            dplyr::transmute_(
-                id =~ paste0(id,"-collider"),
-                start =~ start,
-                end =~ end,
-                strand =~ strand,
-                relation =~ "Antisense",
-                gene =~ antisense_gene,
-                product =~ antisense_product,
-                biotype =~ antisense_biotype,
-                parent =~ antisense_parent
+            dplyr::transmute(
+                id = paste0(id,"-collider"),
+                start = start,
+                end = end,
+                strand = strand,
+                relation = "Antisense",
+                gene = antisense_gene,
+                product = antisense_product,
+                biotype = antisense_biotype,
+                parent = antisense_parent
             )
         rownames(anti_counts) <- anti_info$id
         
         peak_info <- peak_info %>% 
-            dplyr::select_(~id,~start,~end,~strand,~relation,~gene,~product,~biotype,~parent)
+            dplyr::select(id,start,end,strand,relation,gene,product,biotype,parent)
                 
         counts <- rbind(counts, anti_counts)
         peak_info <- dplyr::bind_rows(peak_info, anti_info)

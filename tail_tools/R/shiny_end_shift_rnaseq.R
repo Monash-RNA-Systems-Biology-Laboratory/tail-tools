@@ -13,12 +13,12 @@ get_rnaseq_depth <- function(samples) {
 
     samples %>%
     rowwise() %>%
-    mutate_(
-        mean_cover =~ 0.5*(mean_depth(cover_fwd)+mean_depth(cover_rev))
+    mutate(
+        mean_cover = 0.5*(mean_depth(cover_fwd)+mean_depth(cover_rev))
     ) %>%
     ungroup() %>%
-    mutate_(
-        depth_normalizer =~ mean_cover / mean(mean_cover)
+    mutate(
+        depth_normalizer = mean_cover / mean(mean_cover)
     )
 }
 
@@ -85,10 +85,10 @@ shiny_end_shift_rnaseq_server <- function(input, output, session, result, sample
     })
     
     callModule(shiny_plot_server, "mr_plot", session=session, callback=function() {
-        ggplot(df(),aes_(x=~min_reads, y=~r)) +
+        ggplot(df(),aes(x=min_reads, y=r)) +
             scale_x_log10() +
             coord_cartesian(ylim=c(-1,1)) +
-            ggplot2::geom_segment(aes_(xend=~min_reads, y=~r_low, yend=~r_high), color="#bbbbbb") +
+            ggplot2::geom_segment(aes(xend=min_reads, y=r_low, yend=r_high), color="#bbbbbb") +
             geom_point() +
             theme_bw() +
             labs(x = "Min reads per sample (log scale)",
@@ -105,7 +105,7 @@ shiny_end_shift_rnaseq_server <- function(input, output, session, result, sample
         result <- df()
         if (!is.null(input$mr_plot_brush)) {
             result <- result %>%
-                filter_(~!is.na(r)) %>%
+                filter(!is.na(r)) %>%
                 brushedPoints(input$mr_plot_brush, "min_reads", "r")
         }
         
@@ -251,7 +251,7 @@ shiny_end_shift_rnaseq_multiple_server <- function(
         this_samples <- samples
         this_samples$condition <- tests[[test]]$condition
         this_samples$group <- tests[[test]]$group
-        this_samples <- dplyr::filter_(this_samples, ~!is.na(condition))
+        this_samples <- dplyr::filter(this_samples, !is.na(condition))
     
         reference_dir <- references[reference]
         utrs <- rtracklayer::import(file.path(reference_dir,"utr.gff"))

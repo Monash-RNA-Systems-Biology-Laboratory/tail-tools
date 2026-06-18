@@ -2,7 +2,7 @@
             
 default_plot_count <- function(df, is_grouped, norm_count_name, ...) { 
     print(
-        ggplot(df, aes_(x=~sample, y=~norm_count)) +
+        ggplot(df, aes(x=sample, y=norm_count)) +
         geom_bar(stat="identity", color="#000000", fill="#cccccc") +
         ylab(norm_count_name) +
         xlab("") +
@@ -13,10 +13,10 @@ default_plot_count <- function(df, is_grouped, norm_count_name, ...) {
 
 
 default_plot_tail <- function(df, is_grouped, ...) {
-    df_bad <- filter_(df, ~is_low_tail_count)
+    df_bad <- filter(df, is_low_tail_count)
     
     print(
-        ggplot(df, aes_(x=~sample, y=~tail)) +
+        ggplot(df, aes(x=sample, y=tail)) +
         geom_bar(stat="identity", color="#000000", fill="#ccffcc") +
         geom_bar(data=df_bad, 
                  stat="identity", color="#000000", fill="#ff0000") +
@@ -103,11 +103,11 @@ shiny_mpat <- function(
         bounds <- ranges %>% as.data.frame
         bounds$name <- names(ranges)
         bounds <- bounds %>% 
-            arrange_(~seqnames,~strand,~three_prime) %>% 
-            group_by_(~seqnames,~strand) %>%
-            mutate_(
-                three_prime_min =~ pmax(-Inf, (three_prime + dplyr::lag(three_prime))*0.5, na.rm=T),
-                three_prime_max =~ pmin(Inf, (three_prime + dplyr::lead(three_prime))*0.5, na.rm=T)
+            arrange(seqnames,strand,three_prime) %>% 
+            group_by(seqnames,strand) %>%
+            mutate(
+                three_prime_min = pmax(-Inf, (three_prime + dplyr::lag(three_prime))*0.5, na.rm=T),
+                three_prime_max = pmin(Inf, (three_prime + dplyr::lead(three_prime))*0.5, na.rm=T)
             ) %>%
             ungroup()
         matching <- match(names(ranges), bounds$name)
@@ -121,7 +121,7 @@ shiny_mpat <- function(
         normed <- env$normed()
         
         print( 
-            ggplot(normed$norm_data,aes_(x=~sample,y=~log2_fold_norm_count)) + 
+            ggplot(normed$norm_data,aes(x=sample,y=log2_fold_norm_count)) + 
             geom_point() + 
             facet_wrap(~ gene, drop=F) + 
             ylab(ifelse(normed$is_differential,"log2 fold change",paste0("log2 ",normed$norm_count_name))) +
@@ -133,10 +133,10 @@ shiny_mpat <- function(
     
     overview_tail <- shiny_plot(prefix="overview_tail", dlname="overview_tail", width=800,height=800, function(env) withProgress(message="Plotting overview", {
         normed <- env$normed()
-        df <- filter_(normed$norm_data, ~tail_count > 0)
-        df_bad <- filter_(df, ~is_low_tail_count)
+        df <- filter(normed$norm_data, tail_count > 0)
+        df_bad <- filter(df, is_low_tail_count)
         print(
-            ggplot(df,aes_(x=~sample,y=~relative_tail)) + 
+            ggplot(df,aes(x=sample,y=relative_tail)) + 
             geom_point() + 
             geom_point(data=df_bad,color="red") +
             facet_wrap(~ gene, drop=F) +
@@ -150,7 +150,7 @@ shiny_mpat <- function(
     individual_count <- shiny_plot(prefix="individual_count", dlname="individual-count", width=400,height=400, function(env) {
         normed <- env$normed()
         individual_gene <- env$input$individual_gene
-        df <- filter_(normed$norm_data, ~gene == individual_gene)
+        df <- filter(normed$norm_data, gene == individual_gene)
         
         if (have_plotters && env$input$plotter_custom)
            plotter <- plot_count
@@ -163,7 +163,7 @@ shiny_mpat <- function(
     individual_tail <- shiny_plot(prefix="individual_tail", dlname="individual-tail", width=400,height=400, function(env) {
         normed <- env$normed()
         individual_gene <- env$input$individual_gene
-        df <- filter_(normed$norm_data, ~gene == individual_gene)
+        df <- filter(normed$norm_data, gene == individual_gene)
         
         if (have_plotters && env$input$plotter_custom)
            plotter <- plot_tail
@@ -188,27 +188,27 @@ shiny_mpat <- function(
                 labeller <- env$read_info()$labeller
                 transformer <- env$read_info()$transformer
                 tail_lengths <- env$read_info()$read_info %>% 
-                    group_by_(~sample, ~length) %>% summarize_(n=~sum(n)) %>% ungroup()
+                    group_by(sample, length) %>% summarize(n=sum(n)) %>% ungroup()
                 
                 tail_lengths <- tail_lengths %>%
                     left_join(normalizer, "sample") %>% 
-                    mutate_(n =~ n / normalizer)
+                    mutate(n = n / normalizer)
                 
                 if (env$input$tail_style == "Cumulative") {
                     print(
                         tail_lengths %>% 
-                        arrange_(~sample, ~desc(length)) %>% 
-                        group_by_(~sample) %>%
-                        mutate_(
-                            cumn =~ cumsum(n),
-                            cumn_lag =~ dplyr::lag(cumn,1,0),
-                            length_lead =~ dplyr::lead(length,1,0)
+                        arrange(sample, desc(length)) %>% 
+                        group_by(sample) %>%
+                        mutate(
+                            cumn = cumsum(n),
+                            cumn_lag = dplyr::lag(cumn,1,0),
+                            length_lead = dplyr::lead(length,1,0)
                         ) %>%
                         ungroup() %>%
-                        ggplot(aes_(color=~sample)) +
+                        ggplot(aes(color=sample)) +
                         #geom_point(aes(x=length,y=cumn_lag)) +
-                        ggplot2::geom_segment(aes_(x=~length,xend=~length,y=~transformer(cumn),yend=~transformer(cumn_lag))) +
-                        ggplot2::geom_segment(aes_(x=~length_lead,xend=~length,y=~transformer(cumn),yend=~transformer(cumn))) +
+                        ggplot2::geom_segment(aes(x=length,xend=length,y=transformer(cumn),yend=transformer(cumn_lag))) +
+                        ggplot2::geom_segment(aes(x=length_lead,xend=length,y=transformer(cumn),yend=transformer(cumn))) +
                         scale_x_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                         scale_y_continuous(labels = labeller) +
                         env$color_scale() +
@@ -219,8 +219,8 @@ shiny_mpat <- function(
                     print(
                         tail_lengths %>%
                         tidyr::complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
-                        group_by_(~sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
-                        ggplot(aes_(color=~sample,group=~sample,x=~length_mid,y=~transformer(n))) + 
+                        group_by(sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
+                        ggplot(aes(color=sample,group=sample,x=length_mid,y=transformer(n))) + 
                         geom_line() +
                         scale_x_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                         scale_y_continuous(labels = labeller) +
@@ -235,8 +235,8 @@ shiny_mpat <- function(
                         #mutate(n = n/max(n)) %>%
                         #ungroup() %>%
                         tidyr::complete(sample=factor(this_samples,this_samples), length=seq(0,tail_max), fill=list(n=0)) %>%
-                        group_by_(~sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
-                        ggplot(aes_(x=~sample,y=~length_mid,fill=~transformer(n))) + 
+                        group_by(sample) %>% bin_lengths(tail_bin) %>% ungroup() %>%
+                        ggplot(aes(x=sample,y=length_mid,fill=transformer(n))) + 
                         geom_tile(height=tail_bin) +
                         scale_y_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                         viridis::scale_fill_viridis(guide=FALSE) +
@@ -260,26 +260,26 @@ shiny_mpat <- function(
                 labeller <- env$read_info()$labeller
                 transformer <- env$read_info()$transformer
                 widths <- env$read_info()$read_info %>% 
-                    group_by_(~sample, ~width) %>% summarize_(n=~sum(n)) %>% ungroup()
+                    group_by(sample, width) %>% summarize(n=sum(n)) %>% ungroup()
                 
                 widths <- widths %>%
                     left_join(normalizer, "sample") %>%
-                    mutate_(n =~ n / normalizer)
+                    mutate(n = n / normalizer)
                 
                 print(
                         widths %>%
-                        arrange_(~sample, ~desc(width)) %>% 
-                        group_by_(~sample) %>%
-                        mutate_(
-                            cumn =~ cumsum(n),
-                            cumn_lag =~ dplyr::lag(cumn,1,0),
-                            width_lead =~ dplyr::lead(width,1,0)
+                        arrange(sample, desc(width)) %>% 
+                        group_by(sample) %>%
+                        mutate(
+                            cumn = cumsum(n),
+                            cumn_lag = dplyr::lag(cumn,1,0),
+                            width_lead = dplyr::lead(width,1,0)
                         ) %>%
                         ungroup() %>%
-                        ggplot(aes_(color=~sample)) +
+                        ggplot(aes(color=sample)) +
                         #geom_point(aes(x=length,y=cumn_lag)) +
-                        ggplot2::geom_segment(aes_(x=~width,xend=~width,y=~transformer(cumn),yend=~transformer(cumn_lag))) +
-                        ggplot2::geom_segment(aes_(x=~width_lead,xend=~width,y=~transformer(cumn),yend=~transformer(cumn))) +
+                        ggplot2::geom_segment(aes(x=width,xend=width,y=transformer(cumn),yend=transformer(cumn_lag))) +
+                        ggplot2::geom_segment(aes(x=width_lead,xend=width,y=transformer(cumn),yend=transformer(cumn))) +
                         #scale_x_continuous(limits=c(0,tail_max), oob=function(a,b)a) +
                         scale_y_continuous(labels = labeller) +
                         env$color_scale() +
@@ -412,8 +412,8 @@ shiny_mpat <- function(
              } else if (identical(normalizing_gene, "Reads Per Million")) {
                  norm_count_name = "RPM"
                  normalizer <- raw_data %>%
-                     group_by_(~sample) %>%
-                     summarize_(normalizer =~ sum(count)/1000000)
+                     group_by(sample) %>%
+                     summarize(normalizer = sum(count)/1000000)
                      
              } else {
                  if ("Reads Per Million" %in% normalizing_gene)
@@ -421,76 +421,76 @@ shiny_mpat <- function(
              
                  norm_count_name = "Normalized count"
                  normalizer <- raw_data %>%
-                     filter_(~ gene %in% normalizing_gene) %>%
-                     group_by_(~ sample) %>%
-                     summarize_(count =~ exp(mean(log(count)))) %>%
-                     mutate_(normalizer =~ count / mean(count)) %>%
-                     select_(~sample, ~normalizer)
+                     filter(gene %in% normalizing_gene) %>%
+                     group_by(sample) %>%
+                     summarize(count = exp(mean(log(count)))) %>%
+                     mutate(normalizer = count / mean(count)) %>%
+                     select(sample, normalizer)
              }
              
              norm_data <- raw_data %>%
                  left_join(normalizer, "sample") %>%
-                 mutate_(
-                     norm_count =~ count / normalizer,
-                     log2_norm_count =~ log2(norm_count + 0.5),
-                     log2_fold_norm_count =~ log2_norm_count,
-                     relative_tail =~ tail,
-                     is_low_tail_count =~ tail_count < highlight_low
+                 mutate(
+                     norm_count = count / normalizer,
+                     log2_norm_count = log2(norm_count + 0.5),
+                     log2_fold_norm_count = log2_norm_count,
+                     relative_tail = tail,
+                     is_low_tail_count = tail_count < highlight_low
                  )
              
              is_differential <- length(env$input$normalizing_samples) > 0
              
              if (is_differential) {
                  baseline <- norm_data %>%
-                     filter_(~sample %in% env$input$normalizing_samples) %>%
-                     group_by_(~gene) %>%
-                     summarize_(
-                         baseline =~ mean(log2_fold_norm_count),
-                         baseline_tail =~ mean(tail, na.rm=TRUE)
+                     filter(sample %in% env$input$normalizing_samples) %>%
+                     group_by(gene) %>%
+                     summarize(
+                         baseline = mean(log2_fold_norm_count),
+                         baseline_tail = mean(tail, na.rm=TRUE)
                      ) %>%
-                     select_(~gene, ~baseline, ~baseline_tail)
+                     select(gene, baseline, baseline_tail)
              
                  norm_data <- norm_data %>%
                      left_join(baseline, "gene") %>%
-                     mutate_(
-                         log2_fold_norm_count =~ log2_fold_norm_count - baseline,
-                         relative_tail =~ tail - baseline_tail
+                     mutate(
+                         log2_fold_norm_count = log2_fold_norm_count - baseline,
+                         relative_tail = tail - baseline_tail
                      )
              }     
              
              norm_data <- norm_data %>%
-                 filter_(
-                     ~sample %in% selected_samples,
-                     ~gene %in% selected_genes
+                 filter(
+                     sample %in% selected_samples,
+                     gene %in% selected_genes
                  ) %>%
-                 mutate_(
-                     sample =~ factor(sample, selected_samples),
-                     gene =~ factor(gene, selected_genes)
+                 mutate(
+                     sample = factor(sample, selected_samples),
+                     gene = factor(gene, selected_genes)
                  )
              
              is_grouped <- have_grouping && env$input$group_samples
              respectful_grouping <- NULL
              if (is_grouped) {
                  respectful_grouping <- grouping %>% 
-                      filter_(~sample %in% selected_samples) %>%
-                      mutate_(sample =~ factor(sample, selected_samples)) %>%
-                      arrange_(~sample) %>%
-                      mutate_(group =~ factor(group, unique(group)))
+                      filter(sample %in% selected_samples) %>%
+                      mutate(sample = factor(sample, selected_samples)) %>%
+                      arrange(sample) %>%
+                      mutate(group = factor(group, unique(group)))
                  
                  norm_data <- norm_data %>%
                       left_join(respectful_grouping, "sample") %>%
-                      group_by_(~group, ~gene) %>%
-                      summarize_(
-                          norm_count =~ mean(norm_count),
-                          log2_norm_count =~ mean(log2_norm_count), #Hmm
-                          log2_fold_norm_count =~ mean(log2_fold_norm_count),
-                          tail =~ mean(tail, na.rm=TRUE),
-                          tail_count =~ mean(tail_count),
-                          relative_tail =~ mean(relative_tail, na.rm=TRUE),
-                          is_low_tail_count =~ any(is_low_tail_count)
+                      group_by(group, gene) %>%
+                      summarize(
+                          norm_count = mean(norm_count),
+                          log2_norm_count = mean(log2_norm_count), #Hmm
+                          log2_fold_norm_count = mean(log2_fold_norm_count),
+                          tail = mean(tail, na.rm=TRUE),
+                          tail_count = mean(tail_count),
+                          relative_tail = mean(relative_tail, na.rm=TRUE),
+                          is_low_tail_count = any(is_low_tail_count)
                       ) %>%
                       ungroup() %>%
-                      select_(sample=~group, ~gene, ~norm_count, ~log2_norm_count, ~log2_fold_norm_count, ~tail, ~tail_count, ~relative_tail, ~is_low_tail_count) 
+                      select(sample=group, gene, norm_count, log2_norm_count, log2_fold_norm_count, tail, tail_count, relative_tail, is_low_tail_count) 
              }
              
              list(
@@ -534,10 +534,10 @@ shiny_mpat <- function(
                 
                 if (env$input$tail_tail)
                     read_info <- read_info %>%
-                        filter_(~length >= env$input$tail_min)
+                        filter(length >= env$input$tail_min)
                 
                 if (env$input$tail_percent) {
-                    normalizer <- read_info %>% group_by_(~sample) %>% summarize_(normalizer=~sum(n))
+                    normalizer <- read_info %>% group_by(sample) %>% summarize(normalizer=sum(n))
                     describer <- "Percent reads"
                     labeller <- function(x) paste0(sapply(x*100,scales::comma),"%")
                 } else {
@@ -553,18 +553,18 @@ shiny_mpat <- function(
                     this_samples <- levels(respectful_grouping$group)                    
                     read_info <- read_info %>%
                         left_join(respectful_grouping, "sample") %>%
-                        group_by_(~group, ~length, ~width) %>%
-                        summarize_(n=~sum(n)) %>%
+                        group_by(group, length, width) %>%
+                        summarize(n=sum(n)) %>%
                         ungroup() %>%
-                        select_(sample=~group, ~length, ~width, ~n)
+                        select(sample=group, length, width, n)
                 }
 
                 if (have_grouping && env$input$group_samples) {
                     normalizer <- normalizer %>%
                         left_join(respectful_grouping, "sample") %>%
-                        group_by_(~group) %>%
-                        summarize_(normalizer =~ sum(normalizer)) %>%
-                        select_(sample=~group, ~normalizer)
+                        group_by(group) %>%
+                        summarize(normalizer = sum(normalizer)) %>%
+                        select(sample=group, normalizer)
                 }
                 
                 transformer <- identity

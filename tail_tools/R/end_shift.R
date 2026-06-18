@@ -227,8 +227,8 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
     assert_that(ncol(counts) == length(group))
     
     peak_info <- dplyr::as_data_frame(peak_info) %>%
-        dplyr::mutate_(parent =~ as.character(parent)) %>%
-        dplyr::mutate_(parent =~ ifelse(parent == "", NA, parent))
+        dplyr::mutate(parent = as.character(parent)) %>%
+        dplyr::mutate(parent = ifelse(parent == "", NA, parent))
     assert_that(nrow(peak_info) == nrow(counts))
     
     ci_sds <- qnorm((1+ci)/2)    
@@ -309,28 +309,28 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
         
     cat("Annotate\n")
     gene_info <- peak_info[,c("parent",gene_info_columns),drop=FALSE] %>%
-        dplyr::group_by_(~parent) %>%
+        dplyr::group_by(parent) %>%
         dplyr::summarize_all(function(item) paste(unique(as.character(item)),collapse="/"))
 
     result <- 
         dplyr::data_frame(parent=names(scores), score=scores) %>% 
         dplyr::rowwise() %>%
-        dplyr::mutate_(
-            r =~ score$"r",
-            var =~ score$"var",
-            score =~ NULL,
-            mean_reads =~ sum(counts[splitter[[parent]],,drop=F]) / ncol(counts)
+        dplyr::mutate(
+            r = score$"r",
+            var = score$"var",
+            score = NULL,
+            mean_reads = sum(counts[splitter[[parent]],,drop=F]) / ncol(counts)
         ) %>%
         dplyr::ungroup() %>%
-        dplyr::mutate_(
-            sd =~ sqrt(var),
-            r_low =~ r - sd*ci_sds,
-            r_high =~ r + sd*ci_sds,
-            interest =~ ( abs(r) - sd*ci_sds ) %>% na_replace(-Inf)
+        dplyr::mutate(
+            sd = sqrt(var),
+            r_low = r - sd*ci_sds,
+            r_high = r + sd*ci_sds,
+            interest = ( abs(r) - sd*ci_sds ) %>% na_replace(-Inf)
         ) %>%
-        dplyr::arrange_(~desc(interest)) %>%
-        dplyr::mutate_( rank=~seq_len(n()) ) %>%
-        dplyr::select_(~rank, ~parent, ~r, ~r_low, ~r_high, ~interest, ~mean_reads)
+        dplyr::arrange(desc(interest)) %>%
+        dplyr::mutate( rank=seq_len(n()) ) %>%
+        dplyr::select(rank, parent, r, r_low, r_high, interest, mean_reads)
         
     if (fdr) {
         cat("FDR\n")
@@ -350,10 +350,10 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
     if (edger) {
         result <- left_join(
             result,
-            edger_result$top %>% transmute_(
-                parent=~parent, 
-                edger_rank=~seq_len(n()), 
-                edger_fdr=~FDR
+            edger_result$top %>% transmute(
+                parent=parent, 
+                edger_rank=seq_len(n()), 
+                edger_fdr=FDR
             ),
             "parent")
     }
@@ -361,10 +361,10 @@ end_shift <- function(counts, peak_info, condition, group=NULL,
     if (limma) {
         result <- left_join(
             result,
-            limma_result$top %>% transmute_(
-                parent=~parent, 
-                limma_rank=~seq_len(n()), 
-                limma_fdr=~FDR
+            limma_result$top %>% transmute(
+                parent=parent, 
+                limma_rank=seq_len(n()), 
+                limma_fdr=FDR
             ),
             "parent")
     }
@@ -423,21 +423,21 @@ end_shift_pipeline <- function(path, condition, group=NULL, select=NULL, ci=0.95
         
         # Incorporate antisense peaks
         anti_info <- anti_info %>% 
-            dplyr::transmute_(
-                id =~ paste0(id,"-collider"),
-                start =~ start,
-                end =~ end,
-                strand =~ strand,
-                relation =~ "Antisense",
-                gene =~ antisense_gene,
-                product =~ antisense_product,
-                biotype =~ antisense_biotype,
-                parent =~ antisense_parent
+            dplyr::transmute(
+                id = paste0(id,"-collider"),
+                start = start,
+                end = end,
+                strand = strand,
+                relation = "Antisense",
+                gene = antisense_gene,
+                product = antisense_product,
+                biotype = antisense_biotype,
+                parent = antisense_parent
             )
         rownames(anti_counts) <- anti_info$id
         
         peak_info <- peak_info %>% 
-            dplyr::select_(~id,~start,~end,~strand,~relation,~gene,~product,~biotype,~parent)
+            dplyr::select(id,start,end,strand,relation,gene,product,biotype,parent)
                 
         counts <- rbind(counts, anti_counts)
         peak_info <- dplyr::bind_rows(peak_info, anti_info)

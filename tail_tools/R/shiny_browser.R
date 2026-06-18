@@ -68,13 +68,13 @@ plot_genome <- function(features, samples, pos, marks=c()) {
     }
     
     if (pos_forward) {
-        this_samples <- samples %>% mutate_(
-            cover_same =~ cover_fwd, cover_opp =~ cover_rev,
-            span_same =~ span_fwd, span_opp =~ span_rev)
+        this_samples <- samples %>% mutate(
+            cover_same = cover_fwd, cover_opp = cover_rev,
+            span_same = span_fwd, span_opp = span_rev)
     } else {
-        this_samples <- samples %>% mutate_(
-            cover_same =~ cover_rev, cover_opp =~ cover_fwd,
-            span_same =~ span_rev, span_opp =~ span_fwd)
+        this_samples <- samples %>% mutate(
+            cover_same = cover_rev, cover_opp = cover_fwd,
+            span_same = span_rev, span_opp = span_fwd)
     }
 
     n <- min(1000, BiocGenerics::width(pos))
@@ -98,16 +98,16 @@ plot_genome <- function(features, samples, pos, marks=c()) {
                 x = (BiocGenerics::start(cs)+BiocGenerics::end(co))*0.5
             )
         }) %>% 
-        mutate_(name =~ factor(name, levels=this_samples$name))
+        mutate(name = factor(name, levels=this_samples$name))
         
     alpha <- 0.333
-    line_plot <- ggtemplate(lines,aes_(x=~x,group=~name,color=~label)) + 
-        geom_density(aes_(y=~span_same), stat="identity", color=NA, fill="#dddddd", alpha=alpha) + 
-        geom_density(aes_(y=~-span_opp), stat="identity", color=NA, fill="#dddddd", alpha=alpha) +
-        geom_line(aes_(y=~cover_same), lwd=0.5) + 
-        geom_line(aes_(y=~-cover_opp), lwd=0.5) +
-        #geom_line(aes_(y=~cover_same), lwd=0.25) + 
-        #geom_line(aes_(y=~-cover_opp), lwd=0.25) +
+    line_plot <- ggtemplate(lines,aes(x=x,group=name,color=label)) + 
+        geom_density(aes(y=span_same), stat="identity", color=NA, fill="#dddddd", alpha=alpha) + 
+        geom_density(aes(y=-span_opp), stat="identity", color=NA, fill="#dddddd", alpha=alpha) +
+        geom_line(aes(y=cover_same), lwd=0.5) + 
+        geom_line(aes(y=-cover_opp), lwd=0.5) +
+        #geom_line(aes(y=cover_same), lwd=0.25) + 
+        #geom_line(aes(y=-cover_opp), lwd=0.25) +
         geom_hline(yintercept=0) +
         #scale_color_hue(h=c(0,270), l=c(40,65,90,65)) +
         labs(y="", color="") +
@@ -125,7 +125,7 @@ plot_genome <- function(features, samples, pos, marks=c()) {
     feature_plot <- function(forward, items) {
         p <- ggtemplate() + 
             ylab("") +
-            geom_point(data=tibble(x=c(BiocGenerics::start(pos),BiocGenerics::end(pos)),y=c(0,1)),aes_(x=~x,y=~y),color=NA,fill=NA) +
+            geom_point(data=tibble(x=c(BiocGenerics::start(pos),BiocGenerics::end(pos)),y=c(0,1)),aes(x=x,y=y),color=NA,fill=NA) +
             theme_minimal() +
             scale_y_continuous(limits=c(0,1),breaks=c())
         
@@ -133,13 +133,13 @@ plot_genome <- function(features, samples, pos, marks=c()) {
             df_items <- GenomicRanges::as.data.frame(items)
             p <- p + 
                 ggplot2::geom_segment(data=df_items, 
-                    aes_(x=~start,xend=~end,y=~y,yend=~y), 
+                    aes(x=start,xend=end,y=y,yend=y), 
                     lwd=df_items$thickness,lineend="butt")
                     
             df_items2 <- df_items[df_items$type == "transcript",,drop=FALSE]
             df_items2$x <- if (forward == pos_forward) df_items2$end else df_items2$start
             p <- p + geom_text(data=df_items2, 
-                aes_(x=~x, y=~y, label=~paste0(" ",Name, " ")), 
+                aes(x=x, y=y, label=paste0(" ",Name, " ")), 
                 hjust=if (forward) 0 else 1,
                 vjust=0.5)
         }

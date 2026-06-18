@@ -1,4 +1,8 @@
 
+# Not sure if there is a better way to do this.
+filter <- dplyr::filter
+
+
 #' @export
 is_reverse <- function(granges) as.logical(BiocGenerics::strand(granges) == "-")
 

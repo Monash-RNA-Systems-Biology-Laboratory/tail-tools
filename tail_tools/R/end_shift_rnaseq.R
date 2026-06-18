@@ -217,23 +217,23 @@ end_shift_rnaseq <- function(samples, utrs, extended_utrs=NULL, exons=NULL, ci=0
     ci_sds <- qnorm((1+ci)/2)    
     
     result <- result %>% 
-        dplyr::filter_(~min_reads >= min_min_reads) %>%
-        dplyr::mutate_(
-            sd =~ sqrt(var),
-            r_low =~ r - sd*ci_sds,
-            r_high =~ r + sd*ci_sds,
-            interest =~ ( abs(r) - sd*ci_sds ) %>% na_replace(-Inf)
+        dplyr::filter(min_reads >= min_min_reads) %>%
+        dplyr::mutate(
+            sd = sqrt(var),
+            r_low = r - sd*ci_sds,
+            r_high = r + sd*ci_sds,
+            interest = ( abs(r) - sd*ci_sds ) %>% na_replace(-Inf)
         ) %>%
-        dplyr::arrange_(~desc(interest)) %>%
-        dplyr::mutate_( rank=~seq_len(n()) )
+        dplyr::arrange(desc(interest)) %>%
+        dplyr::mutate( rank=seq_len(n()) )
     
     #arrange(-abs(r))
     
     gene_result <- result %>% 
-        group_by_(~gene_id) %>%
-        filter_(~seq_len(n()) == which.min(rank)) %>%
+        group_by(gene_id) %>%
+        filter(seq_len(n()) == which.min(rank)) %>%
         ungroup() %>%
-        mutate_( rank=~seq_len(n()) )
+        mutate( rank=seq_len(n()) )
 
     list(
         samples = samples,
